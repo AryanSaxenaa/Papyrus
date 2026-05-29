@@ -1,5 +1,6 @@
 # Papyrus
-## Citation Integrity Audit System — Build Specification v2
+
+## Citation Integrity Audit System — Build Specification
 
 ---
 
@@ -39,6 +40,7 @@ finding with a defined detection method and a documented evidence source. Users 
 independently verify every verdict with a browser.
 
 ### Type 1 — DOI 404
+
 The digital object identifier does not resolve to any document. CrossRef returns no record.
 Semantic Scholar finds nothing by title or author match. OpenAlex returns nothing. Exa finds
 nothing semantically similar on the open web.
@@ -48,6 +50,7 @@ Confidence: High.
 This is the cleanest signal in the taxonomy. It is a binary fact.
 
 ### Type 2 — DOI Redirect
+
 The DOI resolves, but the metadata returned describes a completely different paper. The title,
 authors, or journal in the bibliography entry do not match what the identifier actually points
 to.
@@ -59,6 +62,7 @@ Classic LLM confabulation — the model generates a real-looking DOI that belong
 different real paper.
 
 ### Type 5 — Date Impossible
+
 The paper is cited as published in year X, but the journal volume for that year did not exist.
 The journal may have launched in 2021 and the citation claims 2018. Or the volume number does
 not correspond to the year cited.
@@ -69,6 +73,7 @@ for journals with incomplete API metadata.
 Confidence: High.
 
 ### Type 6 — Title Drift
+
 The paper exists and resolves correctly, but the title in the bibliography is a plausible
 variation of the actual title rather than the exact title. The model remembered the topic and
 generated a title that sounds right but isn't.
@@ -81,6 +86,7 @@ mismatch threshold are not flagged. Edit distance is displayed on every Type 6 v
 Confidence: Medium-High.
 
 ### Type 7 — Claim Contradiction
+
 The cited paper exists, is real, and the citation resolves correctly. But the source either
 directly contradicts what is claimed, or the topic of the source does not address the claim at
 all.
@@ -91,6 +97,7 @@ passage. Output: Entails / Contradicts / Neutral.
 NLI known limitations (displayed to users):
 NLI is reliable for detecting clear logical contradiction and topic mismatch. It is less
 reliable on:
+
 - Quantitative discrepancies ("42% reduction" vs "31% reduction" — NLI may return Entails)
 - Statistical hedging ("significant effect" vs "trend not reaching significance")
 - Causation vs correlation ("X causes Y" vs "X is associated with Y")
@@ -104,6 +111,7 @@ Confidence: High for clear contradiction with Tier 1 evidence. Medium for abstra
 Always labeled with evidence tier and quantitative caveat where applicable.
 
 ### Retraction Flag
+
 The cited paper is real and resolves correctly, but it has been retracted. A retracted citation
 is arguably worse than a missing one — the work was relied upon after it was discredited.
 
@@ -112,6 +120,7 @@ Confidence: High.
 Elevated severity display — visually distinct from standard hallucination flags.
 
 ### Version Mismatch
+
 The paper is cited using a preprint DOI (typically arXiv), but the published version has
 materially different conclusions, authorship, or title.
 
@@ -121,6 +130,7 @@ Apify actor provides structured version data when direct API calls return incomp
 Confidence: Medium.
 
 ### Cannot Determine
+
 The source exists behind a paywall and no abstract or metadata is available beyond the
 identifier. Existence may be confirmed but claim alignment cannot be assessed.
 
@@ -186,22 +196,22 @@ When cited papers need metadata or full text retrieved and standard API calls fa
 limits, the following Apify actors serve as structured retrieval tools:
 
 - datapilot/arxiv-research-paper-scraper: Retrieves arXiv paper metadata — titles, abstracts,
-  authors with affiliations, DOI, categories, submission dates, and PDF links in structured
-  JSON. Primary use: preprint version tracking and Version Mismatch detection.
+authors with affiliations, DOI, categories, submission dates, and PDF links in structured
+JSON. Primary use: preprint version tracking and Version Mismatch detection.
 - openclawmara/arxiv-paper-scraper: Secondary arXiv retrieval for cross-validation,
-  particularly for citation metadata fields the primary actor does not surface.
+particularly for citation metadata fields the primary actor does not surface.
 - shahidirfan/openalex-scraper and parseforge/openalex-scraper: Bulk OpenAlex retrieval when
-  the direct REST API hits rate limits. Returns scholarly metadata including institutional
-  affiliations, concept tags, open access status, and ISSN data for journal verification.
+the direct REST API hits rate limits. Returns scholarly metadata including institutional
+affiliations, concept tags, open access status, and ISSN data for journal verification.
 - parseforge/crossref-journals-scraper: Journal-level metadata for Type 5 (Date Impossible)
-  verification — journal names, identifiers, publication dates, volume history, and status flags.
+verification — journal names, identifiers, publication dates, volume history, and status flags.
 - ryanclinton/europe-pmc-search and parseforge/europepmc-scraper: Biomedical and life sciences
-  full text. Europe PMC aggregates PubMed, PubMed Central, bioRxiv, and medRxiv. Used for
-  Tier 1 evidence retrieval in biomedical citation alignment.
+full text. Europe PMC aggregates PubMed, PubMed Central, bioRxiv, and medRxiv. Used for
+Tier 1 evidence retrieval in biomedical citation alignment.
 - nexgendata/academic-research-mcp-server: MCP-based cross-database research server for paper
-  search and citation lookup across arXiv, PubMed, and Google Scholar. Used as a structured
-  search layer when direct DOI resolution fails and semantic search is needed. MCP-native
-  invocation means calls appear in the live resolution panel as named tool calls with parameters.
+search and citation lookup across arXiv, PubMed, and Google Scholar. Used as a structured
+search layer when direct DOI resolution fails and semantic search is needed. MCP-native
+invocation means calls appear in the live resolution panel as named tool calls with parameters.
 
 All Apify actor outputs are cached at the DOI level with a 30-day TTL in Redis. The same paper
 queried by multiple users triggers one actor run.
@@ -238,14 +248,14 @@ citation context sentence, classify the intent as one of four categories and out
 Intent categories:
 
 - Evidentiary: The citation supports a specific factual claim. "Smith et al. found that X
-  increases Y by 40%." Proceeds to full claim alignment.
+increases Y by 40%." Proceeds to full claim alignment.
 - Methodological: The citation is a technique or tool reference. "We used the approach
-  described in Smith et al." Existence-verified, not claim-scored.
+described in Smith et al." Existence-verified, not claim-scored.
 - Contrastive: The citation establishes contrast. "Unlike Smith et al., we find..." Low
-  semantic similarity between the claim context and the source is expected and correct.
-  Scoring as unsupported would be a systematic false positive.
+semantic similarity between the claim context and the source is expected and correct.
+Scoring as unsupported would be a systematic false positive.
 - Background: General field-framing with low claim specificity. "This field has grown
-  substantially (Smith et al., Jones et al.)." Existence-verified, not claim-scored.
+substantially (Smith et al., Jones et al.)." Existence-verified, not claim-scored.
 
 The intent classification for every citation is displayed in the interface and editable by the
 user. If the system misclassifies a contrastive citation as evidentiary, the user corrects it
@@ -312,12 +322,14 @@ other retrieval sources are exhausted. Rate-limited aggressively. Results cached
 
 **Resolution Tiers**
 
-| Tier | Condition | Claim Alignment Available |
-|------|-----------|--------------------------|
-| Tier 1 | Verified + full text retrieved | Yes — high confidence ceiling |
-| Tier 2 | Verified + abstract only | Yes — medium confidence, labeled |
-| Tier 3 | Verified + no text available | No — existence confirmed only |
-| Tier 4 | All sources return nothing | No — unresolvable signal |
+
+| Tier   | Condition                      | Claim Alignment Available        |
+| ------ | ------------------------------ | -------------------------------- |
+| Tier 1 | Verified + full text retrieved | Yes — high confidence ceiling    |
+| Tier 2 | Verified + abstract only       | Yes — medium confidence, labeled |
+| Tier 3 | Verified + no text available   | No — existence confirmed only    |
+| Tier 4 | All sources return nothing     | No — unresolvable signal         |
+
 
 ---
 
@@ -406,14 +418,16 @@ overriding the Layer 2 classification if needed.
 
 **Step 5 — Confidence Assignment**
 
-| NLI Output | Evidence Tier | Final Confidence |
-|------------|---------------|------------------|
-| Entails | Tier 1 (full text) | High — Supported |
-| Entails | Tier 2 (abstract only) | Medium — Supported (abstract only) |
-| Contradicts | Tier 1 | High — Claim Contradiction |
-| Contradicts | Tier 2 | Medium — Possible Contradiction |
-| Neutral | Tier 1 | Medium — Not Addressed |
-| Neutral | Tier 2 | Low — Cannot Determine |
+
+| NLI Output  | Evidence Tier          | Final Confidence                   |
+| ----------- | ---------------------- | ---------------------------------- |
+| Entails     | Tier 1 (full text)     | High — Supported                   |
+| Entails     | Tier 2 (abstract only) | Medium — Supported (abstract only) |
+| Contradicts | Tier 1                 | High — Claim Contradiction         |
+| Contradicts | Tier 2                 | Medium — Possible Contradiction    |
+| Neutral     | Tier 1                 | Medium — Not Addressed             |
+| Neutral     | Tier 2                 | Low — Cannot Determine             |
+
 
 Any verdict at Medium confidence or below is automatically flagged for human review.
 
@@ -692,12 +706,14 @@ Progress tracking per paper with estimated completion based on citation count.
 ## Technology Stack
 
 ### Document Processing
+
 - GROBID — self-hosted Docker, primary academic PDF parser (F1 ~0.87-0.90)
 - PyMuPDF — fallback raw text extraction for non-standard PDF layouts
 - Firecrawl — targeted JavaScript-rendered landing pages only, after all other retrieval
-  methods exhausted
+methods exhausted
 
 ### Bibliographic Resolution APIs
+
 - CrossRef — primary DOI resolution, retraction flags, content negotiation for abstracts
 - Semantic Scholar — title/author search, paper embeddings, version linking
 - OpenAlex — broadest bibliographic coverage, ISSN journal verification (250M+ records)
@@ -707,6 +723,7 @@ Progress tracking per paper with estimated completion based on citation count.
 - Exa AI — last-resort semantic web search, architecturally constrained to signal-only
 
 ### Apify Actors (Structured Retrieval Layer)
+
 - datapilot/arxiv-research-paper-scraper — arXiv structured metadata and version data
 - openclawmara/arxiv-paper-scraper — secondary arXiv cross-validation
 - shahidirfan/openalex-scraper + parseforge/openalex-scraper — bulk OpenAlex retrieval
@@ -715,29 +732,32 @@ Progress tracking per paper with estimated completion based on citation count.
 - nexgendata/academic-research-mcp-server — MCP cross-database paper search
 
 ### AI and Reasoning Models
+
 - DeepSeek v4 Pro — structured extraction: citation intent classification, claim sentence
-  extraction. Not used for detection verdicts. Input and output are bounded and explicit.
+extraction. Not used for detection verdicts. Input and output are bounded and explicit.
 - NLI model — entailment classification (Entails / Contradicts / Neutral). Purpose-built
-  for this task. Applied only to evidentiary citations with Tier 1 or Tier 2 evidence.
+for this task. Applied only to evidentiary citations with Tier 1 or Tier 2 evidence.
 - Embeddings model — OpenAI text-embedding-3-small (default) or Snowflake Arctic Embed.
-  Used for evidence passage retrieval only. Not used for verdicts.
+Used for evidence passage retrieval only. Not used for verdicts.
 
 ### Infrastructure
+
 - Redis — DOI-level result caching (30-day TTL), job queue, rate limit budgets
 - Celery / RQ — async job queue for bulk paper analysis
 - SSE (Server-Sent Events) — real-time event streaming to the live resolution panel
 - PostgreSQL — persistent storage for completed analyses, audit logs, user corrections
-  (ground-truth dataset), exported reports
+(ground-truth dataset), exported reports
 - Docker Compose — local orchestration of GROBID + application services
 
 ### Frontend
+
 - React — main application shell
 - Tailwind CSS — utility styling
 - SSE consumer — live resolution panel event rendering
 - PDF renderer — paper anatomy view with inline citation badge overlays
 - D3 — heatmap grid, coverage bar visualization, version mismatch timeline
 - Custom font pairing — slab-serif or monospaced display font for audit data; humanist
-  sans-serif for body text
+sans-serif for body text
 
 ---
 
@@ -784,6 +804,7 @@ is the missing layer in the existing integrity workflow, not a competitor to pla
 detection.
 
 **Immediate applications**
+
 - Journal editors: bulk submission screening ranked by confirmed failure rate
 - Preprint servers: submission quality gate on bibliography integrity
 - University integrity offices: citation audit layer complementing plagiarism detection
