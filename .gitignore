@@ -42,6 +42,7 @@ venv/
 .mypy_cache/
 .ruff_cache/
 data/uploads/
+data/audits/
 
 # Node
 node_modules/

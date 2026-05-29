@@ -1,26 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
 from app.config import get_settings
-from app.domain.enums import CitationIntent, ResolutionSource
-from app.domain.models import AuditRun, CitationRecord
+from app.domain.enums import CitationIntent
+from app.domain.models import AuditRun, BibliographyEntry, CitationRecord
+from app.pipeline.evidence import retrieve_passage
 from app.pipeline.intent import apply_negation_override, classify_intent
+from app.pipeline.resolution import resolve_record
 from app.pipeline.scoring import finalize_scores
-from app.pipeline.verdicts import (
-    detect_hallucination,
-    extract_claim,
-    run_claim_alignment_stub,
-)
-from app.services.cache import cache_service
-from app.services.crossref import crossref_client
+from app.pipeline.verdicts import extract_claim, run_claim_alignment_stub
+from app.services.deepseek import deepseek_client
 from app.services.events import event_bus
 from app.services.fallback_parser import parse_pdf_fallback
 from app.services.grobid import grobid_client
-from app.services.openalex import openalex_client
-from app.services.semantic_scholar import semantic_scholar_client
 from app.store import audit_store
 
 
@@ -44,29 +40,13 @@ class AuditOrchestrator:
         )
 
         audit.citations = self._build_records(bibliography, inline)
-        for record in audit.citations:
-            record.intent = classify_intent(record)
-            record.intent = apply_negation_override(record)
-
-        intent_counts = {}
-        for record in audit.citations:
-            intent_counts[record.intent.value] = intent_counts.get(record.intent.value, 0) + 1
-        event_bus.emit(audit_id, "intent", "Intent classification complete", counts=intent_counts)
-
-        await asyncio.gather(*(self._resolve_citation(audit_id, record) for record in audit.citations))
-
-        for record in audit.citations:
-            if record.intent == CitationIntent.EVIDENTIARY and record.inline_markers:
-                context = record.inline_markers[0].context_window
-                record.extracted_claim = extract_claim(context)
-                record.evidence_passage = self._evidence_text(record)
-                run_claim_alignment_stub(record)
+        await self._classify_intents(audit_id, audit)
+        await self._resolve_all(audit_id, audit)
+        await self._align_claims(audit)
 
         finalize_scores(audit)
         audit.status = "complete"
-        from datetime import datetime
-
-        audit.completed_at = datetime.utcnow()
+        audit.completed_at = datetime.now(timezone.utc)
         event_bus.emit(
             audit_id,
             "summary",
@@ -77,6 +57,74 @@ class AuditOrchestrator:
         audit_store.save(audit)
         return audit
 
+    async def run_doi(self, audit_id: UUID, doi: str) -> AuditRun:
+        audit = audit_store.get(audit_id)
+        if not audit:
+            raise ValueError("Audit not found")
+
+        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        audit.status = "running"
+        audit.paper_title = f"DOI verification: {normalized}"
+        event_bus.emit(audit_id, "ingestion", "Single DOI verification started", doi=normalized)
+
+        entry = BibliographyEntry(index=1, raw=normalized, doi=normalized, title=None)
+        record = CitationRecord(index=1, bibliography=entry, intent=CitationIntent.EVIDENTIARY)
+        audit.citations = [record]
+
+        await resolve_record(audit_id, record)
+        record.extracted_claim = None
+        record.status = "complete"
+        finalize_scores(audit)
+        audit.status = "complete"
+        audit.completed_at = datetime.now(timezone.utc)
+        audit_store.save(audit)
+        event_bus.emit(audit_id, "summary", "DOI verification complete", doi=normalized)
+        return audit
+
+    async def _classify_intents(self, audit_id: UUID, audit: AuditRun) -> None:
+        for record in audit.citations:
+            context = " ".join(marker.context_window for marker in record.inline_markers)
+            intent = None
+            if context:
+                intent = await deepseek_client.classify_intent(context)
+            record.intent = intent or classify_intent(record)
+            record.intent = apply_negation_override(record)
+
+        intent_counts: dict[str, int] = {}
+        for record in audit.citations:
+            intent_counts[record.intent.value] = intent_counts.get(record.intent.value, 0) + 1
+        event_bus.emit(audit_id, "intent", "Intent classification complete", counts=intent_counts)
+
+    async def _resolve_all(self, audit_id: UUID, audit: AuditRun) -> None:
+        async def _one(record: CitationRecord) -> None:
+            record.status = "resolving"
+            record.verdict_color = "resolving"
+            await resolve_record(audit_id, record)
+            record.status = "complete"
+            event_bus.emit(
+                audit_id,
+                "verdict",
+                f"Citation #{record.index} verdict assigned",
+                citation_index=record.index,
+                hallucination=record.hallucination_type.value,
+                tier=record.evidence_tier.value,
+                color=record.verdict_color,
+            )
+
+        await asyncio.gather(*(_one(record) for record in audit.citations))
+
+    async def _align_claims(self, audit: AuditRun) -> None:
+        for record in audit.citations:
+            if record.intent != CitationIntent.EVIDENTIARY:
+                continue
+            context = record.inline_markers[0].context_window if record.inline_markers else ""
+            if context:
+                claim = await deepseek_client.extract_claim(context)
+                record.extracted_claim = claim or extract_claim(context)
+            text = self._full_evidence_text(record)
+            record.evidence_passage = await retrieve_passage(record.extracted_claim or "", text)
+            run_claim_alignment_stub(record)
+
     async def _parse_pdf(self, audit_id: UUID, pdf_path: Path):
         settings = get_settings()
         if settings.grobid_enabled:
@@ -85,125 +133,33 @@ class AuditOrchestrator:
                 filled = sum(1 for b in bibliography if b.title and (b.doi or b.year))
                 if bibliography and filled / len(bibliography) >= 0.4:
                     return bibliography, inline, title
-                event_bus.emit(
-                    audit_id,
-                    "grobid",
-                    "Sparse GROBID output — routing to PyMuPDF fallback",
-                )
+                event_bus.emit(audit_id, "grobid", "Sparse GROBID output — routing to PyMuPDF fallback")
             except Exception as exc:  # noqa: BLE001
                 event_bus.emit(audit_id, "grobid", f"GROBID unavailable: {exc}")
         return parse_pdf_fallback(pdf_path)
 
     def _build_records(self, bibliography, inline) -> list[CitationRecord]:
-        by_index = {entry.index: entry for entry in bibliography}
         markers_by_index: dict[int, list] = {}
         for marker in inline:
             markers_by_index.setdefault(marker.bibliography_index, []).append(marker)
 
-        records: list[CitationRecord] = []
-        for entry in bibliography:
-            records.append(
-                CitationRecord(
-                    index=entry.index,
-                    bibliography=entry,
-                    inline_markers=markers_by_index.get(entry.index, []),
-                )
+        return [
+            CitationRecord(
+                index=entry.index,
+                bibliography=entry,
+                inline_markers=markers_by_index.get(entry.index, []),
             )
-        if not records and inline:
-            for marker in inline:
-                if marker.bibliography_index not in by_index:
-                    by_index[marker.bibliography_index] = bibliography[0] if bibliography else None
-        return records
+            for entry in bibliography
+        ]
 
-    async def _resolve_citation(self, audit_id: UUID, record: CitationRecord) -> None:
-        record.status = "resolving"
-        record.verdict_color = "resolving"
-        cited = record.bibliography
-        event_bus.emit(
-            audit_id,
-            "resolve",
-            f"Resolving citation #{record.index}",
-            citation_index=record.index,
-            doi=cited.doi,
-        )
-
-        crossref = None
-        scholar = None
-        openalex = None
-
-        if cited.doi:
-            crossref = await cache_service.get_json("doi", cited.doi)
-            if crossref is None:
-                crossref = await crossref_client.resolve_doi(cited.doi)
-                if crossref:
-                    await cache_service.set_json("doi", cited.doi, crossref)
-            record.resolution_attempts.append(
-                self._attempt(ResolutionSource.CROSSREF, cited.doi, crossref is not None, crossref)
-            )
-            event_bus.emit(
-                audit_id,
-                "crossref",
-                "CrossRef DOI lookup",
-                citation_index=record.index,
-                success=crossref is not None,
-                title=(crossref or {}).get("title"),
-            )
-
-        if not crossref and cited.title:
-            scholar = await semantic_scholar_client.search_title(cited.title)
-            record.resolution_attempts.append(
-                self._attempt(ResolutionSource.SEMANTIC_SCHOLAR, cited.title, scholar is not None, scholar)
-            )
-            event_bus.emit(
-                audit_id,
-                "semantic_scholar",
-                "Semantic Scholar title search",
-                citation_index=record.index,
-                success=scholar is not None,
-            )
-
-            if not scholar:
-                openalex = await openalex_client.search_title(cited.title)
-                record.resolution_attempts.append(
-                    self._attempt(ResolutionSource.OPENALEX, cited.title, openalex is not None, openalex)
-                )
-                event_bus.emit(
-                    audit_id,
-                    "openalex",
-                    "OpenAlex title search",
-                    citation_index=record.index,
-                    success=openalex is not None,
-                )
-
-        detect_hallucination(record, crossref, scholar, openalex)
-        record.status = "complete"
-        event_bus.emit(
-            audit_id,
-            "verdict",
-            f"Citation #{record.index} verdict assigned",
-            citation_index=record.index,
-            hallucination=record.hallucination_type.value,
-            tier=record.evidence_tier.value,
-            color=record.verdict_color,
-        )
-
-    def _attempt(self, source: ResolutionSource, query: str, success: bool, payload):
-        from app.domain.models import ResolutionAttempt
-
-        summary = "hit" if success else "miss"
-        return ResolutionAttempt(
-            source=source,
-            query=query,
-            success=success,
-            summary=summary,
-            payload=payload,
-        )
-
-    def _evidence_text(self, record: CitationRecord) -> str | None:
+    def _full_evidence_text(self, record: CitationRecord) -> str | None:
+        parts: list[str] = []
         for attempt in record.resolution_attempts:
-            if attempt.payload:
-                if attempt.payload.get("abstract"):
-                    return attempt.payload["abstract"]
+            payload = attempt.payload or {}
+            if payload.get("abstract"):
+                parts.append(payload["abstract"])
+        if parts:
+            return "\n\n".join(parts)
         if record.resolved_title:
             return record.resolved_title
         return None

@@ -16,6 +16,7 @@ export type AuditRun = {
     type_1: number;
     type_2: number;
     type_6: number;
+    type_7: number;
     retraction: number;
   };
   risk_level: string;
@@ -38,8 +39,13 @@ export type CitationRecord = {
   verdict_color: string;
   status: string;
   extracted_claim?: string | null;
+  claim_user_corrected?: string | null;
+  evidence_passage?: string | null;
   quantitative_caveat?: string | null;
   claim_alignment_verdict?: string | null;
+  exa_signal?: string | null;
+  source_verify_url?: string | null;
+  oa_pdf_url?: string | null;
   resolution_attempts: Array<{
     source: string;
     query: string;
@@ -54,3 +60,5 @@ export type StreamEvent = {
   message: string;
   [key: string]: unknown;
 };
+
+export type HeatmapFilter = "all" | "failures" | "unresolvable" | "retracted";

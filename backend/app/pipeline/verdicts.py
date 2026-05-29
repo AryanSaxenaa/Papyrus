@@ -37,11 +37,12 @@ def detect_hallucination(
     crossref: dict | None,
     scholar: dict | None,
     openalex: dict | None,
+    merged_override: dict | None = None,
 ) -> None:
     settings = get_settings()
     cited = record.bibliography
 
-    resolved = crossref or scholar or openalex
+    resolved = merged_override or crossref or scholar or openalex
     if not resolved:
         if cited.doi:
             record.hallucination_type = HallucinationType.DOI_404
@@ -93,7 +94,7 @@ def detect_hallucination(
 
 
 def _tier_from_text(resolved: dict) -> EvidenceTier:
-    if resolved.get("open_access_pdf"):
+    if resolved.get("open_access_pdf") or resolved.get("oa_url"):
         return EvidenceTier.TIER_1
     if resolved.get("abstract"):
         return EvidenceTier.TIER_2

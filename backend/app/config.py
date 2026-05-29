@@ -28,7 +28,13 @@ class Settings(BaseSettings):
     title_drift_token_threshold: float = 0.65
 
     upload_dir: str = "./data/uploads"
+    audit_data_dir: str = "./data/audits"
     max_upload_mb: int = 50
+
+    unpaywall_email: str = "contact@example.com"
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
+    enable_deepseek: bool = True
 
 
 @lru_cache

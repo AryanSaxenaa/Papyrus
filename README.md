@@ -62,19 +62,23 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits` | Upload PDF, start audit (202) |
 | `GET` | `/api/audits/{id}` | Audit result |
 | `GET` | `/api/audits/{id}/events` | SSE live resolution log |
+| `POST` | `/api/audits/doi` | Verify a single DOI |
 | `GET` | `/api/audits/{id}/report.txt` | Plain-text audit summary |
+| `GET` | `/api/audits/{id}/report.json` | JSON audit export |
 
 ## Implementation status (v1 slice)
 
 - [x] PDF ingestion (GROBID + PyMuPDF fallback)
-- [x] Intent heuristics (DeepSeek integration point reserved)
+- [x] Intent heuristics + optional DeepSeek classification
 - [x] Multi-source resolution (CrossRef → S2 → OpenAlex)
-- [x] Types 1, 2, 5, 6, retraction detection
-- [x] Coverage + risk scoring
-- [x] SSE live panel + heatmap UI
-- [ ] Production NLI model + embeddings retrieval
-- [ ] Unpaywall / Europe PMC / Exa (signal-only) / Apify actors
-- [ ] PostgreSQL persistence + bulk ZIP queue
+- [x] Unpaywall OA lookup, arXiv metadata, Exa weak-signal (never a verdict)
+- [x] Types 1, 2, 5, 6, 7 stub, retraction, version mismatch (preprint vs published)
+- [x] Evidence passage retrieval (lexical + optional OpenAI embeddings)
+- [x] Coverage + risk scoring, JSON/TXT reports, disk persistence
+- [x] SSE live panel + heatmap UI (DOI verify, filters, claim rerun)
+- [ ] Production NLI model (HuggingFace / dedicated service)
+- [ ] Europe PMC / Apify actors, bulk ZIP queue
+- [ ] PostgreSQL persistence
 - [ ] PDF export report
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.

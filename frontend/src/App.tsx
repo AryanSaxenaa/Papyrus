@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AuditRun, CitationRecord, StreamEvent } from "./types";
+import type { AuditRun, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
 const verdictClass: Record<string, string> = {
   supported: "bg-[var(--papyrus-green)]",
@@ -13,18 +13,28 @@ const verdictClass: Record<string, string> = {
   amber: "bg-[var(--papyrus-amber)]",
 };
 
+const INTENT_OPTIONS = ["evidentiary", "methodological", "contrastive", "background"];
+
 export default function App() {
   const [audit, setAudit] = useState<AuditRun | null>(null);
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [selected, setSelected] = useState<CitationRecord | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [doiInput, setDoiInput] = useState("");
+  const [filter, setFilter] = useState<HeatmapFilter>("all");
+  const [claimDraft, setClaimDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const refreshAudit = useCallback(async (id: string) => {
     const response = await fetch(`/api/audits/${id}`);
     if (!response.ok) return;
-    setAudit(await response.json());
-  }, []);
+    const next = (await response.json()) as AuditRun;
+    setAudit(next);
+    if (selected) {
+      const updated = next.citations.find((c) => c.id === selected.id);
+      if (updated) setSelected(updated);
+    }
+  }, [selected]);
 
   useEffect(() => {
     if (!audit?.id || audit.status === "complete" || audit.status === "failed") return;
@@ -47,6 +57,17 @@ export default function App() {
     return () => source.close();
   }, [audit?.id]);
 
+  useEffect(() => {
+    if (!selected) return;
+    setClaimDraft(selected.claim_user_corrected ?? selected.extracted_claim ?? "");
+  }, [selected]);
+
+  const startAudit = async (response: Response) => {
+    if (!response.ok) throw new Error(await response.text());
+    const created = (await response.json()) as AuditRun;
+    setAudit(created);
+  };
+
   const onUpload = async (file: File) => {
     setUploading(true);
     setError(null);
@@ -55,16 +76,68 @@ export default function App() {
     try {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch("/api/audits", { method: "POST", body });
-      if (!response.ok) throw new Error(await response.text());
-      const created = (await response.json()) as AuditRun;
-      setAudit(created);
+      await startAudit(await fetch("/api/audits", { method: "POST", body }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
   };
+
+  const onVerifyDoi = async () => {
+    if (!doiInput.trim()) return;
+    setUploading(true);
+    setError(null);
+    setEvents([]);
+    setSelected(null);
+    try {
+      await startAudit(
+        await fetch("/api/audits/doi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ doi: doiInput.trim() }),
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "DOI verification failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const saveIntent = async (intent: string) => {
+    if (!audit || !selected) return;
+    const response = await fetch(`/api/audits/${audit.id}/citations/${selected.id}/intent`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intent }),
+    });
+    if (response.ok) await refreshAudit(audit.id);
+  };
+
+  const saveClaim = async () => {
+    if (!audit || !selected || !claimDraft.trim()) return;
+    const response = await fetch(`/api/audits/${audit.id}/citations/${selected.id}/claim`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claim: claimDraft.trim() }),
+    });
+    if (response.ok) await refreshAudit(audit.id);
+  };
+
+  const filteredCitations = useMemo(() => {
+    const citations = audit?.citations ?? [];
+    if (filter === "all") return citations;
+    if (filter === "failures") {
+      return citations.filter(
+        (c) => c.verdict_color === "failure" || c.hallucination_type.includes("type_"),
+      );
+    }
+    if (filter === "unresolvable") return citations.filter((c) => c.verdict_color === "unresolvable");
+    return citations.filter(
+      (c) => c.hallucination_type === "retraction" || c.verdict_color === "retraction",
+    );
+  }, [audit?.citations, filter]);
 
   const coverageBar = useMemo(() => {
     if (!audit) return null;
@@ -104,19 +177,35 @@ export default function App() {
               Does not detect AI authorship.
             </p>
           </div>
-          <label className="cursor-pointer rounded-md border border-emerald-700/60 bg-emerald-950/40 px-4 py-2 text-sm font-semibold hover:bg-emerald-900/50">
-            {uploading ? "Uploading…" : "Upload PDF"}
+          <div className="flex flex-wrap items-center gap-2">
             <input
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              disabled={uploading}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void onUpload(file);
-              }}
+              value={doiInput}
+              onChange={(e) => setDoiInput(e.target.value)}
+              placeholder="10.1038/..."
+              className="rounded-md border border-white/15 bg-black/30 px-3 py-2 font-audit text-sm"
             />
-          </label>
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => void onVerifyDoi()}
+              className="rounded-md border border-stone-600 bg-stone-900/60 px-4 py-2 text-sm font-semibold hover:bg-stone-800/80"
+            >
+              Verify DOI
+            </button>
+            <label className="cursor-pointer rounded-md border border-emerald-700/60 bg-emerald-950/40 px-4 py-2 text-sm font-semibold hover:bg-emerald-900/50">
+              {uploading ? "Working…" : "Upload PDF"}
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void onUpload(file);
+                }}
+              />
+            </label>
+          </div>
         </div>
       </header>
 
@@ -146,18 +235,39 @@ export default function App() {
                 </div>
               </div>
               <div className="mt-4">{coverageBar}</div>
-              <p className="mt-2 text-xs text-[var(--papyrus-muted)]">
-                Risk is derived from confirmed failures among resolvable citations only.
-              </p>
+              {audit.status === "complete" && (
+                <div className="mt-3 flex gap-3 text-sm">
+                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.txt`}>
+                    Export TXT
+                  </a>
+                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.json`}>
+                    Export JSON
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
           <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
-            <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
-              Citation heatmap
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
+                Citation heatmap
+              </h3>
+              <div className="flex flex-wrap gap-1 text-xs">
+                {(["all", "failures", "unresolvable", "retracted"] as HeatmapFilter[]).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilter(key)}
+                    className={`rounded px-2 py-1 ${filter === key ? "bg-emerald-900/70" : "bg-black/30"}`}
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2">
-              {(audit?.citations ?? []).map((citation) => (
+              {filteredCitations.map((citation) => (
                 <button
                   key={citation.id}
                   type="button"
@@ -173,38 +283,74 @@ export default function App() {
                   <p className="text-xs opacity-80">{citation.bibliography.year ?? "—"}</p>
                 </button>
               ))}
-              {!audit?.citations?.length && (
+              {!filteredCitations.length && (
                 <p className="col-span-full text-sm text-[var(--papyrus-muted)]">
-                  Upload a PDF to extract and verify citations.
+                  No citations match this filter.
                 </p>
               )}
             </div>
           </div>
 
-          {selected && (
+          {selected && audit && (
             <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
               <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
                 Citation #{selected.index}
               </h3>
               <p className="mt-2 text-sm">{selected.bibliography.title ?? selected.bibliography.raw.slice(0, 240)}</p>
-              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <dt className="text-[var(--papyrus-muted)]">Intent</dt>
-                  <dd className="font-audit">{selected.intent}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--papyrus-muted)]">Tier</dt>
-                  <dd className="font-audit">{selected.evidence_tier}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--papyrus-muted)]">Hallucination</dt>
-                  <dd className="font-audit">{selected.hallucination_type}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--papyrus-muted)]">Claim verdict</dt>
-                  <dd className="font-audit">{selected.claim_alignment_verdict ?? "—"}</dd>
-                </div>
-              </dl>
+
+              <label className="mt-3 block text-xs text-[var(--papyrus-muted)]">
+                Intent
+                <select
+                  className="mt-1 w-full rounded border border-white/15 bg-black/30 px-2 py-1 font-audit text-sm"
+                  value={selected.intent}
+                  onChange={(e) => void saveIntent(e.target.value)}
+                >
+                  {INTENT_OPTIONS.map((intent) => (
+                    <option key={intent} value={intent}>
+                      {intent}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="mt-3 block text-xs text-[var(--papyrus-muted)]">
+                Extracted claim
+                <textarea
+                  className="mt-1 w-full rounded border border-white/15 bg-black/30 px-2 py-1 font-audit text-sm"
+                  rows={3}
+                  value={claimDraft}
+                  onChange={(e) => setClaimDraft(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void saveClaim()}
+                className="mt-2 rounded border border-emerald-700/50 px-3 py-1 text-xs font-semibold text-emerald-200"
+              >
+                Rerun alignment
+              </button>
+
+              {selected.evidence_passage && (
+                <p className="mt-3 rounded border border-white/10 bg-black/20 p-2 text-xs leading-relaxed">
+                  {selected.evidence_passage.slice(0, 500)}
+                </p>
+              )}
+
+              {selected.exa_signal && (
+                <p className="mt-2 text-xs text-stone-300">{selected.exa_signal}</p>
+              )}
+
+              {selected.source_verify_url && (
+                <a
+                  href={selected.source_verify_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-sm text-emerald-300 underline"
+                >
+                  Verify source
+                </a>
+              )}
+
               {selected.quantitative_caveat && (
                 <p className="mt-3 rounded border border-amber-700/40 bg-amber-950/30 p-2 text-xs text-amber-100">
                   {selected.quantitative_caveat}

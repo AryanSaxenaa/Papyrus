@@ -61,6 +61,9 @@ class CitationRecord(BaseModel):
     resolved_year: int | None = None
     resolved_authors: list[str] = Field(default_factory=list)
     retracted: bool = False
+    oa_pdf_url: str | None = None
+    exa_signal: str | None = None
+    source_verify_url: str | None = None
 
     hallucination_type: HallucinationType = HallucinationType.NONE
     title_edit_distance: float | None = None
