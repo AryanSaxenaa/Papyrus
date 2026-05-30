@@ -17,6 +17,7 @@ export type AuditRun = {
   id: string;
   paper_title?: string | null;
   status: string;
+  error?: string | null;
   pipeline_version: string;
   coverage: {
     total: number;
@@ -72,6 +73,13 @@ export type BulkDashboard = {
     coverage_percent: number;
     confirmed_failure_rate: number;
     risk_level: string;
+    type_1?: number;
+    type_2?: number;
+    type_5?: number;
+    type_6?: number;
+    type_7?: number;
+    retraction?: number;
+    version_mismatch?: number;
   }>;
 };
 
@@ -95,6 +103,8 @@ export type CitationRecord = {
   claim_user_corrected?: string | null;
   claim_pending_review?: boolean;
   evidence_passage?: string | null;
+  evidence_provenance?: string | null;
+  evidence_retrieved_at?: string | null;
   quantitative_caveat?: string | null;
   claim_alignment_verdict?: string | null;
   title_edit_distance?: number | null;

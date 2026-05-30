@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ResolutionTrail } from "./ResolutionTrail";
 import { highlightEvidencePassage } from "../lib/highlightEvidence";
 import type { AuditRun, CitationRecord, VersionMismatchInfo } from "../types";
 
@@ -70,6 +71,9 @@ export function SideBySideDrawer({
 
           <Panel title="Verdict & claim">
             <VerdictBadge citation={citation} />
+            {citation.evidence_provenance && (
+              <p className="mt-2 font-audit text-[10px] text-stone-500">{citation.evidence_provenance}</p>
+            )}
             <p className="mt-3 text-xs text-[var(--papyrus-muted)]">Hallucination type</p>
             <p className="font-audit text-sm">{citation.hallucination_type}</p>
             {citation.title_edit_distance != null && (
@@ -90,6 +94,12 @@ export function SideBySideDrawer({
             {citation.version_mismatch && (
               <VersionTimeline info={citation.version_mismatch} />
             )}
+            <div className="mt-4">
+              <p className="text-xs text-[var(--papyrus-muted)]">Resolution sources</p>
+              <div className="mt-2 max-h-40 overflow-y-auto">
+                <ResolutionTrail citation={citation} compact />
+              </div>
+            </div>
             <label className="mt-4 block text-xs text-[var(--papyrus-muted)]">
               Intent
               <select
@@ -190,6 +200,16 @@ export function SideBySideDrawer({
                   </li>
                 ))}
               </ul>
+            )}
+            {citation.evidence_provenance && (
+              <p className="mt-3 font-audit text-[10px] uppercase tracking-wide text-stone-500">
+                {citation.evidence_provenance}
+                {citation.evidence_retrieved_at && (
+                  <span className="ml-2 normal-case text-stone-600">
+                    · retrieved {new Date(citation.evidence_retrieved_at).toLocaleString()}
+                  </span>
+                )}
+              </p>
             )}
             {citation.evidence_passage ? (
               <p className="mt-4 rounded border border-white/10 bg-black/20 p-2 text-xs leading-relaxed text-stone-200">

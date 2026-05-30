@@ -13,15 +13,16 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.reports import render_json_report, render_text_report
 from app.config import get_settings
-from app.domain.enums import CitationIntent
+from app.domain.enums import CitationIntent, NliVerdict
 from app.bulk_store import bulk_job_store
 from app.domain.models import AuditRun, BulkAuditJob, CitationRecord
 from app.pipeline.bulk import process_bulk_zip
 from app.pipeline.orchestrator import audit_orchestrator
 from app.pipeline.scoring import finalize_scores
-from app.pipeline.evidence import retrieve_passage
+from app.pipeline.evidence import refresh_evidence_passage
 from app.pipeline.resolution import resolve_record
-from app.pipeline.verdicts import run_claim_alignment_async
+from app.pipeline.verdicts import extract_claim, run_claim_alignment_async
+from app.services.deepseek import deepseek_client
 from app.services.events import event_bus
 from app.services.corrections import correction_store
 from app.services.url_fetch import url_fetch_service
@@ -201,6 +202,25 @@ async def list_bulk_audits(job_id: UUID) -> list[AuditRun]:
     return audits
 
 
+@router.get("/bulk/{job_id}/events")
+async def stream_bulk_events(job_id: UUID) -> EventSourceResponse:
+    job = bulk_job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Bulk job not found")
+
+    async def generator():
+        queue = await event_bus.subscribe(job_id)
+        try:
+            while True:
+                event = await queue.get()
+                yield {"event": event["type"], "data": json.dumps(event, default=str)}
+        except asyncio.CancelledError:
+            event_bus.unsubscribe(job_id, queue)
+            raise
+
+    return EventSourceResponse(generator())
+
+
 @router.get("/bulk/{job_id}/dashboard")
 async def bulk_dashboard(job_id: UUID) -> dict:
     job = bulk_job_store.get(job_id)
@@ -224,8 +244,11 @@ async def bulk_dashboard(job_id: UUID) -> dict:
                 "resolvable_citations": resolvable,
                 "type_1": audit.failures.type_1,
                 "type_2": audit.failures.type_2,
+                "type_5": audit.failures.type_5,
+                "type_6": audit.failures.type_6,
                 "type_7": audit.failures.type_7,
                 "retraction": audit.failures.retraction,
+                "version_mismatch": audit.failures.version_mismatch,
             }
         )
 
@@ -276,6 +299,20 @@ async def update_intent(audit_id: UUID, citation_id: str, body: IntentUpdate) ->
     previous = record.intent.value
     record.intent = CitationIntent(body.intent)
     record.intent_user_override = True
+    if record.intent == CitationIntent.EVIDENTIARY:
+        context = record.inline_markers[0].context_window if record.inline_markers else ""
+        if context and not record.extracted_claim:
+            claim = await deepseek_client.extract_claim(context)
+            record.extracted_claim = claim or extract_claim(context)
+        await refresh_evidence_passage(record)
+        await run_claim_alignment_async(record)
+    else:
+        record.nli_verdict = NliVerdict.SKIPPED
+        record.claim_alignment_verdict = None
+        record.claim_pending_review = False
+        from app.pipeline.verdicts import _color_for_success
+
+        record.verdict_color = _color_for_success(record)
     correction_store.record(
         str(audit_id),
         citation_id,
@@ -307,6 +344,7 @@ async def update_claim(audit_id: UUID, citation_id: str, body: ClaimUpdate) -> C
         original,
         body.claim,
     )
+    await refresh_evidence_passage(record)
     await run_claim_alignment_async(record)
     finalize_scores(audit)
     audit_store.save(audit)
@@ -329,11 +367,7 @@ async def approve_claim(audit_id: UUID, citation_id: str) -> CitationRecord:
     if not record.extracted_claim and not record.claim_user_corrected:
         raise HTTPException(status_code=400, detail="No claim to approve")
     record.claim_pending_review = False
-    text = audit_orchestrator._full_evidence_text(record)
-    record.evidence_passage = await retrieve_passage(
-        record.claim_user_corrected or record.extracted_claim or "",
-        text,
-    )
+    await refresh_evidence_passage(record)
     await run_claim_alignment_async(record)
     finalize_scores(audit)
     audit_store.save(audit)
@@ -358,11 +392,7 @@ async def rerun_citation(audit_id: UUID, citation_id: str) -> CitationRecord:
     await resolve_record(audit_id, record)
     record.status = "complete"
     if record.intent == CitationIntent.EVIDENTIARY and not record.claim_pending_review:
-        text = audit_orchestrator._full_evidence_text(record)
-        record.evidence_passage = await retrieve_passage(
-            record.claim_user_corrected or record.extracted_claim or "",
-            text,
-        )
+        await refresh_evidence_passage(record)
         await run_claim_alignment_async(record)
     finalize_scores(audit)
     audit_store.save(audit)

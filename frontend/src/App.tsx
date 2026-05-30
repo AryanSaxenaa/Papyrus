@@ -5,6 +5,7 @@ import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
 import { LimitationsPanel } from "./components/LimitationsPanel";
 import { PaperAnatomy } from "./components/PaperAnatomy";
+import { AdminPanel } from "./components/AdminPanel";
 import { CitationAnalytics } from "./components/CitationAnalytics";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
@@ -31,6 +32,8 @@ export default function App() {
   const [doiInput, setDoiInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [bulkJobId, setBulkJobId] = useState<string | null>(null);
+  const [bulkEvents, setBulkEvents] = useState<StreamEvent[]>([]);
   const [bulkDashboard, setBulkDashboard] = useState<BulkDashboard | null>(null);
   const [showAnatomy, setShowAnatomy] = useState(false);
   const [filter, setFilter] = useState<HeatmapFilter>("all");
@@ -56,6 +59,21 @@ export default function App() {
     const timer = window.setInterval(() => refreshAudit(audit.id), 2500);
     return () => window.clearInterval(timer);
   }, [audit?.id, audit?.status, refreshAudit]);
+
+  useEffect(() => {
+    if (!bulkJobId) return;
+    const source = new EventSource(`/api/bulk/${bulkJobId}/events`);
+    source.onmessage = (message) => {
+      try {
+        const payload = JSON.parse(message.data) as StreamEvent;
+        setBulkEvents((prev) => [...prev.slice(-80), payload]);
+      } catch {
+        // ignore malformed chunks
+      }
+    };
+    source.onerror = () => source.close();
+    return () => source.close();
+  }, [bulkJobId]);
 
   useEffect(() => {
     if (!audit?.id) return;
@@ -135,6 +153,9 @@ export default function App() {
       const response = await fetch("/api/audits/bulk", { method: "POST", body });
       if (!response.ok) throw new Error(await response.text());
       const job = (await response.json()) as { id: string; total: number };
+      setBulkJobId(job.id);
+      setBulkEvents([]);
+      setBulkDashboard(null);
       setBulkStatus(`Bulk job ${job.id} queued (${job.total} papers)`);
       const poll = window.setInterval(async () => {
         const statusRes = await fetch(`/api/bulk/${job.id}`);
@@ -156,6 +177,7 @@ export default function App() {
         if (status.status === "complete" || status.status === "failed") {
           window.clearInterval(poll);
           setUploading(false);
+          setBulkJobId(null);
           const dashRes = await fetch(`/api/bulk/${job.id}/dashboard`);
           if (dashRes.ok) setBulkDashboard((await dashRes.json()) as BulkDashboard);
         }
@@ -376,6 +398,7 @@ export default function App() {
             onDeleted={onAuditDeleted}
           />
           <CitationAnalytics />
+          <AdminPanel />
 
           {error && (
             <p className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
@@ -383,9 +406,18 @@ export default function App() {
             </p>
           )}
           {bulkStatus && (
-            <p className="rounded-md border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">
-              {bulkStatus}
-            </p>
+            <div className="rounded-md border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">
+              <p>{bulkStatus}</p>
+              {bulkEvents.length > 0 && (
+                <ul className="mt-2 max-h-24 overflow-y-auto font-audit text-[10px] leading-relaxed text-amber-100/80">
+                  {bulkEvents.slice(-12).map((event, index) => (
+                    <li key={`${event.ts}-${index}`}>
+                      {event.ts.slice(11, 19)} {event.type}: {event.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {bulkDashboard && (
@@ -412,6 +444,7 @@ export default function App() {
                       <th className="py-1 pr-3">Paper</th>
                       <th className="py-1 pr-3">Coverage</th>
                       <th className="py-1 pr-3">Failure rate</th>
+                      <th className="py-1 pr-3">T1 / T7 / Ret</th>
                       <th className="py-1">Risk</th>
                     </tr>
                   </thead>
@@ -433,11 +466,14 @@ export default function App() {
                             </td>
                             <td className="py-2 pr-3 font-audit">{paper.coverage_percent}%</td>
                             <td className="py-2 pr-3 font-audit">{paper.confirmed_failure_rate}%</td>
+                            <td className="py-2 pr-3 font-audit text-xs text-stone-400">
+                              {paper.type_1 ?? 0} / {paper.type_7 ?? 0} / {paper.retraction ?? 0}
+                            </td>
                             <td className="py-2 font-audit uppercase">{paper.risk_level}</td>
                           </tr>
                           {isExpanded && cached && (
                             <tr key={`${paper.audit_id}-heat`} className="border-t border-white/5 bg-black/20">
-                              <td colSpan={4} className="py-3">
+                              <td colSpan={5} className="py-3">
                                 <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
                                   {cached.citations.map((citation) => (
                                     <button
@@ -475,6 +511,11 @@ export default function App() {
                   <p className="font-audit text-xs text-[var(--papyrus-muted)]">
                     Status: {audit.status} · Pipeline {audit.pipeline_version}
                   </p>
+                  {audit.status === "failed" && audit.error && (
+                    <p className="mt-2 rounded border border-red-900/50 bg-red-950/40 px-2 py-1 text-xs text-red-200">
+                      {audit.error}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="font-audit text-3xl font-semibold text-emerald-300">

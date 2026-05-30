@@ -8,7 +8,7 @@ from uuid import UUID
 from app.config import get_settings
 from app.domain.enums import CitationIntent, NliVerdict
 from app.domain.models import AuditRun, BibliographyEntry, CitationRecord
-from app.pipeline.evidence import retrieve_passage
+from app.pipeline.evidence import refresh_evidence_passage
 from app.pipeline.intent import apply_negation_override, classify_intent
 from app.pipeline.resolution import resolve_record
 from app.pipeline.scoring import finalize_scores
@@ -134,8 +134,7 @@ class AuditOrchestrator:
                     citation_index=record.index,
                     claim=(record.extracted_claim or "")[:120],
                 )
-            text = self._full_evidence_text(record)
-            record.evidence_passage = await retrieve_passage(record.extracted_claim or "", text)
+            await refresh_evidence_passage(record)
             if settings.nli_requires_claim_approval and not record.claim_user_corrected:
                 record.claim_pending_review = True
                 record.nli_verdict = NliVerdict.SKIPPED
@@ -183,24 +182,5 @@ class AuditOrchestrator:
             )
             for entry in bibliography
         ]
-
-    def _full_evidence_text(self, record: CitationRecord) -> str | None:
-        for attempt in record.resolution_attempts:
-            payload = attempt.payload or {}
-            if payload.get("full_text"):
-                return payload["full_text"]
-        parts: list[str] = []
-        for attempt in record.resolution_attempts:
-            payload = attempt.payload or {}
-            if payload.get("abstract"):
-                parts.append(payload["abstract"])
-            if payload.get("text"):
-                parts.append(payload["text"])
-        if parts:
-            return "\n\n".join(parts)
-        if record.resolved_title:
-            return record.resolved_title
-        return None
-
 
 audit_orchestrator = AuditOrchestrator()

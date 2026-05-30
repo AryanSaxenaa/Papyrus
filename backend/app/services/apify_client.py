@@ -46,9 +46,24 @@ class ApifyClient:
             await cache_service.set_json("actor", cache_key, {"items": items})
             return items
 
+    async def resolve_academic_mcp(self, title: str, authors: list[str] | None = None) -> dict[str, Any] | None:
+        settings = get_settings()
+        query = f"{authors[0]} {title}" if authors and authors[0] else title
+        items = await self.run_actor(
+            settings.apify_actor_academic_mcp,
+            {"query": query, "searchQuery": query, "searchTerms": query, "maxResults": 1, "maxItems": 1},
+        )
+        if not items:
+            return None
+        return _normalize_academic_item(items[0])
+
     async def resolve_by_title(self, title: str, authors: list[str] | None = None) -> dict[str, Any] | None:
         settings = get_settings()
         query = f"{authors[0]} {title}" if authors else title
+
+        mcp = await self.resolve_academic_mcp(title, authors)
+        if mcp:
+            return mcp
 
         openalex_items = await self.run_actor(
             settings.apify_actor_openalex,
@@ -98,6 +113,27 @@ async def apify_fallback_resolve(
     if title:
         return await client.resolve_by_title(title, authors)
     return None
+
+
+def _normalize_academic_item(row: dict[str, Any]) -> dict[str, Any]:
+    title = row.get("title") or row.get("paperTitle") or row.get("name")
+    abstract = row.get("abstract") or row.get("summary") or row.get("snippet")
+    authors = row.get("authors") or row.get("authorNames") or []
+    if isinstance(authors, str):
+        authors = [authors]
+    doi = row.get("doi") or row.get("DOI")
+    if isinstance(doi, str):
+        doi = doi.removeprefix("https://doi.org/")
+    return {
+        "title": title,
+        "abstract": abstract,
+        "authors": authors if isinstance(authors, list) else [],
+        "year": _year_from_row(row),
+        "doi": doi,
+        "open_access_pdf": row.get("pdfUrl") or row.get("pdf_url") or row.get("openAccessPdf"),
+        "source": ResolutionSource.APIFY.value,
+        "via": "academic_mcp",
+    }
 
 
 def _normalize_openalex_item(row: dict[str, Any]) -> dict[str, Any]:

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     apify_actor_openalex: str = "parseforge/openalex-scraper"
     apify_actor_europe_pmc: str = "parseforge/europepmc-scraper"
     apify_actor_crossref_journals: str = "parseforge/crossref-journals-scraper"
+    apify_actor_academic_mcp: str = "nexgendata/academic-research-mcp-server"
     deepseek_api_key: str | None = None
     openai_api_key: str | None = None
     huggingface_api_key: str | None = None

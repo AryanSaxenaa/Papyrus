@@ -1,3 +1,4 @@
+import { coverageSegments } from "../lib/coverageSegments";
 import type { AuditRun } from "../types";
 
 type Props = {
@@ -5,21 +6,8 @@ type Props = {
 };
 
 export function CoverageBar({ audit }: Props) {
-  const { coverage, citations } = audit;
-  const total = coverage.total || 1;
-  const failures = citations.filter(
-    (c) =>
-      c.verdict_color === "failure" ||
-      c.verdict_color === "retraction" ||
-      c.hallucination_type.includes("type_"),
-  ).length;
-
-  const segments = [
-    { label: "Tier 1", value: coverage.tier_1, color: "bg-emerald-700" },
-    { label: "Tier 2", value: coverage.tier_2, color: "bg-emerald-900" },
-    { label: "Tier 3", value: coverage.tier_3, color: "bg-slate-600" },
-    { label: "Unresolvable", value: coverage.tier_4, color: "bg-stone-600" },
-  ].filter((segment) => segment.value > 0);
+  const total = audit.coverage.total || 1;
+  const segments = coverageSegments(audit);
 
   return (
     <div className="space-y-2">
@@ -33,17 +21,24 @@ export function CoverageBar({ audit }: Props) {
           />
         ))}
       </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-500">
+        {segments.map((segment) => (
+          <span key={segment.label}>
+            {segment.label} {segment.value}
+          </span>
+        ))}
+      </div>
       <p className="text-xs text-[var(--papyrus-muted)]">
         Coverage confidence:{" "}
         <span className="font-audit uppercase text-stone-300">
           {audit.coverage.coverage_confidence ?? "medium"}
         </span>
-        {failures > 0 && (
-          <span className="ml-2 text-red-300/90">· {failures} confirmed failures (resolved citations)</span>
-        )}
-        {coverage.tier_4 > 0 && (
+        <span className="ml-2 text-stone-400">
+          · Risk uses confirmed failures only (not unresolvable citations).
+        </span>
+        {audit.coverage.tier_4 > 0 && (
           <span className="ml-2">
-            · {coverage.tier_4} unresolvable — may reflect database limits, not citation failure.
+            · {audit.coverage.tier_4} unresolvable — may reflect database limits, not citation failure.
           </span>
         )}
       </p>

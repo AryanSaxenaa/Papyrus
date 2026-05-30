@@ -183,8 +183,3 @@ def _apply_lexical_fallback(record: CitationRecord, claim: str, evidence: str) -
         record.verdict_color = "amber"
 
 
-def run_claim_alignment_stub(record: CitationRecord) -> None:
-    """Sync fallback for callers without an event loop."""
-    import asyncio
-
-    asyncio.run(run_claim_alignment_async(record))

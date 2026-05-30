@@ -60,6 +60,18 @@ def sync_citation_index(audit: AuditRun) -> None:
         session.commit()
 
 
+def reindex_all_audits() -> dict[str, int]:
+    from app.store import audit_store
+
+    indexed = 0
+    for audit in audit_store.list():
+        if audit.status != "complete":
+            continue
+        sync_citation_index(audit)
+        indexed += 1
+    return {"audits_indexed": indexed}
+
+
 def failure_rate_by_audit(limit: int = 20) -> list[dict]:
     engine = get_engine()
     if engine is None:

@@ -207,7 +207,8 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
         event_bus.emit(
             audit_id,
             "apify",
-            "Apify actor retrieval",
+            "Apify actor retrieval"
+            + (" (academic MCP)" if apify and apify.get("via") == "academic_mcp" else ""),
             citation_index=record.index,
             success=apify is not None,
         )

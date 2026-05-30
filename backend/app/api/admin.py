@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.config import get_settings
-from app.services.citations_index import failure_rate_by_audit
+from app.services.citations_index import failure_rate_by_audit, reindex_all_audits
 from app.services.corrections import correction_store
 from app.services.rate_limits import rate_limit_service
 
@@ -18,6 +18,11 @@ async def get_rate_limits() -> dict:
 async def citation_stats() -> dict:
     ranked = failure_rate_by_audit(limit=25)
     return {"audits_by_failure_rate": ranked}
+
+
+@router.post("/citations/reindex")
+async def reindex_citations() -> dict:
+    return reindex_all_audits()
 
 
 @router.get("/corrections")

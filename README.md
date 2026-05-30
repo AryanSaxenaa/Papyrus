@@ -25,6 +25,12 @@ cp .env.example .env
 docker compose up -d postgres redis grobid
 ```
 
+Full stack (API + UI + worker):
+
+```bash
+docker compose up --build api web
+```
+
 GROBID needs several GB RAM. Without it, the API falls back to PyMuPDF parsing.
 
 ### 3. API
@@ -70,6 +76,7 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits/bulk` | ZIP of PDFs (async bulk job) |
 | `GET` | `/api/bulk/{id}` | Bulk job status |
 | `GET` | `/api/bulk/{id}/dashboard` | Bulk papers ranked by failure rate |
+| `GET` | `/api/bulk/{id}/events` | SSE live log for bulk job progress |
 | `GET` | `/api/audits/{id}/events/log.txt` | Download resolution event log |
 | `GET` | `/api/admin/rate-limits` | API usage vs daily budgets |
 | `GET` | `/api/admin/config` | Integration feature flags |
@@ -80,6 +87,7 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits/{id}/citations/{cid}/approve-claim` | Run NLI after claim approval |
 | `DELETE` | `/api/audits/{id}` | Remove audit and indexed rows |
 | `GET` | `/api/admin/citations/stats` | Cross-audit citation failure rates |
+| `POST` | `/api/admin/citations/reindex` | Rebuild citation index from completed audits |
 
 ## Implementation status (v1 slice)
 
@@ -87,7 +95,7 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Intent heuristics + optional DeepSeek classification
 - [x] Multi-source resolution (CrossRef → S2 → OpenAlex)
 - [x] Unpaywall OA lookup, arXiv metadata, Exa weak-signal (never a verdict)
-- [x] Types 1, 2, 5, 6, 7 stub, retraction, version mismatch (preprint vs published)
+- [x] Types 1, 2, 5, 6, 7 (NLI claim alignment), retraction, version mismatch (preprint vs published)
 - [x] Evidence passage retrieval (lexical + optional OpenAI embeddings)
 - [x] Coverage + risk scoring, JSON/TXT reports, disk persistence
 - [x] SSE live panel + heatmap UI (DOI verify, filters, claim rerun)
@@ -134,6 +142,14 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Delete audit API + past-audits panel with removal
 - [x] Cross-audit citation failure analytics (`GET /api/admin/citations/stats`)
 - [x] Bulk dashboard pending-paper progress + ETA display
+- [x] Evidence provenance chain in claim viewer (tier, source, retrieved time)
+- [x] Admin panel (rate limits, integration flags, citation reindex)
+- [x] Intent reclassification reruns claim alignment when set to evidentiary
+- [x] TXT/PDF reports include evidence provenance and per-source resolution trail
+- [x] Apify academic-research MCP actor in title-search fallback chain
+- [x] Admin corrections log in UI; Docker Compose `web` service for frontend
+- [x] Spec-aligned coverage bar (tiers + confirmed failures + unresolvable)
+- [x] Resolution trail in claim viewer centre column; bulk job SSE + failure-type columns
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 

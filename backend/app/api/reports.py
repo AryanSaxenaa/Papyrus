@@ -73,6 +73,17 @@ def render_text_report(audit: AuditRun) -> str:
             lines.append(f"     Claim (user-corrected): {citation.claim_user_corrected[:160]}")
         if citation.claim_alignment_verdict:
             lines.append(f"     Alignment: {citation.claim_alignment_verdict} ({citation.confidence})")
+        if citation.evidence_provenance:
+            lines.append(f"     Evidence: {citation.evidence_provenance}")
+        if citation.evidence_retrieved_at:
+            lines.append(f"     Evidence retrieved: {citation.evidence_retrieved_at}")
+        if citation.evidence_passage:
+            lines.append(f"     Passage: {citation.evidence_passage[:240]}")
+        if citation.resolution_attempts:
+            lines.append("     Resolution trail:")
+            for attempt in citation.resolution_attempts:
+                mark = "✓" if attempt.success else "✗"
+                lines.append(f"       {mark} {attempt.source.value}: {attempt.summary} ({attempt.query[:60]})")
         if citation.version_mismatch:
             lines.append("     Version timeline:")
             for entry in [citation.version_mismatch.preprint, *citation.version_mismatch.revisions, citation.version_mismatch.published]:
