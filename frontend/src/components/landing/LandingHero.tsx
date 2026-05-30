@@ -3,6 +3,7 @@ import { motion, useReducedMotion, useScroll, useTransform } from "motion/react"
 import { HeroDashboardMockup } from "./HeroDashboardMockup";
 import { CheckIcon, SparkIcon } from "./LandingIcons";
 import { MagneticLinkButton, Stagger, fadeUp } from "./motion";
+import { GridCanvasBg } from "./GridCanvasBg";
 
 export function LandingHero() {
   const reduce = useReducedMotion();
@@ -12,6 +13,7 @@ export function LandingHero() {
 
   return (
     <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <GridCanvasBg />
       <div className="relative z-10 mx-auto flex w-full max-w-[1280px] flex-1 flex-col px-6 pb-10 -mt-3 lg:px-10 lg:pb-12 lg:pt-0">
         <div className="grid flex-1 items-center gap-10 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:gap-14 xl:gap-16">
           <motion.div style={{ y: leftY }} className="max-w-[520px]">
@@ -73,41 +75,41 @@ export function LandingHero() {
             className="relative flex items-center justify-center lg:justify-end"
             style={{ y: rightY }}
           >
-            <div className="w-full max-w-[640px]">
-              <HeroDashboardMockup />
-            </div>
-            <div
-              className="pointer-events-none absolute bottom-5 right-[-156px] z-10 hidden md:block lg:bottom-5 lg:right-[-156px]"
-            >
-              <div className="relative h-[18.792rem] w-[19.44rem] lg:h-[22.032rem] lg:w-[22.68rem]">
-                <div className="absolute inset-0 overflow-hidden opacity-40" aria-hidden>
-                  <img
-                    src="/images/L1A.png"
-                    alt=""
-                    className="h-[145%] w-full translate-y-[25px] scale-105 object-contain object-bottom blur-xl"
-                  />
-                </div>
+            <div className="relative w-full max-w-[640px] overflow-visible">
+              <div className="relative z-10">
+                <HeroDashboardMockup />
+              </div>
+              <div
+                className="pointer-events-none absolute -bottom-14 -right-10 z-20 hidden md:block"
+                aria-hidden
+              >
                 <div
-                  className="relative h-full w-full overflow-hidden"
+                  className="absolute left-1/2 top-[58%] h-[10rem] w-[10rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-50 lg:h-[12rem] lg:w-[12rem]"
                   style={{
-                    maskImage: "radial-gradient(ellipse 75% 70% at 50% 70%, black 50%, transparent 82%)",
-                    WebkitMaskImage: "radial-gradient(ellipse 75% 70% at 50% 70%, black 50%, transparent 82%)",
+                    background:
+                      "radial-gradient(circle, rgba(187, 247, 208, 0.5) 0%, transparent 70%)",
                   }}
-                >
-                  <img
-                    src="/images/L1A.png"
-                    alt=""
-                    width={362}
-                    height={467}
-                    decoding="async"
-                    className="h-[145%] w-full translate-y-[25px] object-contain object-bottom mix-blend-screen"
-                  />
-                </div>
+                />
+                <img
+                  src="/images/L1A.png"
+                  alt=""
+                  width={362}
+                  height={467}
+                  decoding="async"
+                  className="relative h-auto w-[10rem] object-contain object-bottom mix-blend-screen lg:w-[13rem]"
+                />
               </div>
             </div>
           </motion.div>
         </div>
       </div>
+      <div
+        className="pointer-events-none absolute bottom-0 left-0 right-0 z-20 h-28"
+        style={{
+          background: "linear-gradient(to bottom, transparent, #ffffff)",
+        }}
+        aria-hidden
+      />
     </section>
   );
 }

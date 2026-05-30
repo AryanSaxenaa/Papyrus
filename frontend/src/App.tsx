@@ -15,6 +15,7 @@ import { AppUploadCard } from "./components/app/AppUploadCard";
 import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
+import { MathGridBg } from "./components/app/MathGridBg";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
 export default function App() {
@@ -300,6 +301,8 @@ export default function App() {
 
   return (
     <div className="landing-page papyrus-app min-h-screen overflow-x-hidden bg-[#fafafa]">
+      <MathGridBg />
+      <div className="relative z-[1]">
       <LandingNav />
 
       <div className="mx-auto max-w-[1120px] px-5 lg:px-8">
@@ -615,6 +618,7 @@ export default function App() {
 
       <div className="mt-12">
         <SiteFooter />
+      </div>
       </div>
     </div>
   );

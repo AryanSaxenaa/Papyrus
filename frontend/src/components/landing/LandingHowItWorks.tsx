@@ -60,18 +60,16 @@ export function LandingHowItWorks() {
       setActive(next);
     }
     
-    // Show section when in scroll range
     setIsVisible(progress > 0 && progress < 1);
   });
 
   return (
     <>
-      {/* Spacer before trigger */}
-      <div style={{ height: "50vh" }} />
-      
       {/* Trigger element that provides scroll space */}
       <div
+        id="how-it-works"
         ref={triggerRef}
+        className="scroll-mt-[var(--lp-nav-h)]"
         style={{ height: `${WORKFLOW_STEPS.length * 100}vh` }}
       />
       
@@ -82,14 +80,13 @@ export function LandingHowItWorks() {
       <AnimatePresence>
         {isVisible && (
           <motion.section
-          id="how-it-works"
-          className="fixed inset-0 z-10 flex items-center bg-white"
+          className="fixed inset-0 z-10 flex items-center justify-center bg-white"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
-        <div className="mx-auto w-full max-w-6xl px-6 py-8">
+        <div className="mx-auto flex w-full max-w-6xl flex-col justify-center px-6" style={{ transform: "scale(0.8)" }}>
           <div className="max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#40916c]">
               Verifiable. Transparent. Independent.

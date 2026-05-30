@@ -7,8 +7,6 @@ import { MagneticLinkButton } from "./motion";
 const NAV_LINKS = [
   { label: "How it works", href: "#how-it-works" },
   { label: "Features", href: "#features" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "Docs", href: "#features" },
 ];
 
 function NavAnchor({

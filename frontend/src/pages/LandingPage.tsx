@@ -53,7 +53,17 @@ export default function LandingPage() {
       <LandingNav />
       <LandingHeroShell />
 
-      <div className="bg-white">
+      <div className="relative bg-white">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              "linear-gradient(#40916c 1px, transparent 0), linear-gradient(90deg, #40916c 1px, transparent 0)",
+            backgroundSize: "40px 40px",
+          }}
+          aria-hidden
+        />
+      <div className="relative z-[1]">
       <LandingHowItWorks />
 
       <div className="mx-auto max-w-6xl px-6 pt-8 pb-6">
@@ -137,10 +147,10 @@ export default function LandingPage() {
                     </Link>
                   </MagneticLinkButton>
                   <a
-                    href="mailto:hello@papyrus.app"
+                    href="mailto:aryansaxenaalig@gmail.com"
                     className="inline-block rounded-xl border border-[#0a3d2e]/20 bg-white px-6 py-3 text-sm font-semibold text-[#0a3d2e] hover:bg-white/80 transition-colors"
                   >
-                    Book a demo →
+                    Contact →
                   </a>
                 </div>
               </div>
@@ -159,6 +169,7 @@ export default function LandingPage() {
         </Reveal>
       </section>
 
+      </div>
       </div>
 
       <SiteFooter />
