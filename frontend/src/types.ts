@@ -92,6 +92,7 @@ export type CitationRecord = {
   inline_markers?: Array<{ marker: string; context_window: string }>;
   extracted_claim?: string | null;
   claim_user_corrected?: string | null;
+  claim_pending_review?: boolean;
   evidence_passage?: string | null;
   quantitative_caveat?: string | null;
   claim_alignment_verdict?: string | null;

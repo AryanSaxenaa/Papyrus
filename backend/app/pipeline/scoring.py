@@ -87,4 +87,11 @@ def finalize_scores(audit: AuditRun) -> None:
     else:
         audit.risk_level = RiskLevel.LOW
 
+    if audit.coverage.coverage_confidence == ConfidenceLevel.LOW or len(resolvable) < 3:
+        audit.risk_confidence = ConfidenceLevel.LOW
+    elif failure_rate > 0.10 or audit.coverage.coverage_confidence == ConfidenceLevel.MEDIUM:
+        audit.risk_confidence = ConfidenceLevel.MEDIUM
+    else:
+        audit.risk_confidence = ConfidenceLevel.HIGH
+
     audit.limitations = build_limitations(audit)

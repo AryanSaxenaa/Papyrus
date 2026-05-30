@@ -74,6 +74,10 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/admin/rate-limits` | API usage vs daily budgets |
 | `GET` | `/api/admin/config` | Integration feature flags |
 | `GET` | `/api/admin/corrections` | Recent user intent/claim corrections (ground truth) |
+| `GET` | `/api/health/detailed` | Postgres, Redis, GROBID connectivity |
+| `GET` | `/api/audits/summaries` | Indexed audit list (Postgres summaries table) |
+| `POST` | `/api/audits/{id}/citations/{cid}/rerun` | Re-resolve one citation |
+| `POST` | `/api/audits/{id}/citations/{cid}/approve-claim` | Run NLI after claim approval |
 
 ## Implementation status (v1 slice)
 
@@ -115,11 +119,16 @@ Open http://localhost:5173 and upload a PDF.
 - [x] User correction ground-truth log (Postgres table or `corrections.jsonl`)
 - [x] Audit limitations panel (coverage bias, NLI caveats, out-of-scope list)
 - [x] Medium-confidence review flag in claim viewer
+- [x] OpenAlex DOI lookup + abstract enrichment
+- [x] Local NLI via Ollama or sentence-transformers (`NLI_BACKEND`, optional deps)
+- [x] Audit summaries index table (Postgres) for fast listing
+- [x] Optional claim approval gate before NLI (`NLI_REQUIRES_CLAIM_APPROVAL`)
+- [x] Per-citation resolution rerun API
+- [x] Risk confidence scoring + detailed health check
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 
 ### Still out of scope / v2
 
-- Fully normalized PostgreSQL schema (audits remain JSON blobs; corrections table is normalized)
-- Local/on-prem NLI model (current: Hugging Face API + lexical fallback)
+- Fully normalized citation-level Postgres schema (audits remain JSON blobs)
 - Circular citation detection (spec § excluded from v1)

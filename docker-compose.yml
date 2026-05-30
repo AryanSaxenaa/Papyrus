@@ -51,9 +51,15 @@ services:
     env_file:
       - .env
     environment:
+      DATABASE_URL: postgresql+psycopg2://papyrus:papyrus@postgres:5432/papyrus
+      PERSISTENCE_BACKEND: both
       REDIS_URL: redis://redis:6379/0
       GROBID_URL: http://grobid:8070
+    volumes:
+      - ./backend:/app
+      - papyrus_uploads:/app/data/uploads
     depends_on:
+      - postgres
       - redis
       - grobid
     command: celery -A app.worker.celery_app worker -l info -Q audits

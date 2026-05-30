@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     deepseek_api_key: str | None = None
     openai_api_key: str | None = None
     huggingface_api_key: str | None = None
+    nli_backend: str = "auto"  # auto | hf | ollama | local | lexical
+    ollama_base_url: str | None = None
+    ollama_nli_model: str = "llama3.2"
 
     cache_ttl_seconds: int = 60 * 60 * 24 * 30
     title_drift_ratio_threshold: float = 0.72
@@ -45,6 +48,7 @@ class Settings(BaseSettings):
     deepseek_model: str = "deepseek-chat"
     enable_deepseek: bool = True
     use_celery_bulk: bool = False
+    nli_requires_claim_approval: bool = False
 
 
 @lru_cache

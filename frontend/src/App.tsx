@@ -202,6 +202,23 @@ export default function App() {
     if (response.ok) await refreshAudit(audit.id);
   };
 
+  const approveClaim = async () => {
+    if (!audit || !selected) return;
+    const response = await fetch(
+      `/api/audits/${audit.id}/citations/${selected.id}/approve-claim`,
+      { method: "POST" },
+    );
+    if (response.ok) await refreshAudit(audit.id);
+  };
+
+  const rerunCitation = async () => {
+    if (!audit || !selected) return;
+    const response = await fetch(`/api/audits/${audit.id}/citations/${selected.id}/rerun`, {
+      method: "POST",
+    });
+    if (response.ok) await refreshAudit(audit.id);
+  };
+
   const filteredCitations = useMemo(() => {
     const citations = audit?.citations ?? [];
     if (filter === "all") return citations;
@@ -416,7 +433,12 @@ export default function App() {
                     {audit.coverage.coverage_percent}%
                   </p>
                   <p className="text-xs text-[var(--papyrus-muted)]">Coverage</p>
-                  <p className="mt-2 font-audit text-sm uppercase text-amber-300">{audit.risk_level} risk</p>
+                  <p className="mt-2 font-audit text-sm uppercase text-amber-300">
+                    {audit.risk_level} risk
+                    {audit.risk_confidence && (
+                      <span className="ml-1 text-xs text-stone-400">({audit.risk_confidence} confidence)</span>
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="mt-4">
@@ -505,6 +527,8 @@ export default function App() {
               onClaimDraft={setClaimDraft}
               onSaveIntent={(intent) => void saveIntent(intent)}
               onSaveClaim={() => void saveClaim()}
+              onApproveClaim={() => void approveClaim()}
+              onRerunCitation={() => void rerunCitation()}
               onClose={() => setSelected(null)}
             />
           )}

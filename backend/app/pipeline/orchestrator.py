@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import UUID
 
 from app.config import get_settings
-from app.domain.enums import CitationIntent
+from app.domain.enums import CitationIntent, NliVerdict
 from app.domain.models import AuditRun, BibliographyEntry, CitationRecord
 from app.pipeline.evidence import retrieve_passage
 from app.pipeline.intent import apply_negation_override, classify_intent
@@ -47,7 +47,7 @@ class AuditOrchestrator:
         audit.citations = self._build_records(bibliography, inline)
         await self._classify_intents(audit_id, audit)
         await self._resolve_all(audit_id, audit)
-        await self._align_claims(audit)
+        await self._align_claims(audit_id, audit)
 
         finalize_scores(audit)
         audit.status = "complete"
@@ -118,7 +118,8 @@ class AuditOrchestrator:
 
         await asyncio.gather(*(_one(record) for record in audit.citations))
 
-    async def _align_claims(self, audit: AuditRun) -> None:
+    async def _align_claims(self, audit_id: UUID, audit: AuditRun) -> None:
+        settings = get_settings()
         for record in audit.citations:
             if record.intent != CitationIntent.EVIDENTIARY:
                 continue
@@ -126,8 +127,26 @@ class AuditOrchestrator:
             if context:
                 claim = await deepseek_client.extract_claim(context)
                 record.extracted_claim = claim or extract_claim(context)
+                event_bus.emit(
+                    audit_id,
+                    "claim",
+                    "Claim extracted",
+                    citation_index=record.index,
+                    claim=(record.extracted_claim or "")[:120],
+                )
             text = self._full_evidence_text(record)
             record.evidence_passage = await retrieve_passage(record.extracted_claim or "", text)
+            if settings.nli_requires_claim_approval and not record.claim_user_corrected:
+                record.claim_pending_review = True
+                record.nli_verdict = NliVerdict.SKIPPED
+                event_bus.emit(
+                    audit_id,
+                    "claim",
+                    "Awaiting user claim approval before NLI",
+                    citation_index=record.index,
+                )
+                continue
+            record.claim_pending_review = False
             await run_claim_alignment_async(record)
 
     async def run_from_url(self, audit_id: UUID, source_url: str, pdf_path: Path) -> AuditRun:

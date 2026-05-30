@@ -30,6 +30,21 @@ class BulkJobRecord(Base):
     )
 
 
+class AuditSummaryRecord(Base):
+    """Denormalized index for listing audits without parsing full JSON payloads."""
+
+    __tablename__ = "audit_summaries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    paper_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[str] = mapped_column(String(32))
+    coverage_percent: Mapped[float] = mapped_column()
+    failure_rate: Mapped[float] = mapped_column()
+    risk_level: Mapped[str] = mapped_column(String(16))
+    citation_count: Mapped[int] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class CitationCorrectionRecord(Base):
     """User intent/claim overrides for ground-truth dataset building."""
 

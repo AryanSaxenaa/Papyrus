@@ -86,6 +86,7 @@ class CitationRecord(BaseModel):
 
     extracted_claim: str | None = None
     claim_user_corrected: str | None = None
+    claim_pending_review: bool = False
     evidence_passage: str | None = None
     nli_verdict: NliVerdict = NliVerdict.SKIPPED
     quantitative_claim: bool = False

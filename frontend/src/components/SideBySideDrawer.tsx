@@ -10,6 +10,8 @@ type Props = {
   onClaimDraft: (value: string) => void;
   onSaveIntent: (intent: string) => void;
   onSaveClaim: () => void;
+  onApproveClaim?: () => void;
+  onRerunCitation?: () => void;
   onClose: () => void;
 };
 
@@ -20,6 +22,8 @@ export function SideBySideDrawer({
   onClaimDraft,
   onSaveIntent,
   onSaveClaim,
+  onApproveClaim,
+  onRerunCitation,
   onClose,
 }: Props) {
   const context = citation.inline_markers?.[0]?.context_window ?? "No inline context captured.";
@@ -108,13 +112,33 @@ export function SideBySideDrawer({
                 onChange={(e) => onClaimDraft(e.target.value)}
               />
             </label>
-            <button
-              type="button"
-              onClick={onSaveClaim}
-              className="mt-2 rounded border border-emerald-700/50 px-3 py-1 text-xs font-semibold text-emerald-200"
-            >
-              Rerun alignment
-            </button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {citation.claim_pending_review && onApproveClaim && (
+                <button
+                  type="button"
+                  onClick={onApproveClaim}
+                  className="rounded border border-amber-600/60 bg-amber-950/50 px-3 py-1 text-xs font-semibold text-amber-100"
+                >
+                  Approve claim & run NLI
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onSaveClaim}
+                className="rounded border border-emerald-700/50 px-3 py-1 text-xs font-semibold text-emerald-200"
+              >
+                Rerun alignment
+              </button>
+              {onRerunCitation && (
+                <button
+                  type="button"
+                  onClick={onRerunCitation}
+                  className="rounded border border-stone-600 px-3 py-1 text-xs text-stone-300"
+                >
+                  Rerun resolution
+                </button>
+              )}
+            </div>
             {citation.extracted_claim && citation.claim_user_corrected && (
               <p className="mt-3 text-xs text-stone-500">
                 Original extraction:{" "}

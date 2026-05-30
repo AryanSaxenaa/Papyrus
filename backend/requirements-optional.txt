@@ -1,0 +1,3 @@
+# Optional: local on-prem NLI without Hugging Face API (set NLI_BACKEND=local)
+sentence-transformers>=3.0.0
+torch>=2.0.0

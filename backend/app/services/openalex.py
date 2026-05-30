@@ -16,6 +16,20 @@ class OpenAlexClient:
         settings = get_settings()
         self._params = {"mailto": settings.openalex_mailto}
 
+    async def lookup_doi(self, doi: str) -> dict[str, Any] | None:
+        if not await rate_limit_service.allow("openalex"):
+            return None
+        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{self.BASE}/works/https://doi.org/{quote(normalized, safe='')}",
+                params=self._params,
+            )
+            await rate_limit_service.record("openalex")
+            if response.status_code != 200:
+                return None
+            return self._normalize_work(response.json())
+
     async def search_title(self, title: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("openalex"):
             return None
@@ -30,20 +44,32 @@ class OpenAlexClient:
             results = response.json().get("results") or []
             if not results:
                 return None
-            work = results[0]
-            doi = (work.get("doi") or "").removeprefix("https://doi.org/")
-            authorships = work.get("authorships") or []
-            authors = [
-                (a.get("author") or {}).get("display_name", "")
-                for a in authorships
-            ]
-            return {
-                "title": work.get("title"),
-                "authors": [a for a in authors if a],
-                "year": work.get("publication_year"),
-                "doi": doi or None,
-                "abstract": work.get("abstract"),
-            }
+            return self._normalize_work(results[0])
+
+    def _normalize_work(self, work: dict[str, Any]) -> dict[str, Any]:
+        doi = (work.get("doi") or "").removeprefix("https://doi.org/")
+        authorships = work.get("authorships") or []
+        authors = [(a.get("author") or {}).get("display_name", "") for a in authorships]
+        abstract = work.get("abstract")
+        if abstract is None:
+            inverted = work.get("abstract_inverted_index")
+            if isinstance(inverted, dict):
+                abstract = _reconstruct_abstract(inverted)
+        return {
+            "title": work.get("title"),
+            "authors": [a for a in authors if a],
+            "year": work.get("publication_year"),
+            "doi": doi or None,
+            "abstract": abstract,
+        }
+
+
+def _reconstruct_abstract(inverted: dict[str, list[int]]) -> str:
+    positions: dict[int, str] = {}
+    for word, idxs in inverted.items():
+        for idx in idxs:
+            positions[idx] = word
+    return " ".join(positions[i] for i in sorted(positions))
 
 
 openalex_client = OpenAlexClient()

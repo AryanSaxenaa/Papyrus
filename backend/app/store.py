@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db.models import AuditRecord
+from app.db.models import AuditRecord, AuditSummaryRecord
 from app.db.session import get_engine
 from app.domain.models import AuditRun
 
@@ -59,6 +59,40 @@ class AuditStore:
         if self._use_postgres():
             self._save_postgres(audit, payload)
 
+    def list_summaries(self) -> list[dict]:
+        engine = get_engine()
+        if engine is None:
+            return [
+                {
+                    "id": str(a.id),
+                    "paper_title": a.paper_title,
+                    "status": a.status,
+                    "coverage_percent": a.coverage.coverage_percent,
+                    "failure_rate": a.failures.confirmed_failure_rate,
+                    "risk_level": a.risk_level.value,
+                    "citation_count": len(a.citations),
+                    "created_at": a.created_at.isoformat(),
+                }
+                for a in self.list()
+            ]
+        with Session(engine) as session:
+            rows = session.scalars(
+                select(AuditSummaryRecord).order_by(AuditSummaryRecord.created_at.desc())
+            ).all()
+            return [
+                {
+                    "id": row.id,
+                    "paper_title": row.paper_title,
+                    "status": row.status,
+                    "coverage_percent": row.coverage_percent,
+                    "failure_rate": row.failure_rate,
+                    "risk_level": row.risk_level,
+                    "citation_count": row.citation_count,
+                    "created_at": row.created_at.isoformat() if row.created_at else None,
+                }
+                for row in rows
+            ]
+
     def list(self) -> list[AuditRun]:
         if self._use_postgres():
             engine = get_engine()
@@ -101,6 +135,24 @@ class AuditStore:
                 session.add(row)
             else:
                 row.payload = payload
+            session.commit()
+        self._save_summary(audit)
+
+    def _save_summary(self, audit: AuditRun) -> None:
+        engine = get_engine()
+        if engine is None:
+            return
+        with Session(engine) as session:
+            row = session.get(AuditSummaryRecord, str(audit.id))
+            if row is None:
+                row = AuditSummaryRecord(id=str(audit.id))
+                session.add(row)
+            row.paper_title = (audit.paper_title or "")[:512] or None
+            row.status = audit.status
+            row.coverage_percent = audit.coverage.coverage_percent
+            row.failure_rate = audit.failures.confirmed_failure_rate
+            row.risk_level = audit.risk_level.value
+            row.citation_count = len(audit.citations)
             session.commit()
 
 

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import httpx
 
 from app.config import get_settings
 from app.domain.enums import EvidenceTier, NliVerdict
+from app.services.local_nli import classify_local
+from app.services.ollama_nli import classify_ollama
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +16,33 @@ NLI_MODEL = "cross-encoder/nli-deberta-v3-base"
 
 
 async def classify_entailment(claim: str, evidence: str) -> NliVerdict | None:
-    """Return NLI verdict via Hugging Face Inference API, or None to use fallback."""
+    """NLI via configured backend chain, or None to use lexical fallback."""
     settings = get_settings()
-    if not settings.huggingface_api_key:
+    backend = settings.nli_backend.lower()
+
+    if backend in {"auto", "ollama"}:
+        result = await classify_ollama(claim, evidence)
+        if result is not None:
+            return result
+
+    if backend in {"auto", "local"}:
+        result = await asyncio.to_thread(classify_local, claim, evidence)
+        if result is not None:
+            return result
+
+    if backend in {"auto", "hf"} and settings.huggingface_api_key:
+        result = await _classify_huggingface(claim, evidence)
+        if result is not None:
+            return result
+
+    if backend == "lexical":
         return None
 
+    return None
+
+
+async def _classify_huggingface(claim: str, evidence: str) -> NliVerdict | None:
+    settings = get_settings()
     async with httpx.AsyncClient(timeout=90.0) as client:
         response = await client.post(
             f"https://api-inference.huggingface.co/models/{NLI_MODEL}",
@@ -27,9 +52,7 @@ async def classify_entailment(claim: str, evidence: str) -> NliVerdict | None:
         if response.status_code != 200:
             logger.warning("HF NLI failed: %s", response.text[:200])
             return None
-
-        payload = response.json()
-        label = _extract_label(payload)
+        label = _extract_label(response.json())
         return _map_label(label)
 
 

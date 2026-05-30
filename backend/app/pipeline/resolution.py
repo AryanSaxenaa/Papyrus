@@ -108,6 +108,28 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
             elif not crossref:
                 crossref = s2_doi
 
+        if cited.doi:
+            openalex_doi = await cache_service.get_json("openalex_doi", cited.doi)
+            if openalex_doi is None:
+                openalex_doi = await openalex_client.lookup_doi(cited.doi)
+                if openalex_doi:
+                    await cache_service.set_json("openalex_doi", cited.doi, openalex_doi)
+            record.resolution_attempts.append(
+                _attempt(ResolutionSource.OPENALEX, f"DOI:{cited.doi}", openalex_doi is not None, openalex_doi)
+            )
+            if openalex_doi:
+                if crossref and not crossref.get("abstract") and openalex_doi.get("abstract"):
+                    crossref = {**crossref, "abstract": openalex_doi["abstract"]}
+                elif not crossref:
+                    crossref = openalex_doi
+                    event_bus.emit(
+                        audit_id,
+                        "openalex",
+                        "OpenAlex DOI lookup",
+                        citation_index=record.index,
+                        success=True,
+                    )
+
     arxiv_id = arxiv_client.extract_id(cited.doi) or arxiv_client.extract_id(cited.raw)
     if arxiv_id:
         arxiv = await arxiv_client.fetch(arxiv_id)

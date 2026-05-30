@@ -19,6 +19,8 @@ from app.domain.models import AuditRun, BulkAuditJob, CitationRecord
 from app.pipeline.bulk import process_bulk_zip
 from app.pipeline.orchestrator import audit_orchestrator
 from app.pipeline.scoring import finalize_scores
+from app.pipeline.evidence import retrieve_passage
+from app.pipeline.resolution import resolve_record
 from app.pipeline.verdicts import run_claim_alignment_async
 from app.services.events import event_bus
 from app.services.corrections import correction_store
@@ -47,6 +49,51 @@ class UrlAuditRequest(BaseModel):
 @router.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "papyrus"}
+
+
+@router.get("/health/detailed")
+async def health_detailed() -> dict:
+    settings = get_settings()
+    checks: dict[str, dict] = {"api": {"ok": True}}
+
+    try:
+        from app.db.session import get_engine
+
+        engine = get_engine()
+        if engine is not None:
+            from sqlalchemy import text
+
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            checks["postgres"] = {"ok": True}
+        else:
+            checks["postgres"] = {"ok": False, "note": "not configured"}
+    except Exception as exc:  # noqa: BLE001
+        checks["postgres"] = {"ok": False, "error": str(exc)}
+
+    try:
+        from app.services.cache import cache_service
+
+        checks["redis"] = {"ok": await cache_service.ping()}
+    except Exception as exc:  # noqa: BLE001
+        checks["redis"] = {"ok": False, "error": str(exc)}
+
+    if settings.grobid_enabled:
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{settings.grobid_url}/api/isalive")
+                checks["grobid"] = {"ok": response.status_code == 200}
+        except Exception as exc:  # noqa: BLE001
+            checks["grobid"] = {"ok": False, "error": str(exc)}
+
+    return {"status": "ok" if all(c.get("ok") for c in checks.values()) else "degraded", "checks": checks}
+
+
+@router.get("/audits/summaries")
+async def list_audit_summaries() -> list[dict]:
+    return audit_store.list_summaries()
 
 
 @router.get("/audits")
@@ -243,6 +290,7 @@ async def update_claim(audit_id: UUID, citation_id: str, body: ClaimUpdate) -> C
     record = _get_citation(audit, citation_id)
     original = record.extracted_claim
     record.claim_user_corrected = body.claim
+    record.claim_pending_review = False
     correction_store.record(
         str(audit_id),
         citation_id,
@@ -261,6 +309,56 @@ async def update_claim(audit_id: UUID, citation_id: str, body: ClaimUpdate) -> C
         citation_index=record.index,
         verdict=record.claim_alignment_verdict,
     )
+    return record
+
+
+@router.post("/audits/{audit_id}/citations/{citation_id}/approve-claim")
+async def approve_claim(audit_id: UUID, citation_id: str) -> CitationRecord:
+    audit = audit_store.get(audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    record = _get_citation(audit, citation_id)
+    if not record.extracted_claim and not record.claim_user_corrected:
+        raise HTTPException(status_code=400, detail="No claim to approve")
+    record.claim_pending_review = False
+    text = audit_orchestrator._full_evidence_text(record)
+    record.evidence_passage = await retrieve_passage(
+        record.claim_user_corrected or record.extracted_claim or "",
+        text,
+    )
+    await run_claim_alignment_async(record)
+    finalize_scores(audit)
+    audit_store.save(audit)
+    event_bus.emit(
+        audit_id,
+        "nli",
+        "NLI run after claim approval",
+        citation_index=record.index,
+        verdict=record.claim_alignment_verdict,
+    )
+    return record
+
+
+@router.post("/audits/{audit_id}/citations/{citation_id}/rerun")
+async def rerun_citation(audit_id: UUID, citation_id: str) -> CitationRecord:
+    audit = audit_store.get(audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    record = _get_citation(audit, citation_id)
+    record.status = "resolving"
+    record.verdict_color = "resolving"
+    await resolve_record(audit_id, record)
+    record.status = "complete"
+    if record.intent == CitationIntent.EVIDENTIARY and not record.claim_pending_review:
+        text = audit_orchestrator._full_evidence_text(record)
+        record.evidence_passage = await retrieve_passage(
+            record.claim_user_corrected or record.extracted_claim or "",
+            text,
+        )
+        await run_claim_alignment_async(record)
+    finalize_scores(audit)
+    audit_store.save(audit)
+    event_bus.emit(audit_id, "verdict", "Citation rerun complete", citation_index=record.index)
     return record
 
 
