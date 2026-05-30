@@ -1,3 +1,18 @@
+export type VersionEntry = {
+  label: string;
+  date?: string | null;
+  title?: string | null;
+  abstract?: string | null;
+  source?: string | null;
+};
+
+export type VersionMismatchInfo = {
+  preprint?: VersionEntry | null;
+  published?: VersionEntry | null;
+  revisions: VersionEntry[];
+  material_difference: boolean;
+};
+
 export type AuditRun = {
   id: string;
   paper_title?: string | null;
@@ -13,11 +28,16 @@ export type AuditRun = {
   };
   failures: {
     confirmed_failure_rate: number;
+    supported: number;
+    not_supported: number;
+    cannot_assess: number;
     type_1: number;
     type_2: number;
+    type_5: number;
     type_6: number;
     type_7: number;
     retraction: number;
+    version_mismatch: number;
   };
   risk_level: string;
   paper_text?: string | null;
@@ -58,6 +78,7 @@ export type CitationRecord = {
   evidence_passage?: string | null;
   quantitative_caveat?: string | null;
   claim_alignment_verdict?: string | null;
+  version_mismatch?: VersionMismatchInfo | null;
   exa_signal?: string | null;
   source_verify_url?: string | null;
   oa_pdf_url?: string | null;
@@ -73,7 +94,15 @@ export type StreamEvent = {
   ts: string;
   type: string;
   message: string;
+  citation_index?: number;
   [key: string]: unknown;
 };
 
-export type HeatmapFilter = "all" | "failures" | "unresolvable" | "retracted";
+export type HeatmapFilter =
+  | "all"
+  | "supported"
+  | "contradictions"
+  | "cannot_assess"
+  | "failures"
+  | "unresolvable"
+  | "retracted";

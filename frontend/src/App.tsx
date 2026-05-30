@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CoverageSummary } from "./components/CoverageSummary";
+import { HeatmapLegend } from "./components/HeatmapLegend";
+import { LivePanel } from "./components/LivePanel";
+import { SideBySideDrawer } from "./components/SideBySideDrawer";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
 const verdictClass: Record<string, string> = {
@@ -12,8 +16,6 @@ const verdictClass: Record<string, string> = {
   pending: "bg-[#2a312e]",
   amber: "bg-[var(--papyrus-amber)]",
 };
-
-const INTENT_OPTIONS = ["evidentiary", "methodological", "contrastive", "background"];
 
 function highlightCitations(text: string, citations: CitationRecord[]) {
   const colors: Record<string, string> = {
@@ -215,6 +217,23 @@ export default function App() {
   const filteredCitations = useMemo(() => {
     const citations = audit?.citations ?? [];
     if (filter === "all") return citations;
+    if (filter === "supported") {
+      return citations.filter(
+        (c) => c.claim_alignment_verdict === "supported" || c.verdict_color === "supported",
+      );
+    }
+    if (filter === "contradictions") {
+      return citations.filter(
+        (c) =>
+          c.hallucination_type === "type_7_claim_contradiction" ||
+          c.claim_alignment_verdict === "claim_contradiction",
+      );
+    }
+    if (filter === "cannot_assess") {
+      return citations.filter(
+        (c) => c.claim_alignment_verdict === "cannot_determine" || c.verdict_color === "cannot_assess",
+      );
+    }
     if (filter === "failures") {
       return citations.filter(
         (c) => c.verdict_color === "failure" || c.hallucination_type.includes("type_"),
@@ -393,6 +412,7 @@ export default function App() {
                 </div>
               </div>
               <div className="mt-4">{coverageBar}</div>
+              <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
               {audit.status === "complete" && (
                 <div className="mt-3 flex gap-3 text-sm">
                   <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.txt`}>
@@ -413,23 +433,10 @@ export default function App() {
           )}
 
           <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
-                Citation heatmap
-              </h3>
-              <div className="flex flex-wrap gap-1 text-xs">
-                {(["all", "failures", "unresolvable", "retracted"] as HeatmapFilter[]).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilter(key)}
-                    className={`rounded px-2 py-1 ${filter === key ? "bg-emerald-900/70" : "bg-black/30"}`}
-                  >
-                    {key}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
+              Citation heatmap
+            </h3>
+            <HeatmapLegend />
             <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2">
               {filteredCitations.map((citation) => (
                 <button
@@ -473,108 +480,24 @@ export default function App() {
           )}
 
           {selected && audit && (
-            <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
-              <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
-                Citation #{selected.index}
-              </h3>
-              <p className="mt-2 text-sm">{selected.bibliography.title ?? selected.bibliography.raw.slice(0, 240)}</p>
-
-              {selected.inline_markers?.[0]?.context_window && (
-                <p className="mt-3 rounded border border-white/10 bg-black/20 p-2 text-xs leading-relaxed">
-                  {selected.inline_markers[0].context_window}
-                </p>
-              )}
-
-              <div className="mt-3">
-                <p className="text-xs text-[var(--papyrus-muted)]">Resolution provenance</p>
-                <ul className="mt-1 space-y-1 font-audit text-xs">
-                  {selected.resolution_attempts.map((attempt, index) => (
-                    <li key={`${attempt.source}-${index}`} className="text-stone-300">
-                      <span className={attempt.success ? "text-emerald-400" : "text-stone-500"}>
-                        {attempt.success ? "✓" : "✗"}
-                      </span>{" "}
-                      {attempt.source}: {attempt.summary}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <label className="mt-3 block text-xs text-[var(--papyrus-muted)]">
-                Intent
-                <select
-                  className="mt-1 w-full rounded border border-white/15 bg-black/30 px-2 py-1 font-audit text-sm"
-                  value={selected.intent}
-                  onChange={(e) => void saveIntent(e.target.value)}
-                >
-                  {INTENT_OPTIONS.map((intent) => (
-                    <option key={intent} value={intent}>
-                      {intent}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="mt-3 block text-xs text-[var(--papyrus-muted)]">
-                Extracted claim
-                <textarea
-                  className="mt-1 w-full rounded border border-white/15 bg-black/30 px-2 py-1 font-audit text-sm"
-                  rows={3}
-                  value={claimDraft}
-                  onChange={(e) => setClaimDraft(e.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void saveClaim()}
-                className="mt-2 rounded border border-emerald-700/50 px-3 py-1 text-xs font-semibold text-emerald-200"
-              >
-                Rerun alignment
-              </button>
-
-              {selected.evidence_passage && (
-                <p className="mt-3 rounded border border-white/10 bg-black/20 p-2 text-xs leading-relaxed">
-                  {selected.evidence_passage.slice(0, 500)}
-                </p>
-              )}
-
-              {selected.exa_signal && (
-                <p className="mt-2 text-xs text-stone-300">{selected.exa_signal}</p>
-              )}
-
-              {selected.source_verify_url && (
-                <a
-                  href={selected.source_verify_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-block text-sm text-emerald-300 underline"
-                >
-                  Verify source
-                </a>
-              )}
-
-              {selected.quantitative_caveat && (
-                <p className="mt-3 rounded border border-amber-700/40 bg-amber-950/30 p-2 text-xs text-amber-100">
-                  {selected.quantitative_caveat}
-                </p>
-              )}
-            </div>
+            <SideBySideDrawer
+              audit={audit}
+              citation={selected}
+              claimDraft={claimDraft}
+              onClaimDraft={setClaimDraft}
+              onSaveIntent={(intent) => void saveIntent(intent)}
+              onSaveClaim={() => void saveClaim()}
+              onClose={() => setSelected(null)}
+            />
           )}
         </section>
 
-        <section className="rounded-xl border border-white/10 bg-[#0c100e] p-4">
+        <section className="rounded-xl border border-white/10 bg-[#0c100e] p-4 min-h-[70vh]">
           <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
             Live resolution panel
           </h3>
-          <div className="mt-3 max-h-[70vh] space-y-2 overflow-y-auto font-audit text-xs leading-relaxed">
-            {events.map((event, index) => (
-              <div key={`${event.ts}-${index}`} className="border-b border-white/5 pb-2">
-                <span className="text-[var(--papyrus-muted)]">{event.ts.slice(11, 19)}</span>{" "}
-                <span className="text-emerald-300">{event.type}</span> {event.message}
-              </div>
-            ))}
-            {!events.length && (
-              <p className="text-[var(--papyrus-muted)]">Resolution events will stream here during analysis.</p>
-            )}
+          <div className="mt-3 h-[calc(70vh-3rem)]">
+            <LivePanel events={events} audit={audit} />
           </div>
         </section>
       </main>

@@ -45,6 +45,21 @@ class InlineCitation(BaseModel):
     context_window: str
 
 
+class VersionEntry(BaseModel):
+    label: str
+    date: str | None = None
+    title: str | None = None
+    abstract: str | None = None
+    source: str | None = None
+
+
+class VersionMismatchInfo(BaseModel):
+    preprint: VersionEntry | None = None
+    published: VersionEntry | None = None
+    revisions: list[VersionEntry] = Field(default_factory=list)
+    material_difference: bool = False
+
+
 class CitationRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     index: int
@@ -67,6 +82,7 @@ class CitationRecord(BaseModel):
 
     hallucination_type: HallucinationType = HallucinationType.NONE
     title_edit_distance: float | None = None
+    version_mismatch: VersionMismatchInfo | None = None
 
     extracted_claim: str | None = None
     claim_user_corrected: str | None = None

@@ -84,6 +84,11 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Evidence passage retrieval (lexical + optional OpenAI embeddings)
 - [x] Coverage + risk scoring, JSON/TXT reports, disk persistence
 - [x] SSE live panel + heatmap UI (DOI verify, filters, claim rerun)
+- [x] Side-by-side claim viewer (context / verdict / evidence drawer)
+- [x] Coverage summary chips + heatmap legend + contradiction filter
+- [x] Dual-column live panel (event log + resolving stack, citation search)
+- [x] Version mismatch timeline (arXiv preprint vs published)
+- [x] PubMed/PMC URL → PDF via Firecrawl landing scrape
 - [x] Europe PMC biomedical lookup
 - [x] NLI via Hugging Face Inference API (fallback: lexical heuristic)
 - [x] Bulk ZIP queue, URL ingestion (arXiv + direct PDF)

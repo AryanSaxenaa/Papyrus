@@ -6,14 +6,18 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.services.firecrawl import firecrawl_client
+
 ARXIV_ABS = re.compile(r"arxiv\.org/abs/([\d.]+v?\d*)", re.I)
 ARXIV_PDF = re.compile(r"arxiv\.org/pdf/([\d.]+v?\d*)", re.I)
 DOI_URL = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.I)
+PMC_PDF = re.compile(r"(https?://[^\s\"']+/pdf/[^\s\"']+\.pdf)", re.I)
+PMID_PATTERN = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)", re.I)
 
 
 class UrlFetchService:
     async def download_pdf(self, url: str, destination: Path) -> Path:
-        pdf_url = self.resolve_pdf_url(url)
+        pdf_url = await self.resolve_pdf_url_async(url)
         async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
             response = await client.get(pdf_url)
             response.raise_for_status()
@@ -22,6 +26,18 @@ class UrlFetchService:
                 raise ValueError("URL did not return a PDF — try uploading the file directly")
             destination.write_bytes(response.content)
         return destination
+
+    async def resolve_pdf_url_async(self, url: str) -> str:
+        try:
+            return self.resolve_pdf_url(url)
+        except ValueError:
+            landing = await self._resolve_landing_pdf(url)
+            if landing:
+                return landing
+            raise ValueError(
+                "Could not resolve a PDF from this URL. Supported: arXiv, DOI with open access, "
+                "PubMed/PMC (via Firecrawl), and direct .pdf links."
+            )
 
     def resolve_pdf_url(self, url: str) -> str:
         parsed = urlparse(url.strip())
@@ -41,10 +57,36 @@ class UrlFetchService:
         if url.lower().endswith(".pdf"):
             return url
 
-        raise ValueError(
-            "Unsupported URL. Use arXiv, DOI, or a direct PDF link. "
-            "PubMed/SSRN landing pages require Firecrawl (not yet enabled)."
-        )
+        raise ValueError("Unsupported direct URL pattern")
+
+    async def _resolve_landing_pdf(self, url: str) -> str | None:
+        host = urlparse(url).netloc.lower()
+        if "ncbi.nlm.nih.gov" in host or "pubmed" in host:
+            return await self._pubmed_pdf(url)
+        scraped = await firecrawl_client.scrape_landing_page(url)
+        if not scraped:
+            return None
+        return self._pdf_from_scrape(scraped)
+
+    def _pdf_from_scrape(self, scraped: dict) -> str | None:
+        body = scraped.get("markdown") or scraped.get("abstract") or ""
+        match = PMC_PDF.search(body)
+        return match.group(1) if match else None
+
+    async def _pubmed_pdf(self, url: str) -> str | None:
+        scraped = await firecrawl_client.scrape_landing_page(url)
+        if scraped:
+            found = self._pdf_from_scrape(scraped)
+            if found:
+                return found
+        pmid_match = PMID_PATTERN.search(url)
+        if pmid_match:
+            pmc_search = await firecrawl_client.scrape_landing_page(
+                f"https://pubmed.ncbi.nlm.nih.gov/{pmid_match.group(1)}/"
+            )
+            if pmc_search:
+                return self._pdf_from_scrape(pmc_search)
+        return None
 
     def infer_title_hint(self, url: str) -> str | None:
         arxiv_match = ARXIV_ABS.search(url) or ARXIV_PDF.search(url)

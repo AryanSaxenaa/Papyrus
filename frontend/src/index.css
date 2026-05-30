@@ -23,3 +23,14 @@ body {
 .font-audit {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

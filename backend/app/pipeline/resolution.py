@@ -6,6 +6,7 @@ from uuid import UUID
 from app.domain.enums import EvidenceTier, HallucinationType, ResolutionSource
 from app.domain.models import CitationRecord, ResolutionAttempt
 from app.pipeline.verdicts import compare_titles, detect_hallucination
+from app.pipeline.version_tracking import build_version_timeline
 from app.services.arxiv import arxiv_client
 from app.services.europe_pmc import europe_pmc_client
 from app.services.cache import cache_service
@@ -222,6 +223,14 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
         if ratio < 0.5:
             record.hallucination_type = HallucinationType.VERSION_MISMATCH
             record.verdict_color = "failure"
+            record.version_mismatch = build_version_timeline(arxiv, crossref)
+            event_bus.emit(
+                audit_id,
+                "version",
+                "Version mismatch timeline built",
+                citation_index=record.index,
+                material=record.version_mismatch.material_difference if record.version_mismatch else False,
+            )
 
     if record.evidence_tier == EvidenceTier.TIER_4 and cited.title:
         exa = await exa_client.weak_signal_search(cited.title, cited.authors)

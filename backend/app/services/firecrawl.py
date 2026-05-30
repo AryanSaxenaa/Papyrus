@@ -35,6 +35,7 @@ class FirecrawlClient:
             return {
                 "title": metadata.get("title"),
                 "abstract": abstract or markdown[:2000] if markdown else None,
+                "markdown": markdown,
                 "source_url": url,
             }
 
