@@ -43,6 +43,7 @@ venv/
 .ruff_cache/
 data/uploads/
 data/audits/
+data/**/fulltext/
 
 # Node
 node_modules/

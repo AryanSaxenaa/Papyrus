@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.config import get_settings
+from app.db.session import init_db
 from app.services.cache import cache_service
 
 
@@ -14,6 +15,7 @@ async def lifespan(_: FastAPI):
     settings = get_settings()
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.audit_data_dir).mkdir(parents=True, exist_ok=True)
+    init_db()
     try:
         await cache_service.connect()
     except Exception:

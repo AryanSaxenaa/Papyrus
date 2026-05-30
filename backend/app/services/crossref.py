@@ -25,7 +25,30 @@ class CrossRefClient:
                 return None
             response.raise_for_status()
             message = response.json().get("message", {})
-            return self._normalize(message)
+            result = self._normalize(message)
+            if not result.get("abstract"):
+                negotiated = await self._negotiate_doi(client, normalized)
+                if negotiated:
+                    result["abstract"] = negotiated.get("abstract") or result.get("abstract")
+                    result["title"] = result.get("title") or negotiated.get("title")
+            return result
+
+    async def _negotiate_doi(self, client: httpx.AsyncClient, doi: str) -> dict[str, Any] | None:
+        headers = {
+            **self._headers,
+            "Accept": "application/vnd.citationstyles.csl+json",
+        }
+        response = await client.get(f"https://doi.org/{doi}", headers=headers, follow_redirects=True)
+        if response.status_code != 200:
+            return None
+        try:
+            payload = response.json()
+        except ValueError:
+            return None
+        title = payload.get("title")
+        if isinstance(title, list):
+            title = title[0] if title else None
+        return {"title": title, "abstract": payload.get("abstract")}
 
     def _normalize(self, message: dict[str, Any]) -> dict[str, Any]:
         title = (message.get("title") or [""])[0]

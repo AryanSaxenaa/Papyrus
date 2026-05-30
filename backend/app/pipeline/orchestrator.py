@@ -17,6 +17,7 @@ from app.services.deepseek import deepseek_client
 from app.services.events import event_bus
 from app.services.fallback_parser import parse_pdf_fallback
 from app.services.grobid import grobid_client
+from app.services.pdf_text import extract_paper_text
 from app.store import audit_store
 
 
@@ -31,6 +32,10 @@ class AuditOrchestrator:
 
         bibliography, inline, paper_title = await self._parse_pdf(audit_id, pdf_path)
         audit.paper_title = paper_title
+        try:
+            audit.paper_text = extract_paper_text(pdf_path)
+        except Exception:  # noqa: BLE001
+            audit.paper_text = None
         event_bus.emit(
             audit_id,
             "grobid",
@@ -161,11 +166,17 @@ class AuditOrchestrator:
         ]
 
     def _full_evidence_text(self, record: CitationRecord) -> str | None:
+        for attempt in record.resolution_attempts:
+            payload = attempt.payload or {}
+            if payload.get("full_text"):
+                return payload["full_text"]
         parts: list[str] = []
         for attempt in record.resolution_attempts:
             payload = attempt.payload or {}
             if payload.get("abstract"):
                 parts.append(payload["abstract"])
+            if payload.get("text"):
+                parts.append(payload["text"])
         if parts:
             return "\n\n".join(parts)
         if record.resolved_title:

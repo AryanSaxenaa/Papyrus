@@ -141,6 +141,42 @@ async def list_bulk_audits(job_id: UUID) -> list[AuditRun]:
     return audits
 
 
+@router.get("/bulk/{job_id}/dashboard")
+async def bulk_dashboard(job_id: UUID) -> dict:
+    job = bulk_job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Bulk job not found")
+
+    papers = []
+    for audit_id in job.audit_ids:
+        audit = audit_store.get(audit_id)
+        if not audit:
+            continue
+        resolvable = audit.coverage.tier_1 + audit.coverage.tier_2 + audit.coverage.tier_3
+        papers.append(
+            {
+                "audit_id": str(audit.id),
+                "title": audit.paper_title,
+                "status": audit.status,
+                "coverage_percent": audit.coverage.coverage_percent,
+                "confirmed_failure_rate": audit.failures.confirmed_failure_rate,
+                "risk_level": audit.risk_level.value,
+                "resolvable_citations": resolvable,
+                "type_1": audit.failures.type_1,
+                "type_2": audit.failures.type_2,
+                "type_7": audit.failures.type_7,
+                "retraction": audit.failures.retraction,
+            }
+        )
+
+    papers.sort(key=lambda row: row["confirmed_failure_rate"], reverse=True)
+    return {
+        "job": job.model_dump(mode="json"),
+        "papers": papers,
+        "note": "Ranked by confirmed failure rate among resolvable citations, not unresolvable count.",
+    }
+
+
 @router.get("/audits/{audit_id}/events")
 async def stream_events(audit_id: UUID) -> EventSourceResponse:
     if not audit_store.get(audit_id):

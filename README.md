@@ -69,6 +69,7 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits/url` | Audit paper from arXiv/DOI/PDF URL |
 | `POST` | `/api/audits/bulk` | ZIP of PDFs (async bulk job) |
 | `GET` | `/api/bulk/{id}` | Bulk job status |
+| `GET` | `/api/bulk/{id}/dashboard` | Bulk papers ranked by failure rate |
 
 ## Implementation status (v1 slice)
 
@@ -84,7 +85,11 @@ Open http://localhost:5173 and upload a PDF.
 - [x] NLI via Hugging Face Inference API (fallback: lexical heuristic)
 - [x] Bulk ZIP queue, URL ingestion (arXiv + direct PDF)
 - [x] PDF export report
-- [ ] PostgreSQL persistence
-- [ ] Apify actors, Firecrawl landing pages, full-text PDF fetch for Tier 1
+- [x] PostgreSQL persistence (`PERSISTENCE_BACKEND=json|postgres|both`)
+- [x] Firecrawl landing-page abstract fallback
+- [x] Open-access full-text PDF fetch for Tier 1 evidence
+- [x] CrossRef DOI content negotiation
+- [x] Bulk dashboard + paper anatomy view
+- [ ] Apify actors (arXiv, OpenAlex bulk, Europe PMC scrapers)
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.

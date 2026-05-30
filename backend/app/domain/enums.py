@@ -54,6 +54,8 @@ class ResolutionSource(StrEnum):
     ARXIV = "arxiv"
     EXA = "exa"
     EUROPE_PMC = "europe_pmc"
+    FIRECRAWL = "firecrawl"
+    FULLTEXT = "fulltext"
     DEEPSEEK = "deepseek"
     GROBID = "grobid"
     PYMUPDF = "pymupdf"

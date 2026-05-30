@@ -20,7 +20,21 @@ export type AuditRun = {
     retraction: number;
   };
   risk_level: string;
+  paper_text?: string | null;
   citations: CitationRecord[];
+};
+
+export type BulkDashboard = {
+  job: { id: string; status: string; total: number; completed: number; failed: number };
+  note?: string;
+  papers: Array<{
+    audit_id: string;
+    title?: string | null;
+    status: string;
+    coverage_percent: number;
+    confirmed_failure_rate: number;
+    risk_level: string;
+  }>;
 };
 
 export type CitationRecord = {

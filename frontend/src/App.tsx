@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AuditRun, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
+import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
 const verdictClass: Record<string, string> = {
   supported: "bg-[var(--papyrus-green)]",
@@ -15,6 +15,32 @@ const verdictClass: Record<string, string> = {
 
 const INTENT_OPTIONS = ["evidentiary", "methodological", "contrastive", "background"];
 
+function highlightCitations(text: string, citations: CitationRecord[]) {
+  const colors: Record<string, string> = {
+    supported: "#1f6b4a",
+    failure: "#8b1e2f",
+    retraction: "#8b1e2f",
+    cannot_assess: "#3d5a73",
+    neutral: "#5c6460",
+    unresolvable: "#4a524e",
+    resolving: "#b8860b",
+    pending: "#2a312e",
+    amber: "#b8860b",
+  };
+  let html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  for (const citation of citations) {
+    for (const marker of [citation.bibliography.doi, `[${citation.index}]`]) {
+      if (!marker) continue;
+      const color = colors[citation.verdict_color] ?? colors.pending;
+      html = html.replaceAll(
+        marker,
+        `<mark style="background:${color};color:#fff;border-radius:2px;padding:0 2px">${marker}</mark>`,
+      );
+    }
+  }
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 export default function App() {
   const [audit, setAudit] = useState<AuditRun | null>(null);
   const [events, setEvents] = useState<StreamEvent[]>([]);
@@ -23,6 +49,8 @@ export default function App() {
   const [doiInput, setDoiInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [bulkDashboard, setBulkDashboard] = useState<BulkDashboard | null>(null);
+  const [showAnatomy, setShowAnatomy] = useState(false);
   const [filter, setFilter] = useState<HeatmapFilter>("all");
   const [claimDraft, setClaimDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +161,8 @@ export default function App() {
         if (status.status === "complete" || status.status === "failed") {
           window.clearInterval(poll);
           setUploading(false);
+          const dashRes = await fetch(`/api/bulk/${job.id}/dashboard`);
+          if (dashRes.ok) setBulkDashboard((await dashRes.json()) as BulkDashboard);
         }
       }, 3000);
     } catch (err) {
@@ -306,6 +336,45 @@ export default function App() {
             </p>
           )}
 
+          {bulkDashboard && (
+            <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
+              <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
+                Bulk analysis dashboard
+              </h3>
+              <p className="mt-1 text-xs text-[var(--papyrus-muted)]">{bulkDashboard.note}</p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-[var(--papyrus-muted)]">
+                    <tr>
+                      <th className="py-1 pr-3">Paper</th>
+                      <th className="py-1 pr-3">Coverage</th>
+                      <th className="py-1 pr-3">Failure rate</th>
+                      <th className="py-1">Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkDashboard.papers.map((paper) => (
+                      <tr
+                        key={paper.audit_id}
+                        className="cursor-pointer border-t border-white/5 hover:bg-white/5"
+                        onClick={() => {
+                          void fetch(`/api/audits/${paper.audit_id}`)
+                            .then((response) => response.json())
+                            .then((data) => setAudit(data as AuditRun));
+                        }}
+                      >
+                        <td className="py-2 pr-3">{paper.title ?? paper.audit_id.slice(0, 8)}</td>
+                        <td className="py-2 pr-3 font-audit">{paper.coverage_percent}%</td>
+                        <td className="py-2 pr-3 font-audit">{paper.confirmed_failure_rate}%</td>
+                        <td className="py-2 font-audit uppercase">{paper.risk_level}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {audit && (
             <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -382,6 +451,23 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {audit?.paper_text && (
+            <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
+              <button
+                type="button"
+                className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]"
+                onClick={() => setShowAnatomy((value) => !value)}
+              >
+                Paper anatomy view {showAnatomy ? "▾" : "▸"}
+              </button>
+              {showAnatomy && (
+                <div className="mt-3 max-h-64 overflow-y-auto text-sm leading-relaxed text-stone-200">
+                  {highlightCitations(audit.paper_text, audit.citations)}
+                </div>
+              )}
+            </div>
+          )}
 
           {selected && audit && (
             <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">

@@ -10,3 +10,5 @@ pymupdf==1.24.14
 sse-starlette==2.2.1
 python-dotenv==1.0.1
 fpdf2==2.8.2
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10

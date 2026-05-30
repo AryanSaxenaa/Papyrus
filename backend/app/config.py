@@ -10,7 +10,9 @@ class Settings(BaseSettings):
     pipeline_version: str = "2.0"
     debug: bool = False
 
-    database_url: str = "postgresql+asyncpg://papyrus:papyrus@localhost:5432/papyrus"
+    # SQLAlchemy sync URL (postgresql+psycopg2:// in Docker).
+    database_url: str = "postgresql+psycopg2://papyrus:papyrus@localhost:5432/papyrus"
+    persistence_backend: str = "json"  # json | postgres | both
     redis_url: str = "redis://localhost:6379/0"
 
     grobid_url: str = "http://localhost:8070"
@@ -20,6 +22,7 @@ class Settings(BaseSettings):
     semantic_scholar_api_key: str | None = None
     openalex_mailto: str = "contact@example.com"
     exa_api_key: str | None = None
+    firecrawl_api_key: str | None = None
     deepseek_api_key: str | None = None
     openai_api_key: str | None = None
     huggingface_api_key: str | None = None

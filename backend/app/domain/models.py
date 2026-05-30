@@ -123,6 +123,7 @@ class AuditRun(BaseModel):
     events: list[dict[str, Any]] = Field(default_factory=list)
     bulk_job_id: UUID | None = None
     source_url: str | None = None
+    paper_text: str | None = None
 
 
 class BulkAuditJob(BaseModel):

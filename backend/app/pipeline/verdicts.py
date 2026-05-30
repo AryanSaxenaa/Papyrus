@@ -94,6 +94,8 @@ def detect_hallucination(
 
 
 def _tier_from_text(resolved: dict) -> EvidenceTier:
+    if resolved.get("full_text"):
+        return EvidenceTier.TIER_1
     if resolved.get("open_access_pdf") or resolved.get("oa_url"):
         return EvidenceTier.TIER_1
     if resolved.get("abstract"):

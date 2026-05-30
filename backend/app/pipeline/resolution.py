@@ -14,6 +14,8 @@ from app.services.events import event_bus
 from app.services.exa import exa_client
 from app.services.openalex import openalex_client
 from app.services.semantic_scholar import semantic_scholar_client
+from app.services.firecrawl import firecrawl_client
+from app.services.fulltext import fulltext_service
 from app.services.unpaywall import unpaywall_client
 
 
@@ -38,6 +40,8 @@ def merge_resolved(
     if unpaywall and unpaywall.get("open_access_pdf"):
         merged["open_access_pdf"] = unpaywall["open_access_pdf"]
         merged["oa_url"] = unpaywall.get("oa_url")
+    if europe_pmc and europe_pmc.get("open_access_pdf") and not merged.get("open_access_pdf"):
+        merged["open_access_pdf"] = europe_pmc["open_access_pdf"]
     return merged
 
 
@@ -140,6 +144,34 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
             )
 
     merged = merge_resolved(crossref, scholar, openalex, arxiv, unpaywall, europe_pmc)
+
+    pdf_url = (merged or {}).get("open_access_pdf") or record.oa_pdf_url
+    if pdf_url and not (merged or {}).get("full_text"):
+        full_text = await fulltext_service.fetch_open_access_text(pdf_url)
+        if full_text:
+            merged = merged or {}
+            merged["full_text"] = full_text
+            record.resolution_attempts.append(
+                _attempt(ResolutionSource.FULLTEXT, pdf_url, True, {"full_text": full_text, "chars": len(full_text)})
+            )
+            event_bus.emit(
+                audit_id,
+                "fulltext",
+                "Open-access full text retrieved",
+                citation_index=record.index,
+                chars=len(full_text),
+            )
+
+    if merged and not merged.get("abstract") and cited.doi:
+        landing = f"https://doi.org/{cited.doi.strip()}"
+        firecrawl = await firecrawl_client.scrape_landing_page(landing)
+        record.resolution_attempts.append(
+            _attempt(ResolutionSource.FIRECRAWL, landing, firecrawl is not None, firecrawl)
+        )
+        if firecrawl and firecrawl.get("abstract"):
+            merged["abstract"] = firecrawl["abstract"]
+            event_bus.emit(audit_id, "firecrawl", "Landing page abstract retrieved", citation_index=record.index)
+
     detect_hallucination(record, crossref, scholar, openalex, merged_override=merged or None)
 
     if (
