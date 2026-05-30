@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { highlightEvidencePassage } from "../lib/highlightEvidence";
 import type { AuditRun, CitationRecord, VersionMismatchInfo } from "../types";
 
 const INTENT_OPTIONS = ["evidentiary", "methodological", "contrastive", "background"];
@@ -153,24 +154,58 @@ export function SideBySideDrawer({
           </Panel>
 
           <Panel title="Evidence drawer">
-            <ul className="space-y-1 font-audit text-xs">
-              {citation.resolution_attempts.map((attempt, index) => (
-                <li key={`${attempt.source}-${index}`} className="text-stone-300">
-                  <span className={attempt.success ? "text-emerald-400" : "text-stone-500"}>
-                    {attempt.success ? "✓" : "✗"}
-                  </span>{" "}
-                  {attempt.source}: {attempt.summary}
-                </li>
-              ))}
-            </ul>
+            {citation.evidence_tier === "tier_2" && (
+              <p className="mb-3 rounded border border-slate-600/50 bg-slate-900/40 p-2 text-xs text-slate-200">
+                Analysis based on abstract only — full text unavailable. Numerical claims in the body
+                cannot be verified from the abstract alone.
+              </p>
+            )}
+            {citation.evidence_tier === "tier_3" && (
+              <p className="mb-3 rounded border border-sky-800/40 bg-sky-950/30 p-2 text-xs text-sky-100">
+                Metadata-only resolution — existence may be confirmed but claim alignment is limited to
+                title and abstract fields when present.
+              </p>
+            )}
+            {citation.evidence_tier === "tier_4" || citation.verdict_color === "unresolvable" ? (
+              <div className="mb-3 rounded border border-stone-600/50 bg-stone-900/40 p-2 text-xs text-stone-300">
+                <p className="font-semibold text-stone-200">No document found in indexed sources.</p>
+                <p className="mt-2 text-[var(--papyrus-muted)]">Sources queried with no match:</p>
+                <ul className="mt-1 space-y-1 font-audit">
+                  {citation.resolution_attempts.map((attempt, index) => (
+                    <li key={`${attempt.source}-${index}`}>
+                      {attempt.source}: {attempt.summary}
+                    </li>
+                  ))}
+                </ul>
+                {citation.exa_signal && <p className="mt-2 text-amber-100/90">{citation.exa_signal}</p>}
+              </div>
+            ) : (
+              <ul className="space-y-1 font-audit text-xs">
+                {citation.resolution_attempts.map((attempt, index) => (
+                  <li key={`${attempt.source}-${index}`} className="text-stone-300">
+                    <span className={attempt.success ? "text-emerald-400" : "text-stone-500"}>
+                      {attempt.success ? "✓" : "✗"}
+                    </span>{" "}
+                    {attempt.source}: {attempt.summary}
+                  </li>
+                ))}
+              </ul>
+            )}
             {citation.evidence_passage ? (
               <p className="mt-4 rounded border border-white/10 bg-black/20 p-2 text-xs leading-relaxed text-stone-200">
-                {citation.evidence_passage.slice(0, 1200)}
+                {highlightEvidencePassage(citation.evidence_passage.slice(0, 1200), claim)}
               </p>
             ) : (
-              <p className="mt-4 text-xs text-[var(--papyrus-muted)]">No evidence passage retrieved yet.</p>
+              citation.evidence_tier !== "tier_4" &&
+              citation.verdict_color !== "unresolvable" && (
+                <p className="mt-4 text-xs text-[var(--papyrus-muted)]">No evidence passage retrieved yet.</p>
+              )
             )}
-            {citation.exa_signal && <p className="mt-3 text-xs text-stone-400">{citation.exa_signal}</p>}
+            {citation.exa_signal &&
+              citation.evidence_tier !== "tier_4" &&
+              citation.verdict_color !== "unresolvable" && (
+                <p className="mt-3 text-xs text-stone-400">{citation.exa_signal}</p>
+              )}
             {citation.source_verify_url && (
               <a
                 href={citation.source_verify_url}

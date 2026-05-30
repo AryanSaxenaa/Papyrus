@@ -78,6 +78,8 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/audits/summaries` | Indexed audit list (Postgres summaries table) |
 | `POST` | `/api/audits/{id}/citations/{cid}/rerun` | Re-resolve one citation |
 | `POST` | `/api/audits/{id}/citations/{cid}/approve-claim` | Run NLI after claim approval |
+| `DELETE` | `/api/audits/{id}` | Remove audit and indexed rows |
+| `GET` | `/api/admin/citations/stats` | Cross-audit citation failure rates |
 
 ## Implementation status (v1 slice)
 
@@ -125,10 +127,25 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Optional claim approval gate before NLI (`NLI_REQUIRES_CLAIM_APPROVAL`)
 - [x] Per-citation resolution rerun API
 - [x] Risk confidence scoring + detailed health check
+- [x] Citation-level Postgres index (`citation_index` table) for analytics
+- [x] Past audits panel, heatmap verdict badges, Tier 2 / unresolvable evidence drawers
+- [x] Live panel event-type filter; evidence sentence highlight
+- [x] Basic pytest suite (`backend/tests/`, `requirements-dev.txt`)
+- [x] Delete audit API + past-audits panel with removal
+- [x] Cross-audit citation failure analytics (`GET /api/admin/citations/stats`)
+- [x] Bulk dashboard pending-paper progress + ETA display
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 
 ### Still out of scope / v2
 
-- Fully normalized citation-level Postgres schema (audits remain JSON blobs)
+- Full relational audit schema (audit bodies remain JSON blobs; citations indexed separately)
 - Circular citation detection (spec § excluded from v1)
+
+### Tests
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```

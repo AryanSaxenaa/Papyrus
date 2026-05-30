@@ -14,18 +14,25 @@ type Props = {
   audit: AuditRun | null;
 };
 
+const EVENT_TYPES = ["all", "crossref", "nli", "claim", "verdict", "version", "bulk", "error"] as const;
+
 export function LivePanel({ events, audit }: Props) {
   const [search, setSearch] = useState("");
+  const [eventType, setEventType] = useState<string>("all");
 
   const filteredEvents = useMemo(() => {
+    let list = events;
+    if (eventType !== "all") {
+      list = list.filter((event) => event.type === eventType);
+    }
     const query = search.trim();
-    if (!query) return events;
+    if (!query) return list;
     const asNum = Number(query);
-    return events.filter((event) => {
+    return list.filter((event) => {
       if (!Number.isNaN(asNum) && event.citation_index === asNum) return true;
-      return event.message.toLowerCase().includes(query.toLowerCase());
+      return event.message.toLowerCase().includes(query.toLowerCase()) || event.type.includes(query);
     });
-  }, [events, search]);
+  }, [events, search, eventType]);
 
   const resolving = useMemo(() => {
     const citations = audit?.citations ?? [];
@@ -37,14 +44,27 @@ export function LivePanel({ events, audit }: Props) {
   return (
     <div className="grid h-full gap-4 md:grid-cols-2">
       <div className="flex min-h-0 flex-col">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="font-audit text-xs uppercase tracking-wide text-[var(--papyrus-muted)]">Event log</h4>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Citation #"
-            className="w-28 rounded border border-white/10 bg-black/30 px-2 py-1 font-audit text-xs"
-          />
+          <div className="flex flex-wrap gap-1">
+            <select
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+              className="rounded border border-white/10 bg-black/30 px-2 py-1 font-audit text-xs"
+            >
+              {EVENT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Citation # or text"
+              className="w-32 rounded border border-white/10 bg-black/30 px-2 py-1 font-audit text-xs"
+            />
+          </div>
         </div>
         <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto font-audit text-xs leading-relaxed">
           {filteredEvents.map((event, index) => (

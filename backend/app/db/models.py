@@ -45,6 +45,22 @@ class AuditSummaryRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CitationIndexRecord(Base):
+    """Denormalized per-citation rows for analytics and cross-audit queries."""
+
+    __tablename__ = "citation_index"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    audit_id: Mapped[str] = mapped_column(String(36), index=True)
+    citation_id: Mapped[str] = mapped_column(String(36), index=True)
+    citation_index: Mapped[int] = mapped_column()
+    intent: Mapped[str] = mapped_column(String(32))
+    evidence_tier: Mapped[str] = mapped_column(String(16))
+    verdict_color: Mapped[str] = mapped_column(String(24))
+    hallucination_type: Mapped[str] = mapped_column(String(48))
+    claim_alignment_verdict: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+
 class CitationCorrectionRecord(Base):
     """User intent/claim overrides for ground-truth dataset building."""
 

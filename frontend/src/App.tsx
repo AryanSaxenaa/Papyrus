@@ -5,7 +5,10 @@ import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
 import { LimitationsPanel } from "./components/LimitationsPanel";
 import { PaperAnatomy } from "./components/PaperAnatomy";
+import { CitationAnalytics } from "./components/CitationAnalytics";
+import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
+import { verdictBadgeLabel } from "./lib/verdictLabel";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
 const verdictClass: Record<string, string> = {
@@ -35,6 +38,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [expandedBulkId, setExpandedBulkId] = useState<string | null>(null);
   const [bulkAuditCache, setBulkAuditCache] = useState<Record<string, AuditRun>>({});
+  const [auditsListKey, setAuditsListKey] = useState(0);
 
   const refreshAudit = useCallback(async (id: string) => {
     const response = await fetch(`/api/audits/${id}`);
@@ -81,6 +85,7 @@ export default function App() {
     if (!response.ok) throw new Error(await response.text());
     const created = (await response.json()) as AuditRun;
     setAudit(created);
+    setAuditsListKey((key) => key + 1);
   };
 
   const onUpload = async (file: File) => {
@@ -250,6 +255,30 @@ export default function App() {
     );
   }, [audit?.citations, filter]);
 
+  const loadAuditById = async (auditId: string) => {
+    const response = await fetch(`/api/audits/${auditId}`);
+    if (!response.ok) return;
+    setAudit((await response.json()) as AuditRun);
+    setEvents([]);
+    setSelected(null);
+    setAuditsListKey((key) => key + 1);
+  };
+
+  const onAuditDeleted = (auditId: string) => {
+    if (audit?.id === auditId) {
+      setAudit(null);
+      setEvents([]);
+      setSelected(null);
+    }
+    setBulkAuditCache((prev) => {
+      if (!(auditId in prev)) return prev;
+      const next = { ...prev };
+      delete next[auditId];
+      return next;
+    });
+    setAuditsListKey((key) => key + 1);
+  };
+
   const openBulkPaper = async (auditId: string) => {
     if (bulkAuditCache[auditId]) {
       setAudit(bulkAuditCache[auditId]);
@@ -340,6 +369,14 @@ export default function App() {
 
       <main className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="space-y-4">
+          <PastAudits
+            refreshKey={auditsListKey}
+            activeAuditId={audit?.id ?? null}
+            onSelect={(id) => void loadAuditById(id)}
+            onDeleted={onAuditDeleted}
+          />
+          <CitationAnalytics />
+
           {error && (
             <p className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
               {error}
@@ -357,6 +394,17 @@ export default function App() {
                 Bulk analysis dashboard
               </h3>
               <p className="mt-1 text-xs text-[var(--papyrus-muted)]">{bulkDashboard.note}</p>
+              {(bulkDashboard.pending_papers ?? 0) > 0 && (
+                <p className="mt-2 font-audit text-xs text-amber-200">
+                  {bulkDashboard.pending_papers} paper(s) still resolving…
+                  {bulkDashboard.job.estimated_seconds_remaining != null && (
+                    <span className="text-stone-400">
+                      {" "}
+                      · ~{Math.ceil(bulkDashboard.job.estimated_seconds_remaining / 60)} min remaining
+                    </span>
+                  )}
+                </p>
+              )}
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="text-xs text-[var(--papyrus-muted)]">
@@ -488,6 +536,9 @@ export default function App() {
                     {citation.bibliography.authors[0] ?? "Unknown"}
                   </p>
                   <p className="text-xs opacity-80">{citation.bibliography.year ?? "—"}</p>
+                  <p className="mt-1 font-audit text-[9px] font-semibold uppercase tracking-wide opacity-90">
+                    {verdictBadgeLabel(citation)}
+                  </p>
                 </button>
               ))}
               {!filteredCitations.length && (

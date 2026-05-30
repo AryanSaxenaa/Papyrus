@@ -101,6 +101,12 @@ async def list_audits() -> list[AuditRun]:
     return audit_store.list()
 
 
+@router.delete("/audits/{audit_id}", status_code=204)
+async def delete_audit(audit_id: UUID) -> None:
+    if not audit_store.delete(audit_id):
+        raise HTTPException(status_code=404, detail="Audit not found")
+
+
 @router.get("/audits/{audit_id}")
 async def get_audit(audit_id: UUID) -> AuditRun:
     audit = audit_store.get(audit_id)
@@ -224,9 +230,11 @@ async def bulk_dashboard(job_id: UUID) -> dict:
         )
 
     papers.sort(key=lambda row: row["confirmed_failure_rate"], reverse=True)
+    pending = sum(1 for row in papers if row["status"] in {"queued", "running"})
     return {
         "job": job.model_dump(mode="json"),
         "papers": papers,
+        "pending_papers": pending,
         "note": "Ranked by confirmed failure rate among resolvable citations, not unresolvable count.",
     }
 

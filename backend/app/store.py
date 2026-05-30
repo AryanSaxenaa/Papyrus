@@ -4,11 +4,12 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db.models import AuditRecord, AuditSummaryRecord
+from app.db.models import AuditRecord, AuditSummaryRecord, CitationIndexRecord
+from app.services.citations_index import sync_citation_index
 from app.db.session import get_engine
 from app.domain.models import AuditRun
 
@@ -137,6 +138,32 @@ class AuditStore:
                 row.payload = payload
             session.commit()
         self._save_summary(audit)
+        sync_citation_index(audit)
+
+    def delete(self, audit_id: UUID) -> bool:
+        removed = False
+        if audit_id in self._audits:
+            del self._audits[audit_id]
+            removed = True
+        path = self._path(audit_id)
+        if path.exists():
+            path.unlink()
+            removed = True
+        engine = get_engine()
+        if engine is not None:
+            with Session(engine) as session:
+                row = session.get(AuditRecord, str(audit_id))
+                if row:
+                    session.delete(row)
+                    removed = True
+                summary = session.get(AuditSummaryRecord, str(audit_id))
+                if summary:
+                    session.delete(summary)
+                session.execute(
+                    delete(CitationIndexRecord).where(CitationIndexRecord.audit_id == str(audit_id))
+                )
+                session.commit()
+        return removed
 
     def _save_summary(self, audit: AuditRun) -> None:
         engine = get_engine()

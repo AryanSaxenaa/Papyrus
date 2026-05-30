@@ -64,6 +64,7 @@ export type BulkDashboard = {
     avg_seconds_per_paper?: number | null;
   };
   note?: string;
+  pending_papers?: number;
   papers: Array<{
     audit_id: string;
     title?: string | null;
