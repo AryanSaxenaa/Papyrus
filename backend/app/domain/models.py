@@ -127,6 +127,7 @@ class FailureSummary(BaseModel):
 class AuditRun(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     paper_title: str | None = None
+    paper_authors: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: datetime | None = None
     pipeline_version: str = "2.0"

@@ -257,10 +257,12 @@ async def bulk_dashboard(job_id: UUID) -> dict:
         if not audit:
             continue
         resolvable = audit.coverage.tier_1 + audit.coverage.tier_2 + audit.coverage.tier_3
+        first_author = audit.paper_authors[0] if audit.paper_authors else None
         papers.append(
             {
                 "audit_id": str(audit.id),
                 "title": audit.paper_title,
+                "first_author": first_author,
                 "status": audit.status,
                 "coverage_percent": audit.coverage.coverage_percent,
                 "confirmed_failure_rate": audit.failures.confirmed_failure_rate,

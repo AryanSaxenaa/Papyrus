@@ -27,6 +27,7 @@ def render_text_report(audit: AuditRun) -> str:
         f" Unresolvable (outside indexed sources):                {audit.coverage.tier_4:>3}   ({pct(audit.coverage.tier_4)}%)",
         " ────────────────────────────────────────────────────────────",
         f" Coverage score:                                        {audit.coverage.coverage_percent:>3}%",
+        f" ({audit.coverage.tier_1 + audit.coverage.tier_2} of {audit.coverage.total} citations received at least Tier 2 resolution)",
         f" Coverage confidence:                      {audit.coverage.coverage_confidence.value.upper()}",
     ]
     if audit.coverage.tier_4:

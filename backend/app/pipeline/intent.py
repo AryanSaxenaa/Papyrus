@@ -5,7 +5,7 @@ from app.domain.models import CitationRecord
 
 
 CONTRASTIVE = re.compile(
-    r"\b(contrary to|unlike|in contrast|we challenge|we dispute|inconsistent with)\b",
+    r"\b(contrary to|unlike|in contrast to|in contrast|we challenge|we dispute|inconsistent with)\b",
     re.I,
 )
 METHODOLOGICAL = re.compile(

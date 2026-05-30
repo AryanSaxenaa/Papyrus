@@ -22,8 +22,9 @@ def finalize_scores(audit: AuditRun) -> None:
     tier_3 = sum(1 for c in citations if c.evidence_tier == EvidenceTier.TIER_3)
     tier_4 = sum(1 for c in citations if c.evidence_tier == EvidenceTier.TIER_4)
 
+    tier_2_plus = tier_1 + tier_2
     resolved = tier_1 + tier_2 + tier_3
-    coverage_percent = round((resolved / total) * 100, 1) if total else 0.0
+    coverage_percent = round((tier_2_plus / total) * 100, 1) if total else 0.0
     unresolvable_ratio = (tier_4 / total) if total else 0.0
     if unresolvable_ratio > 0.5:
         coverage_confidence = ConfidenceLevel.LOW

@@ -15,7 +15,9 @@ DOI_PATTERN = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.I)
 YEAR_PATTERN = re.compile(r"\b(19|20)\d{2}\b")
 
 
-def parse_pdf_fallback(pdf_path: Path) -> tuple[list[BibliographyEntry], list[InlineCitation], str | None]:
+def parse_pdf_fallback(
+    pdf_path: Path,
+) -> tuple[list[BibliographyEntry], list[InlineCitation], str | None, list[str]]:
     doc = fitz.open(pdf_path)
     text = "\n".join(page.get_text() for page in doc)
     doc.close()
@@ -61,7 +63,7 @@ def parse_pdf_fallback(pdf_path: Path) -> tuple[list[BibliographyEntry], list[In
             )
         )
 
-    return bibliography, inline, paper_title
+    return bibliography, inline, paper_title, []
 
 
 def _split_reference_block(lines: list[str]) -> list[list[str]]:

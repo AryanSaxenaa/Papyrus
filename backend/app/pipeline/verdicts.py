@@ -73,12 +73,6 @@ def detect_hallucination(
             record.evidence_tier = _tier_from_text(crossref)
             return
 
-    if cited.year and resolved.get("year") and cited.year != resolved.get("year") and crossref:
-        record.hallucination_type = HallucinationType.DATE_IMPOSSIBLE
-        record.verdict_color = "failure"
-        record.evidence_tier = _tier_from_text(crossref)
-        return
-
     record.hallucination_type = HallucinationType.NONE
     record.evidence_tier = _tier_from_text(resolved)
     record.verdict_color = _color_for_success(record)

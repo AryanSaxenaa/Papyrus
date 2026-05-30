@@ -20,9 +20,24 @@ export const COVERAGE_FILL: Record<string, string> = {
   "bg-red-900": "#7f1d1d",
 };
 
+export function isRetraction(citation: CitationRecord): boolean {
+  return citation.hallucination_type === "retraction" || citation.verdict_color === "retraction";
+}
+
 export function citationFill(citation: CitationRecord): string {
-  if (citation.hallucination_type === "retraction" || citation.verdict_color === "retraction") {
+  if (isRetraction(citation)) {
     return VERDICT_FILL.retraction;
   }
   return VERDICT_FILL[citation.verdict_color] ?? VERDICT_FILL.pending;
+}
+
+export function citationCardClass(citation: CitationRecord): string {
+  const base = "rounded-md border p-2 text-left";
+  if (isRetraction(citation)) {
+    return `${base} border-amber-400 ring-1 ring-amber-400/80`;
+  }
+  if (citation.verdict_color === "resolving" || citation.status === "resolving") {
+    return `${base} border-white/10 animate-pulse`;
+  }
+  return `${base} border-white/10`;
 }

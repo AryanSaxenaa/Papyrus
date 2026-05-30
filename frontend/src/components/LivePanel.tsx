@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import { verdictBadgeLabel } from "../lib/verdictLabel";
-import { citationFill } from "../lib/verdictColors";
+import { citationCardClass, citationFill } from "../lib/verdictColors";
 import type { AuditRun, CitationRecord, StreamEvent } from "../types";
 
 type Props = {
@@ -103,7 +103,7 @@ function CitationStack({ citations }: { citations: CitationRecord[] }) {
           <div
             key={citation.id}
             data-stack-id={citation.id}
-            className="animate-[fadeSlide_0.45s_ease-out_both] rounded-md border border-white/10 p-2"
+            className={`${citationCardClass(citation)} animate-[fadeSlide_0.45s_ease-out_both]`}
             style={{ animationDelay: `${index * 40}ms`, backgroundColor: citationFill(citation) }}
           >
             <p className="font-audit text-xs text-[var(--papyrus-muted)]">#{citation.index}</p>

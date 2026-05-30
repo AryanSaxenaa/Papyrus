@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
 import { verdictBadgeLabel } from "../lib/verdictLabel";
-import { citationFill } from "../lib/verdictColors";
+import { citationCardClass, citationFill } from "../lib/verdictColors";
 import type { CitationRecord } from "../types";
 
 type Props = {
@@ -36,7 +36,7 @@ export function CitationHeatmap({ citations, selectedId, onSelect }: Props) {
           data-citation-id={citation.id}
           id={`heatmap-citation-${citation.id}`}
           onClick={() => onSelect(citation)}
-          className={`rounded-md border border-white/10 p-2 text-left transition hover:scale-[1.02] ${
+          className={`${citationCardClass(citation)} transition hover:scale-[1.02] ${
             selectedId === citation.id ? "ring-2 ring-emerald-400" : ""
           }`}
           style={{ backgroundColor: citationFill(citation) }}

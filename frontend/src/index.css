@@ -17,11 +17,15 @@ body {
   min-height: 100vh;
   background: var(--papyrus-bg);
   color: var(--papyrus-text);
-  font-family: "Source Sans 3", system-ui, sans-serif;
+  font-family: "Source Sans 3", sans-serif;
 }
 
 .font-audit {
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.font-display {
+  font-family: "IBM Plex Serif", serif;
 }
 
 @keyframes fadeSlide {

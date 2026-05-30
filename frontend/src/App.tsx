@@ -5,23 +5,12 @@ import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
 import { LimitationsPanel } from "./components/LimitationsPanel";
 import { CitationHeatmap } from "./components/CitationHeatmap";
+import { HeatmapFilterBar } from "./components/HeatmapFilterBar";
 import { PaperAnatomy } from "./components/PaperAnatomy";
 import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
-
-const verdictClass: Record<string, string> = {
-  supported: "bg-[var(--papyrus-green)]",
-  failure: "bg-[var(--papyrus-crimson)]",
-  retraction: "bg-[var(--papyrus-crimson)] ring-2 ring-amber-400",
-  cannot_assess: "bg-[var(--papyrus-steel)]",
-  neutral: "bg-[var(--papyrus-grey)]",
-  unresolvable: "bg-[#4a524e]",
-  resolving: "bg-[var(--papyrus-amber)] animate-pulse",
-  pending: "bg-[#2a312e]",
-  amber: "bg-[var(--papyrus-amber)]",
-};
 
 export default function App() {
   const [audit, setAudit] = useState<AuditRun | null>(null);
@@ -267,9 +256,17 @@ export default function App() {
       );
     }
     if (filter === "failures") {
-      return citations.filter(
-        (c) => c.verdict_color === "failure" || c.hallucination_type.includes("type_"),
-      );
+      return citations.filter((c) => {
+        if (c.verdict_color === "unresolvable" || c.evidence_tier === "tier_4") {
+          return false;
+        }
+        return (
+          c.verdict_color === "failure" ||
+          (c.hallucination_type.startsWith("type_") && c.hallucination_type !== "retraction") ||
+          c.claim_alignment_verdict === "claim_contradiction" ||
+          c.claim_alignment_verdict === "not_addressed"
+        );
+      });
     }
     if (filter === "unresolvable") return citations.filter((c) => c.verdict_color === "unresolvable");
     return citations.filter(
@@ -324,7 +321,7 @@ export default function App() {
             <p className="font-audit text-xs uppercase tracking-[0.2em] text-[var(--papyrus-muted)]">
               Citation integrity audit
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight">Papyrus</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight">Papyrus</h1>
             <p className="mt-1 max-w-2xl text-sm text-[var(--papyrus-muted)]">
               Verifies whether references exist and whether evidentiary citations are supported.
               Does not detect AI authorship.
@@ -463,6 +460,7 @@ export default function App() {
                   <thead className="text-xs text-[var(--papyrus-muted)]">
                     <tr>
                       <th className="py-1 pr-3">Paper</th>
+                      <th className="py-1 pr-3">First author</th>
                       <th className="py-1 pr-3">Coverage</th>
                       <th className="py-1 pr-3">Failure rate</th>
                       <th className="py-1 pr-3">T1 / T7 / Ret</th>
@@ -485,6 +483,9 @@ export default function App() {
                                 <span className="ml-2 font-audit text-[10px] text-emerald-400">expanded</span>
                               )}
                             </td>
+                            <td className="py-2 pr-3 text-stone-400">
+                              {paper.first_author ?? "—"}
+                            </td>
                             <td className="py-2 pr-3 font-audit">{paper.coverage_percent}%</td>
                             <td className="py-2 pr-3 font-audit">{paper.confirmed_failure_rate}%</td>
                             <td className="py-2 pr-3 font-audit text-xs text-stone-400">
@@ -494,24 +495,14 @@ export default function App() {
                           </tr>
                           {isExpanded && cached && (
                             <tr key={`${paper.audit_id}-heat`} className="border-t border-white/5 bg-black/20">
-                              <td colSpan={5} className="py-3">
-                                <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
-                                  {cached.citations.map((citation) => (
-                                    <button
-                                      key={citation.id}
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelected(citation);
-                                      }}
-                                      className={`rounded p-1 text-left text-[10px] ${
-                                        verdictClass[citation.verdict_color] ?? verdictClass.pending
-                                      }`}
-                                    >
-                                      #{citation.index}
-                                    </button>
-                                  ))}
-                                </div>
+                              <td colSpan={6} className="py-3">
+                                <CitationHeatmap
+                                  citations={cached.citations}
+                                  selectedId={selected?.id}
+                                  onSelect={(citation) => {
+                                    setSelected(citation);
+                                  }}
+                                />
                               </td>
                             </tr>
                           )}
@@ -539,10 +530,12 @@ export default function App() {
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="font-audit text-3xl font-semibold text-emerald-300">
+                  <p className="font-display font-audit text-3xl font-semibold text-emerald-300">
                     {audit.coverage.coverage_percent}%
                   </p>
-                  <p className="text-xs text-[var(--papyrus-muted)]">Coverage</p>
+                  <p className="text-xs text-[var(--papyrus-muted)]">
+                    Coverage ({audit.coverage.tier_1 + audit.coverage.tier_2} of {audit.coverage.total} at Tier 2+)
+                  </p>
                   <p className="mt-2 font-audit text-sm uppercase text-amber-300">
                     {audit.risk_level} risk
                     {audit.risk_confidence && (
@@ -580,6 +573,7 @@ export default function App() {
               Citation heatmap
             </h3>
             <HeatmapLegend />
+            <HeatmapFilterBar filter={filter} onFilter={setFilter} />
             <div className="mt-3">
               {filteredCitations.length > 0 ? (
                 <CitationHeatmap

@@ -1,7 +1,6 @@
 import type { AuditRun, HeatmapFilter } from "../types";
 
 const CHIPS: Array<{ key: HeatmapFilter; label: string; count: (audit: AuditRun) => number }> = [
-  { key: "all", label: "All", count: (a) => a.citations.length },
   {
     key: "supported",
     label: "Supported",
@@ -17,9 +16,28 @@ const CHIPS: Array<{ key: HeatmapFilter; label: string; count: (audit: AuditRun)
     label: "Cannot assess",
     count: (a) => a.failures.cannot_assess ?? 0,
   },
-  { key: "failures", label: "Failures", count: (a) => a.citations.filter((c) => c.verdict_color === "failure").length },
-  { key: "unresolvable", label: "Unresolvable", count: (a) => a.coverage.tier_4 },
-  { key: "retracted", label: "Retracted", count: (a) => a.failures.retraction ?? 0 },
+  {
+    key: "failures",
+    label: "Confirmed failure",
+    count: (a) => {
+      const f = a.failures;
+      return (
+        (f.type_1 ?? 0) +
+        (f.type_2 ?? 0) +
+        (f.type_5 ?? 0) +
+        (f.type_6 ?? 0) +
+        (f.type_7 ?? 0) +
+        (f.retraction ?? 0) +
+        (f.version_mismatch ?? 0) +
+        (f.not_supported ?? 0)
+      );
+    },
+  },
+  {
+    key: "retracted",
+    label: "Retracted",
+    count: (a) => a.failures.retraction ?? 0,
+  },
 ];
 
 type Props = {

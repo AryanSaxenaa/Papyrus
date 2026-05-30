@@ -30,8 +30,9 @@ class AuditOrchestrator:
         audit.status = "running"
         event_bus.emit(audit_id, "ingestion", "PDF upload received", path=str(pdf_path))
 
-        bibliography, inline, paper_title = await self._parse_pdf(audit_id, pdf_path)
+        bibliography, inline, paper_title, paper_authors = await self._parse_pdf(audit_id, pdf_path)
         audit.paper_title = paper_title
+        audit.paper_authors = paper_authors
         try:
             audit.paper_text = extract_paper_text(pdf_path)
         except Exception:  # noqa: BLE001
@@ -160,10 +161,10 @@ class AuditOrchestrator:
         settings = get_settings()
         if settings.grobid_enabled:
             try:
-                bibliography, inline, title = await grobid_client.parse_pdf(pdf_path)
+                bibliography, inline, title, paper_authors = await grobid_client.parse_pdf(pdf_path)
                 filled = sum(1 for b in bibliography if b.title and (b.doi or b.year))
                 if bibliography and filled / len(bibliography) >= 0.4:
-                    return bibliography, inline, title
+                    return bibliography, inline, title, paper_authors
                 event_bus.emit(audit_id, "grobid", "Sparse GROBID output — routing to PyMuPDF fallback")
             except Exception as exc:  # noqa: BLE001
                 event_bus.emit(audit_id, "grobid", f"GROBID unavailable: {exc}")

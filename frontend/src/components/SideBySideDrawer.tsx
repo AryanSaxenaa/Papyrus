@@ -139,7 +139,7 @@ export function SideBySideDrawer({
                 onClick={onSaveClaim}
                 className="rounded border border-emerald-700/50 px-3 py-1 text-xs font-semibold text-emerald-200"
               >
-                Rerun alignment
+                Rerun NLI
               </button>
               {onRerunCitation && (
                 <button

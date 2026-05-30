@@ -16,6 +16,7 @@ export type VersionMismatchInfo = {
 export type AuditRun = {
   id: string;
   paper_title?: string | null;
+  paper_authors?: string[];
   status: string;
   error?: string | null;
   pipeline_version: string;
@@ -69,6 +70,7 @@ export type BulkDashboard = {
   papers: Array<{
     audit_id: string;
     title?: string | null;
+    first_author?: string | null;
     status: string;
     coverage_percent: number;
     confirmed_failure_rate: number;

@@ -18,7 +18,9 @@ class GrobidClient:
         settings = get_settings()
         self._url = settings.grobid_url.rstrip("/")
 
-    async def parse_pdf(self, pdf_path: Path) -> tuple[list[BibliographyEntry], list[InlineCitation], str | None]:
+    async def parse_pdf(
+        self, pdf_path: Path
+    ) -> tuple[list[BibliographyEntry], list[InlineCitation], str | None, list[str]]:
         async with httpx.AsyncClient(timeout=120.0) as client:
             with pdf_path.open("rb") as handle:
                 files = {"input": (pdf_path.name, handle, "application/pdf")}
@@ -34,6 +36,12 @@ class GrobidClient:
         root = ET.fromstring(tei_xml)
         title_el = root.find(".//tei:titleStmt/tei:title", NS)
         paper_title = title_el.text.strip() if title_el is not None and title_el.text else None
+
+        paper_authors: list[str] = []
+        for author in root.findall(".//tei:sourceDesc//tei:author/tei:persName", NS):
+            name = f"{_text(author.find('tei:forename', NS))} {_text(author.find('tei:surname', NS))}".strip()
+            if name:
+                paper_authors.append(name)
 
         bibliography: list[BibliographyEntry] = []
         for idx, bibl in enumerate(root.findall(".//tei:listBibl/tei:biblStruct", NS), start=1):
@@ -72,7 +80,7 @@ class GrobidClient:
                 InlineCitation(marker=marker, bibliography_index=bib_index, context_window=context)
             )
 
-        return bibliography, inline, paper_title
+        return bibliography, inline, paper_title, paper_authors
 
 
 def _text(node: ET.Element | None) -> str | None:
