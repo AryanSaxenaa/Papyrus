@@ -23,6 +23,12 @@ class EventBus:
         self._history[key].append(event)
         for queue in self._queues[key]:
             queue.put_nowait(event)
+        try:
+            from app.services.relational_audit import persist_audit_event
+
+            persist_audit_event(key, event)
+        except Exception:
+            pass
         return event
 
     def history(self, audit_id: UUID | str) -> list[dict[str, Any]]:

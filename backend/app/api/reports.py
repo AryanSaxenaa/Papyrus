@@ -111,6 +111,9 @@ def render_text_report(audit: AuditRun) -> str:
             lines.append(
                 f" Circular pair: #{pair.get('citation_a')} ↔ #{pair.get('citation_b')} ({pair.get('doi_a')} / {pair.get('doi_b')})"
             )
+        for cycle in audit.quality_summary.get("circular_cycles", []):
+            path = " → ".join(f"#{idx}" for idx in cycle.get("citation_indices", []))
+            lines.append(f" Circular cycle ({cycle.get('length')} hops): {path}")
         lines.append("")
     lines.extend(
         [

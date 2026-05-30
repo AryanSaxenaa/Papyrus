@@ -91,6 +91,8 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/admin/corrections/export.csv` | Ground-truth corrections as CSV |
 | `GET` | `/api/bulk/{id}/events/log.txt` | Bulk job event log download |
 | `GET` | `/api/bulk/{id}/dashboard.json` | Bulk dashboard JSON export |
+| `GET` | `/api/audits/{id}/citations/{cid}/attempts` | Resolution attempts from relational DB |
+| `GET` | `/api/admin/schema/stats` | Relational table row counts |
 
 ## Implementation status (v1 slice)
 
@@ -155,18 +157,23 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Resolution trail in claim viewer centre column; bulk job SSE + failure-type columns
 - [x] Duplicate DOI quality signals; optional circular-pair preview (`ENABLE_CIRCULAR_CHECK`)
 - [x] Bulk log/JSON export; admin corrections CSV export
+- [x] Full relational citation + resolution_attempt + event tables (dual-write with JSON)
+- [x] Multi-hop circular cycle detection (depth-limited)
+- [x] Snowflake Arctic embedding backend option
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 
-### v2 preview (optional)
+### v2 features
 
-- **Duplicate DOI detection** — flags when the same DOI appears on multiple bibliography entries (always on).
-- **Circular citation signal** — reciprocal DOI pairs within one paper via Semantic Scholar references (`ENABLE_CIRCULAR_CHECK=true`). Methodological signal only; not a hallucination verdict.
+- **Relational audit schema** — `audit_metadata`, `citations`, `resolution_attempts`, and `audit_events` tables sync on every save when Postgres is enabled (`SYNC_RELATIONAL_AUDITS=true`, default on).
+- **Duplicate DOI detection** — always on; methodological quality signal.
+- **Circular citation analysis** — reciprocal pairs and depth-limited multi-hop cycles within the bibliography via Semantic Scholar (`ENABLE_CIRCULAR_CHECK=true`, `CIRCULAR_CHECK_DEPTH=2`). Signals only; not hallucination verdicts.
+- **Snowflake Arctic embeddings** — optional Type 6 / title gate backend via Hugging Face (`EMBEDDINGS_BACKEND=snowflake`).
 
-### Still out of scope
+### Intentionally not implemented (spec excluded)
 
-- Full relational audit schema (audit bodies remain JSON blobs; citations indexed separately)
-- Deep multi-hop circular analysis across external literature (beyond bounded v2 preview)
+- **Author Ghost** — high false-positive rate on legitimate first publications and non-Western names.
+- **Journal Phantom (DOAJ)** — replaced by CrossRef ISSN + OpenAlex verification.
 
 ### Tests
 

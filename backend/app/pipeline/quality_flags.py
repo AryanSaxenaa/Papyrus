@@ -5,6 +5,7 @@ from uuid import UUID
 
 from app.config import get_settings
 from app.domain.models import AuditRun, CitationRecord
+from app.pipeline.citation_graph import find_internal_cycles
 from app.services.cache import cache_service
 from app.services.events import event_bus
 from app.services.semantic_scholar import semantic_scholar_client
@@ -40,47 +41,60 @@ async def _reference_dois_cached(doi: str) -> list[str]:
     return dois
 
 
-async def detect_circular_pairs(audit_id: UUID, citations: list[CitationRecord]) -> list[dict[str, Any]]:
-    """v2 preview: flag reciprocal DOI pairs within the same bibliography (signal only, not a verdict)."""
-    settings = get_settings()
-    if not settings.enable_circular_check:
-        return []
-
+async def _build_internal_adjacency(
+    citations: list[CitationRecord],
+    max_seeds: int,
+) -> tuple[dict[str, int], dict[str, list[str]]]:
     doi_to_index: dict[str, int] = {}
     for record in citations:
         doi = _normalize_doi(record.resolved_doi or record.bibliography.doi)
         if doi:
             doi_to_index[doi] = record.index
 
-    if len(doi_to_index) < 2:
-        return []
-
+    adjacency: dict[str, list[str]] = {doi: [] for doi in doi_to_index}
     checked = 0
-    pairs: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
-
     for record in citations:
-        if checked >= settings.circular_check_max_citations:
+        if checked >= max_seeds:
             break
         source_doi = _normalize_doi(record.resolved_doi or record.bibliography.doi)
         if not source_doi:
             continue
         checked += 1
         refs = await _reference_dois_cached(source_doi)
+        adjacency[source_doi] = [r for r in refs if r in doi_to_index]
+
+    return doi_to_index, adjacency
+
+
+async def detect_circular_pairs(
+    audit_id: UUID,
+    citations: list[CitationRecord],
+    doi_to_index: dict[str, int] | None = None,
+    adjacency: dict[str, list[str]] | None = None,
+) -> list[dict[str, Any]]:
+    """Direct reciprocal pairs (1-hop) within the bibliography."""
+    settings = get_settings()
+    if not settings.enable_circular_check:
+        return []
+
+    if doi_to_index is None or adjacency is None:
+        doi_to_index, adjacency = await _build_internal_adjacency(citations, settings.circular_check_max_citations)
+    pairs: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for source_doi, refs in adjacency.items():
         for ref_doi in refs:
-            target_index = doi_to_index.get(ref_doi)
-            if target_index is None or target_index == record.index:
-                continue
-            back_refs = await _reference_dois_cached(ref_doi)
-            if source_doi not in back_refs:
+            if source_doi not in (adjacency.get(ref_doi) or []):
                 continue
             key = tuple(sorted((source_doi, ref_doi)))
             if key in seen:
                 continue
             seen.add(key)
+            record_index = doi_to_index[source_doi]
+            target_index = doi_to_index[ref_doi]
             pairs.append(
                 {
-                    "citation_a": record.index,
+                    "citation_a": record_index,
                     "citation_b": target_index,
                     "doi_a": source_doi,
                     "doi_b": ref_doi,
@@ -93,16 +107,50 @@ async def detect_circular_pairs(audit_id: UUID, citations: list[CitationRecord])
             event_bus.emit(
                 audit_id,
                 "circular",
-                f"Circular citation signal: #{record.index} ↔ #{target_index}",
-                citation_index=record.index,
+                f"Circular citation signal: #{record_index} ↔ #{target_index}",
+                citation_index=record_index,
             )
 
     return pairs
 
 
+async def detect_circular_cycles(
+    audit_id: UUID,
+    citations: list[CitationRecord],
+    doi_to_index: dict[str, int] | None = None,
+    adjacency: dict[str, list[str]] | None = None,
+) -> list[dict[str, Any]]:
+    """Multi-hop cycles within bibliography (v2, depth-limited)."""
+    settings = get_settings()
+    if not settings.enable_circular_check or settings.circular_check_depth < 2:
+        return []
+
+    if doi_to_index is None or adjacency is None:
+        doi_to_index, adjacency = await _build_internal_adjacency(citations, settings.circular_check_max_citations)
+    cycles = find_internal_cycles(doi_to_index, adjacency, max_depth=settings.circular_check_depth)
+    for cycle in cycles:
+        indices = cycle.get("citation_indices") or []
+        if indices:
+            event_bus.emit(
+                audit_id,
+                "circular",
+                f"Citation cycle detected: {' → '.join(f'#{i}' for i in indices)}",
+                citation_index=indices[0],
+            )
+    return cycles
+
+
 async def apply_quality_flags(audit_id: UUID, audit: AuditRun) -> None:
     duplicates = detect_duplicate_dois(audit.citations)
-    circular = await detect_circular_pairs(audit_id, audit.citations)
+    settings = get_settings()
+    doi_to_index: dict[str, int] | None = None
+    adjacency: dict[str, list[str]] | None = None
+    if settings.enable_circular_check:
+        doi_to_index, adjacency = await _build_internal_adjacency(
+            audit.citations, settings.circular_check_max_citations
+        )
+    circular_pairs = await detect_circular_pairs(audit_id, audit.citations, doi_to_index, adjacency)
+    circular_cycles = await detect_circular_cycles(audit_id, audit.citations, doi_to_index, adjacency)
 
     for entry in duplicates:
         flag = f"Duplicate DOI {entry['doi']} at citations {entry['citation_indices']}"
@@ -110,15 +158,24 @@ async def apply_quality_flags(audit_id: UUID, audit: AuditRun) -> None:
             if record.index in entry["citation_indices"]:
                 record.quality_flags.append(flag)
 
-    for pair in circular:
+    for pair in circular_pairs:
         for record in audit.citations:
             if record.index == pair["citation_a"]:
                 record.quality_flags.append(f"Circular signal with citation #{pair['citation_b']}")
             if record.index == pair["citation_b"]:
                 record.quality_flags.append(f"Circular signal with citation #{pair['citation_a']}")
 
+    for cycle in circular_cycles:
+        path = " → ".join(f"#{idx}" for idx in cycle.get("citation_indices", []))
+        flag = f"Citation cycle ({cycle.get('length')} hops): {path}"
+        for record in audit.citations:
+            if record.index in cycle.get("citation_indices", []):
+                record.quality_flags.append(flag)
+
     audit.quality_summary = {
         "duplicate_dois": duplicates,
-        "circular_pairs": circular,
+        "circular_pairs": circular_pairs,
+        "circular_cycles": circular_cycles,
         "circular_check_enabled": get_settings().enable_circular_check,
+        "circular_check_depth": get_settings().circular_check_depth,
     }

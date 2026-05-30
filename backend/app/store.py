@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.models import AuditRecord, AuditSummaryRecord, CitationIndexRecord
 from app.services.citations_index import sync_citation_index
+from app.services.relational_audit import delete_relational_audit, sync_relational_audit
 from app.db.session import get_engine
 from app.domain.models import AuditRun
 
@@ -139,6 +140,7 @@ class AuditStore:
             session.commit()
         self._save_summary(audit)
         sync_citation_index(audit)
+        sync_relational_audit(audit)
 
     def delete(self, audit_id: UUID) -> bool:
         removed = False
@@ -163,6 +165,7 @@ class AuditStore:
                     delete(CitationIndexRecord).where(CitationIndexRecord.audit_id == str(audit_id))
                 )
                 session.commit()
+            delete_relational_audit(str(audit_id))
         return removed
 
     def _save_summary(self, audit: AuditRun) -> None:

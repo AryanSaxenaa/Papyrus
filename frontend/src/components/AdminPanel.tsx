@@ -28,6 +28,7 @@ export function AdminPanel() {
   const [config, setConfig] = useState<ConfigPayload | null>(null);
   const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
   const [reindexStatus, setReindexStatus] = useState<string | null>(null);
+  const [schemaStats, setSchemaStats] = useState<Record<string, number | boolean> | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -35,10 +36,12 @@ export function AdminPanel() {
       fetch("/api/admin/rate-limits").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/admin/config").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/admin/corrections?limit=15").then((r) => (r.ok ? r.json() : null)),
-    ]).then(([limitsData, configData, correctionsData]) => {
+      fetch("/api/admin/schema/stats").then((r) => (r.ok ? r.json() : null)),
+    ]).then(([limitsData, configData, correctionsData, schemaData]) => {
       setLimits(limitsData?.sources ?? null);
       setConfig(configData);
       setCorrections(correctionsData?.corrections ?? []);
+      setSchemaStats(schemaData);
     });
   }, [open]);
 
@@ -64,6 +67,15 @@ export function AdminPanel() {
       </button>
       {open && (
         <div className="mt-3 space-y-4 text-xs">
+          {schemaStats?.postgres && (
+            <div>
+              <p className="font-audit uppercase text-[var(--papyrus-muted)]">Relational schema (v2)</p>
+              <p className="mt-1 text-stone-400">
+                {String(schemaStats.citations ?? 0)} citations · {String(schemaStats.resolution_attempts ?? 0)}{" "}
+                attempts · {String(schemaStats.audit_events ?? 0)} events
+              </p>
+            </div>
+          )}
           {config && (
             <div>
               <p className="font-audit uppercase text-[var(--papyrus-muted)]">Pipeline</p>

@@ -55,7 +55,9 @@ export type AuditRun = {
   quality_summary?: {
     duplicate_dois?: Array<{ doi: string; citation_indices: number[] }>;
     circular_pairs?: Array<{ citation_a: number; citation_b: number; note?: string }>;
+    circular_cycles?: Array<{ citation_indices: number[]; length?: number }>;
     circular_check_enabled?: boolean;
+    circular_check_depth?: number;
   } | null;
   paper_text?: string | null;
   citations: CitationRecord[];

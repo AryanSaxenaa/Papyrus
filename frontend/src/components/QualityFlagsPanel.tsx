@@ -10,8 +10,9 @@ export function QualityFlagsPanel({ audit }: Props) {
 
   const duplicates = (summary.duplicate_dois as Array<{ doi: string; citation_indices: number[] }>) ?? [];
   const circular = (summary.circular_pairs as Array<{ citation_a: number; citation_b: number; note?: string }>) ?? [];
+  const cycles = (summary.circular_cycles as Array<{ citation_indices: number[]; length?: number }>) ?? [];
 
-  if (!duplicates.length && !circular.length) return null;
+  if (!duplicates.length && !circular.length && !cycles.length) return null;
 
   return (
     <div className="mt-4 rounded-md border border-violet-900/40 bg-violet-950/20 p-3 text-xs text-violet-100">
@@ -38,9 +39,19 @@ export function QualityFlagsPanel({ audit }: Props) {
           ))}
         </ul>
       )}
-      {!summary.circular_check_enabled && circular.length === 0 && duplicates.length > 0 && (
+      {cycles.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {cycles.map((cycle) => (
+            <li key={cycle.citation_indices.join("-")}>
+              Multi-hop cycle ({cycle.length ?? cycle.citation_indices.length} hops): #
+              {cycle.citation_indices.join(" → #")}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!summary.circular_check_enabled && !circular.length && !cycles.length && duplicates.length > 0 && (
         <p className="mt-2 text-violet-200/60">
-          Enable <span className="font-audit">ENABLE_CIRCULAR_CHECK=true</span> for reciprocal citation scanning.
+          Enable <span className="font-audit">ENABLE_CIRCULAR_CHECK=true</span> for reciprocal and multi-hop cycle scanning.
         </p>
       )}
     </div>

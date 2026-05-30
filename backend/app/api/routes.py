@@ -25,6 +25,7 @@ from app.pipeline.verdicts import extract_claim, run_claim_alignment_async
 from app.services.deepseek import deepseek_client
 from app.services.events import event_bus
 from app.services.corrections import correction_store
+from app.services.relational_audit import list_citation_attempts
 from app.services.url_fetch import url_fetch_service
 from app.store import audit_store
 
@@ -106,6 +107,29 @@ async def list_audits() -> list[AuditRun]:
 async def delete_audit(audit_id: UUID) -> None:
     if not audit_store.delete(audit_id):
         raise HTTPException(status_code=404, detail="Audit not found")
+
+
+@router.get("/audits/{audit_id}/citations/{citation_id}/attempts")
+async def get_citation_attempts(audit_id: UUID, citation_id: str) -> dict:
+    audit = audit_store.get(audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    record = _get_citation(audit, citation_id)
+    attempts = list_citation_attempts(str(audit_id), citation_id)
+    source = "postgres"
+    if not attempts:
+        source = "inline"
+        attempts = [
+            {
+                "source": a.source.value,
+                "query": a.query,
+                "success": a.success,
+                "summary": a.summary,
+                "payload": a.payload,
+            }
+            for a in record.resolution_attempts
+        ]
+    return {"citation_id": citation_id, "attempts": attempts, "source": source}
 
 
 @router.get("/audits/{audit_id}")

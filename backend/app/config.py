@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     nli_requires_claim_approval: bool = False
     enable_circular_check: bool = False
     circular_check_max_citations: int = 20
+    circular_check_depth: int = 2
+    sync_relational_audits: bool = True
+    embeddings_backend: str = "openai"  # openai | snowflake (HF inference)
+    snowflake_embedding_model: str = "Snowflake/snowflake-arctic-embed-m-v1.5"
 
 
 @lru_cache

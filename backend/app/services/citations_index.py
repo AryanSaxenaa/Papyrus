@@ -61,15 +61,19 @@ def sync_citation_index(audit: AuditRun) -> None:
 
 
 def reindex_all_audits() -> dict[str, int]:
+    from app.services.relational_audit import sync_relational_audit
     from app.store import audit_store
 
     indexed = 0
+    relational = 0
     for audit in audit_store.list():
         if audit.status != "complete":
             continue
         sync_citation_index(audit)
+        sync_relational_audit(audit)
         indexed += 1
-    return {"audits_indexed": indexed}
+        relational += 1
+    return {"audits_indexed": indexed, "relational_synced": relational}
 
 
 def failure_rate_by_audit(limit: int = 20) -> list[dict]:

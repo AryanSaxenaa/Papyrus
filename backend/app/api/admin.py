@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
 from app.services.citations_index import failure_rate_by_audit, reindex_all_audits
+from app.services.relational_audit import relational_schema_stats
 from app.services.corrections import correction_store
 from app.services.rate_limits import rate_limit_service
 
@@ -27,6 +28,11 @@ async def citation_stats() -> dict:
 @router.post("/citations/reindex")
 async def reindex_citations() -> dict:
     return reindex_all_audits()
+
+
+@router.get("/schema/stats")
+async def schema_stats() -> dict:
+    return relational_schema_stats()
 
 
 @router.get("/corrections")
@@ -82,5 +88,7 @@ async def get_public_config() -> dict:
             "apify": bool(settings.apify_api_token),
             "semantic_scholar": bool(settings.semantic_scholar_api_key),
             "circular_check": settings.enable_circular_check,
+            "relational_sync": settings.sync_relational_audits,
+            "embeddings_backend": settings.embeddings_backend,
         },
     }
