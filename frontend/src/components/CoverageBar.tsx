@@ -18,7 +18,7 @@ export function CoverageBar({ audit }: Props) {
     if (!svgEl) return;
 
     const width = svgEl.clientWidth || 480;
-    const height = 12;
+    const height = 10;
     const svg = d3.select(svgEl);
     svg.selectAll("*").remove();
     svg.attr("viewBox", `0 0 ${width} ${height}`).attr("role", "img").attr("aria-label", "Coverage bar");
@@ -34,33 +34,34 @@ export function CoverageBar({ audit }: Props) {
         .attr("y", 0)
         .attr("width", segmentWidth)
         .attr("height", height)
-        .attr("rx", 4)
-        .attr("fill", COVERAGE_FILL[segment.color] ?? "#57534e");
+        .attr("rx", 3)
+        .attr("fill", COVERAGE_FILL[segment.color] ?? "#78716c");
       x += segmentWidth;
     }
   }, [audit.id, segments, total]);
 
   return (
     <div className="space-y-2">
-      <svg ref={svgRef} className="h-3 w-full" />
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-stone-500">
+      <svg ref={svgRef} className="h-2.5 w-full rounded-full overflow-hidden" />
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-zinc-400">
         {segments.map((segment) => (
           <span key={segment.label}>
             {segment.label} {segment.value}
           </span>
         ))}
       </div>
-      <p className="text-xs text-[var(--papyrus-muted)]">
+      <p className="text-xs text-zinc-500">
         Coverage confidence:{" "}
-        <span className="font-audit uppercase text-stone-300">
+        <span className="font-audit uppercase text-zinc-700 font-medium">
           {audit.coverage.coverage_confidence ?? "medium"}
         </span>
-        <span className="ml-2 text-stone-400">
+        <span className="ml-2 text-zinc-400">
           · Risk uses confirmed failures only (not unresolvable citations).
         </span>
         {audit.coverage.tier_4 > 0 && (
-          <span className="ml-2">
-            · {audit.coverage.tier_4} unresolvable — may reflect database limits, not citation failure.
+          <span className="ml-2 text-zinc-400">
+            · {audit.coverage.tier_4} unresolvable - may reflect database limits, not citation
+            failure.
           </span>
         )}
       </p>

@@ -25,7 +25,7 @@ export function PaperAnatomy({ text, citations, onSelectCitation }: Props) {
   }
 
   return (
-    <div className="text-sm leading-relaxed text-stone-200">
+    <div className="text-sm leading-relaxed text-zinc-700">
       {segments.map((segment, index) => {
         if (segment.kind === "text") {
           return <span key={`${index}-text`}>{segment.text}</span>;

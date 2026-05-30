@@ -1,23 +1,23 @@
 import type { CitationRecord } from "../types";
 
 const VERDICT_FILL: Record<string, string> = {
-  supported: "#1a4d3e",
-  failure: "#6b1f2a",
-  retraction: "#6b1f2a",
-  cannot_assess: "#3d4f5c",
-  neutral: "#4a524e",
-  unresolvable: "#3a403d",
-  resolving: "#8b6914",
-  pending: "#2a312e",
-  amber: "#8b6914",
+  supported: "#166534",
+  failure: "#991b1b",
+  retraction: "#991b1b",
+  cannot_assess: "#1e3a8a",
+  neutral: "#3f3f46",
+  unresolvable: "#52525b",
+  resolving: "#b45309",
+  pending: "#a1a1aa",
+  amber: "#b45309",
 };
 
 export const COVERAGE_FILL: Record<string, string> = {
-  "bg-emerald-600": "#059669",
-  "bg-emerald-900": "#064e3b",
+  "bg-emerald-600": "#16a34a",
+  "bg-emerald-900": "#166534",
   "bg-slate-600": "#475569",
-  "bg-stone-600": "#57534e",
-  "bg-red-900": "#7f1d1d",
+  "bg-stone-600": "#78716c",
+  "bg-red-900": "#991b1b",
 };
 
 export function isRetraction(citation: CitationRecord): boolean {
@@ -33,16 +33,16 @@ export function citationFill(citation: CitationRecord): string {
 
 /** Tailwind ring classes for inline citation markers (text + PDF overlay). */
 export function citationMarkerRingClass(citation: CitationRecord): string {
-  return isRetraction(citation) ? "ring-1 ring-amber-400" : "";
+  return isRetraction(citation) ? "ring-1 ring-amber-500" : "";
 }
 
 export function citationCardClass(citation: CitationRecord): string {
-  const base = "rounded-md border p-2 text-left";
+  const base = "rounded-md border p-2 text-left text-white";
   if (isRetraction(citation)) {
     return `${base} border-amber-400 ring-1 ring-amber-400/80`;
   }
   if (citation.verdict_color === "resolving" || citation.status === "resolving") {
-    return `${base} border-white/10 animate-pulse`;
+    return `${base} border-white/20 animate-pulse`;
   }
-  return `${base} border-white/10`;
+  return `${base} border-white/20`;
 }

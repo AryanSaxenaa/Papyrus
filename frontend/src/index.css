@@ -1,23 +1,13 @@
 @import "tailwindcss";
-
-:root {
-  --papyrus-bg: #0f1412;
-  --papyrus-panel: #151c19;
-  --papyrus-text: #e8efe9;
-  --papyrus-muted: #8fa195;
-  --papyrus-green: #1f6b4a;
-  --papyrus-amber: #b8860b;
-  --papyrus-crimson: #8b1e2f;
-  --papyrus-steel: #3d5a73;
-  --papyrus-grey: #5c6460;
-}
+@import "./components/landing/landing.css";
+@import "./styles/papyrus.css";
 
 body {
   margin: 0;
   min-height: 100vh;
   background: var(--papyrus-bg);
   color: var(--papyrus-text);
-  font-family: "Source Sans 3", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
 }
 
 .font-audit {
@@ -25,7 +15,8 @@ body {
 }
 
 .font-display {
-  font-family: "IBM Plex Serif", serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-weight: 700;
 }
 
 @keyframes fadeSlide {

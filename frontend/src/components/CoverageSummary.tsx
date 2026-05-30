@@ -2,6 +2,11 @@ import type { AuditRun, HeatmapFilter } from "../types";
 
 const CHIPS: Array<{ key: HeatmapFilter; label: string; count: (audit: AuditRun) => number }> = [
   {
+    key: "all",
+    label: "All",
+    count: (a) => a.citations.length,
+  },
+  {
     key: "supported",
     label: "Supported",
     count: (a) => a.failures.supported ?? 0,
@@ -53,11 +58,11 @@ export function CoverageSummary({ audit, filter, onFilter }: Props) {
         <button
           key={chip.key}
           type="button"
-          onClick={() => onFilter(chip.key)}
-          className={`rounded-full border px-3 py-1 font-audit text-xs transition ${
+          onClick={() => onFilter(filter === chip.key && chip.key !== "all" ? "all" : chip.key)}
+          className={`rounded-full border px-3 py-1 font-audit text-xs transition-colors ${
             filter === chip.key
-              ? "border-emerald-600/60 bg-emerald-950/50 text-emerald-100"
-              : "border-white/10 bg-black/20 text-stone-300 hover:bg-white/5"
+              ? "border-[#bbf7d0] bg-[#ecfdf3] font-semibold text-[#0a3d2e]"
+              : "border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-50 hover:border-zinc-400"
           }`}
         >
           {chip.label}

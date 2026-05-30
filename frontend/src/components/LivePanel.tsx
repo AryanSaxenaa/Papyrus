@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import * as d3 from "d3";
-import { verdictBadgeLabel } from "../lib/verdictLabel";
-import { citationCardClass, citationFill } from "../lib/verdictColors";
-import type { AuditRun, CitationRecord, StreamEvent } from "../types";
+import { useMemo, useState } from "react";
+import type { AuditRun, StreamEvent } from "../types";
 
 type Props = {
   events: StreamEvent[];
@@ -29,95 +26,53 @@ export function LivePanel({ events, audit }: Props) {
     });
   }, [events, search, eventType]);
 
-  const stackCitations = useMemo(() => {
-    const citations = [...(audit?.citations ?? [])].sort((a, b) => a.index - b.index);
-    return citations;
-  }, [audit?.citations]);
-
-  return (
-    <div className="grid h-full gap-4 md:grid-cols-2">
-      <div className="flex min-h-0 flex-col">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="font-audit text-xs uppercase tracking-wide text-[var(--papyrus-muted)]">Event log</h4>
-          <div className="flex flex-wrap gap-1">
-            <select
-              value={eventType}
-              onChange={(e) => setEventType(e.target.value)}
-              className="rounded border border-white/10 bg-black/30 px-2 py-1 font-audit text-xs"
-            >
-              {EVENT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Citation # or text"
-              className="w-32 rounded border border-white/10 bg-black/30 px-2 py-1 font-audit text-xs"
-            />
-          </div>
-        </div>
-        <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto font-audit text-xs leading-relaxed">
-          {filteredEvents.map((event, index) => (
-            <div key={`${event.ts}-${index}`} className="border-b border-white/5 pb-2">
-              <span className="text-[var(--papyrus-muted)]">{event.ts.slice(11, 19)}</span>{" "}
-              {typeof event.citation_index === "number" && (
-                <span className="text-stone-400">#{event.citation_index} </span>
-              )}
-              <span className="text-emerald-300">{event.type}</span> {event.message}
-            </div>
-          ))}
-          {!filteredEvents.length && (
-            <p className="text-[var(--papyrus-muted)]">
-              {search ? "No events match this citation index." : "Resolution events stream here during analysis."}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <CitationStack citations={stackCitations} />
-    </div>
-  );
-}
-
-function CitationStack({ citations }: { citations: CitationRecord[] }) {
-  const stackRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!stackRef.current) return;
-    d3.select(stackRef.current)
-      .selectAll<HTMLDivElement, CitationRecord>("div[data-stack-id]")
-      .data(citations, (d) => d.id)
-      .transition()
-      .duration(500)
-      .style("background-color", (d) => citationFill(d));
-  }, [citations]);
+  const running = audit && audit.status !== "complete" && audit.status !== "failed";
 
   return (
     <div className="flex min-h-0 flex-col">
-      <h4 className="font-audit text-xs uppercase tracking-wide text-[var(--papyrus-muted)]">Citation stack</h4>
-      <div ref={stackRef} className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto">
-        {citations.map((citation, index) => (
-          <div
-            key={citation.id}
-            data-stack-id={citation.id}
-            className={`${citationCardClass(citation)} animate-[fadeSlide_0.45s_ease-out_both]`}
-            style={{ animationDelay: `${index * 40}ms`, backgroundColor: citationFill(citation) }}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-zinc-500">
+          {running ? "Pipeline events stream while the audit runs." : "Resolution events from this audit."}
+        </p>
+        <div className="flex flex-wrap gap-1">
+          <select
+            value={eventType}
+            onChange={(e) => setEventType(e.target.value)}
+            className="papyrus-input py-1 font-audit text-xs"
+            aria-label="Event type"
           >
-            <p className="font-audit text-xs text-[var(--papyrus-muted)]">#{citation.index}</p>
-            <p className="truncate text-sm font-semibold">
-              {citation.bibliography.authors[0] ?? "Unknown"} · {citation.bibliography.year ?? "—"}
-            </p>
-            <p className="mt-1 truncate text-xs opacity-80">
-              {citation.bibliography.title ?? citation.bibliography.raw}
-            </p>
-            <p className="mt-1 font-audit text-[9px] uppercase opacity-90">{verdictBadgeLabel(citation)}</p>
+            {EVENT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Citation # or text"
+            className="papyrus-input w-36 py-1 font-audit text-xs"
+            aria-label="Filter events"
+          />
+        </div>
+      </div>
+      <div className="mt-2 max-h-64 min-h-[8rem] space-y-1.5 overflow-y-auto papyrus-scroll-hidden font-audit text-xs leading-relaxed">
+        {filteredEvents.map((event, index) => (
+          <div key={`${event.ts}-${index}`} className="border-b border-zinc-100 pb-1.5">
+            <span className="text-zinc-400">{event.ts.slice(11, 19)}</span>{" "}
+            {typeof event.citation_index === "number" && (
+              <span className="text-zinc-500">#{event.citation_index} </span>
+            )}
+            <span className="font-medium text-[#2d6a4f]">{event.type}</span>{" "}
+            <span className="text-zinc-700">{event.message}</span>
           </div>
         ))}
-        {!citations.length && (
-          <p className="text-xs text-[var(--papyrus-muted)]">Citations appear here as the audit runs.</p>
+        {!filteredEvents.length && (
+          <p className="text-zinc-400">
+            {search
+              ? "No events match this filter."
+              : "Events will appear here once analysis starts."}
+          </p>
         )}
       </div>
     </div>

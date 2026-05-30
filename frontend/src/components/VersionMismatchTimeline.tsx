@@ -84,9 +84,9 @@ export function VersionMismatchTimeline({ info }: Props) {
       .attr("x2", innerWidth)
       .attr("y1", 0)
       .attr("y2", 0)
-      .attr("stroke", "#b45309")
-      .attr("stroke-width", 2)
-      .attr("opacity", 0.6);
+      .attr("stroke", "#d97706")
+      .attr("stroke-width", 1.5)
+      .attr("opacity", 0.5);
 
     nodes.forEach((node) => {
       const x =
@@ -98,13 +98,13 @@ export function VersionMismatchTimeline({ info }: Props) {
         .attr("cx", x)
         .attr("cy", 0)
         .attr("r", node.id === "published" ? 6 : 5)
-        .attr("fill", node.id === "published" ? "#fbbf24" : "#d97706");
+        .attr("fill", node.id === "published" ? "#f59e0b" : "#d97706");
 
       g.append("text")
         .attr("x", x)
         .attr("y", -12)
         .attr("text-anchor", "middle")
-        .attr("fill", "#fcd34d")
+        .attr("fill", "#92400e")
         .attr("font-size", 10)
         .text(node.label);
 
@@ -113,7 +113,7 @@ export function VersionMismatchTimeline({ info }: Props) {
           .attr("x", x)
           .attr("y", 16)
           .attr("text-anchor", "middle")
-          .attr("fill", "#a8a29e")
+          .attr("fill", "#71717a")
           .attr("font-size", 9)
           .text(d3.timeFormat("%Y-%m-%d")(node.date));
       }
@@ -122,10 +122,12 @@ export function VersionMismatchTimeline({ info }: Props) {
 
   return (
     <div className="mt-4 space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Version timeline</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Version timeline</p>
       <svg ref={svgRef} className="h-[72px] w-full" />
       {info.material_difference && (
-        <p className="text-xs text-amber-100">Material difference detected between preprint and published versions.</p>
+        <p className="text-xs text-amber-700">
+          Material difference detected between preprint and published versions.
+        </p>
       )}
       {info.material_difference && info.preprint?.abstract && info.published?.abstract && (
         <div className="grid gap-2 md:grid-cols-2">
@@ -134,11 +136,13 @@ export function VersionMismatchTimeline({ info }: Props) {
         </div>
       )}
       {nodes.map((node) => (
-        <div key={node.id} className="border-l-2 border-amber-700/60 pl-3">
-          <p className="font-audit text-xs text-amber-300">{node.label}</p>
-          {node.title && <p className="mt-1 text-xs font-semibold">{node.title}</p>}
+        <div key={node.id} className="border-l-2 border-amber-300 pl-3">
+          <p className="font-audit text-xs text-amber-700">{node.label}</p>
+          {node.title && <p className="mt-1 text-xs font-semibold text-zinc-800">{node.title}</p>}
           {node.abstract && (
-            <p className="mt-1 text-[11px] leading-relaxed text-stone-400">{node.abstract.slice(0, 280)}…</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+              {node.abstract.slice(0, 280)}...
+            </p>
           )}
         </div>
       ))}
@@ -148,9 +152,9 @@ export function VersionMismatchTimeline({ info }: Props) {
 
 function AbstractBlock({ label, text }: { label: string; text: string }) {
   return (
-    <div className="rounded border border-white/10 bg-black/20 p-2">
-      <p className="font-audit text-[10px] uppercase text-amber-300">{label}</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-stone-400">{text.slice(0, 400)}…</p>
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+      <p className="font-audit text-[10px] uppercase text-amber-700">{label}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{text.slice(0, 400)}...</p>
     </div>
   );
 }

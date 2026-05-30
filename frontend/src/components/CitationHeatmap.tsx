@@ -37,7 +37,7 @@ export function CitationHeatmap({ citations, selectedId, onSelect }: Props) {
           id={`heatmap-citation-${citation.id}`}
           onClick={() => onSelect(citation)}
           className={`${citationCardClass(citation)} transition hover:scale-[1.02] ${
-            selectedId === citation.id ? "ring-2 ring-emerald-400" : ""
+            selectedId === citation.id ? "ring-2 ring-[#86efac]" : ""
           }`}
           style={{ backgroundColor: citationFill(citation) }}
         >

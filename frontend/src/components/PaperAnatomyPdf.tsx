@@ -134,11 +134,11 @@ export function PaperAnatomyPdf({ auditId, citations, onSelectCitation, onUnavai
   }, [citations]);
 
   return (
-    <div className="max-h-[28rem] overflow-auto rounded border border-white/10 bg-stone-950/40 p-2">
+    <div className="max-h-[28rem] overflow-auto rounded-xl border border-zinc-200 bg-zinc-50/80 p-3 papyrus-scroll-hidden">
       {loading && (
-        <p className="mb-2 text-sm text-[var(--papyrus-muted)]">Loading PDF with citation overlays…</p>
+        <p className="mb-2 text-sm text-zinc-500">Loading PDF with citation overlays…</p>
       )}
-      {error && <p className="mb-2 text-sm text-amber-200">{error}</p>}
+      {error && <p className="mb-2 text-sm text-amber-700">{error}</p>}
       <div
         ref={containerRef}
         className={`mx-auto w-fit ${loading && !error ? "opacity-0" : ""}`}

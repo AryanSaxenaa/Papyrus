@@ -15,12 +15,12 @@ type Props = {
 
 export function HeatmapFilterBar({ filter, onFilter }: Props) {
   return (
-    <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--papyrus-muted)]">
-      <span className="font-audit uppercase tracking-wide">Heatmap filter</span>
+    <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+      <span className="font-audit uppercase tracking-wide">Filter</span>
       <select
         value={filter}
         onChange={(e) => onFilter(e.target.value as HeatmapFilter)}
-        className="rounded border border-white/10 bg-black/30 px-2 py-1 font-audit text-stone-200"
+        className="papyrus-input py-1 font-audit text-xs"
       >
         {OPTIONS.map((option) => (
           <option key={option.key} value={option.key}>

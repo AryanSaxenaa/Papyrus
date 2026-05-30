@@ -5,9 +5,13 @@ import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
 import { LimitationsPanel } from "./components/LimitationsPanel";
 import { CitationHeatmap } from "./components/CitationHeatmap";
-import { HeatmapFilterBar } from "./components/HeatmapFilterBar";
 import { PaperAnatomyView } from "./components/PaperAnatomyView";
 import { canShowPaperAnatomy } from "./lib/anatomyMarkers";
+import { SiteFooter } from "./components/SiteFooter";
+import { LandingNav } from "./components/landing/LandingNav";
+import { AppFeaturesCard } from "./components/app/AppFeaturesCard";
+import { AppHeroIllustration } from "./components/app/AppHeroIllustration";
+import { AppUploadCard } from "./components/app/AppUploadCard";
 import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
@@ -18,8 +22,7 @@ export default function App() {
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [selected, setSelected] = useState<CitationRecord | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [doiInput, setDoiInput] = useState("");
-  const [urlInput, setUrlInput] = useState("");
+  const [activityOpen, setActivityOpen] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
   const [bulkJobId, setBulkJobId] = useState<string | null>(null);
   const [bulkEvents, setBulkEvents] = useState<StreamEvent[]>([]);
@@ -48,6 +51,12 @@ export default function App() {
     const timer = window.setInterval(() => refreshAudit(audit.id), 2500);
     return () => window.clearInterval(timer);
   }, [audit?.id, audit?.status, refreshAudit]);
+
+  useEffect(() => {
+    if (audit && audit.status !== "complete" && audit.status !== "failed") {
+      setActivityOpen(true);
+    }
+  }, [audit?.id, audit?.status]);
 
   useEffect(() => {
     if (!bulkJobId) return;
@@ -107,22 +116,23 @@ export default function App() {
     }
   };
 
-  const onAuditUrl = async () => {
-    if (!urlInput.trim()) return;
+  const onStartReference = async (kind: "doi" | "url", value: string) => {
     setUploading(true);
     setError(null);
     setEvents([]);
     setSelected(null);
     try {
+      const endpoint = kind === "url" ? "/api/audits/url" : "/api/audits/doi";
+      const body = kind === "url" ? { url: value } : { doi: value };
       await startAudit(
-        await fetch("/api/audits/url", {
+        await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: urlInput.trim() }),
+          body: JSON.stringify(body),
         }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "URL audit failed");
+      setError(err instanceof Error ? err.message : "Could not start audit");
     } finally {
       setUploading(false);
     }
@@ -169,27 +179,6 @@ export default function App() {
       }, 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bulk upload failed");
-      setUploading(false);
-    }
-  };
-
-  const onVerifyDoi = async () => {
-    if (!doiInput.trim()) return;
-    setUploading(true);
-    setError(null);
-    setEvents([]);
-    setSelected(null);
-    try {
-      await startAudit(
-        await fetch("/api/audits/doi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ doi: doiInput.trim() }),
-        }),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "DOI verification failed");
-    } finally {
       setUploading(false);
     }
   };
@@ -310,106 +299,62 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-white/10 bg-[var(--papyrus-panel)] px-6 py-5">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="font-audit text-xs uppercase tracking-[0.2em] text-[var(--papyrus-muted)]">
-              Citation integrity audit
-            </p>
-            <h1 className="font-display text-3xl font-semibold tracking-tight">Papyrus</h1>
-            <p className="mt-1 max-w-2xl text-sm text-[var(--papyrus-muted)]">
-              Verifies whether references exist and whether evidentiary citations are supported.
-              Does not detect AI authorship.
-            </p>
-            <a
-              href="/docs"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-block text-xs text-emerald-300 underline"
-            >
-              API reference (OpenAPI)
-            </a>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={doiInput}
-              onChange={(e) => setDoiInput(e.target.value)}
-              placeholder="10.1038/..."
-              className="rounded-md border border-white/15 bg-black/30 px-3 py-2 font-audit text-sm"
-            />
-            <input
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="https://arxiv.org/abs/..."
-              className="rounded-md border border-white/15 bg-black/30 px-3 py-2 font-audit text-sm min-w-[200px]"
-            />
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => void onAuditUrl()}
-              className="rounded-md border border-stone-600 bg-stone-900/60 px-4 py-2 text-sm font-semibold hover:bg-stone-800/80"
-            >
-              Audit URL
-            </button>
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => void onVerifyDoi()}
-              className="rounded-md border border-stone-600 bg-stone-900/60 px-4 py-2 text-sm font-semibold hover:bg-stone-800/80"
-            >
-              Verify DOI
-            </button>
-            <label className="cursor-pointer rounded-md border border-amber-800/60 bg-amber-950/30 px-4 py-2 text-sm font-semibold hover:bg-amber-900/40">
-              Bulk ZIP
-              <input
-                type="file"
-                accept="application/zip"
-                className="hidden"
-                disabled={uploading}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void onBulkUpload(file);
-                }}
-              />
-            </label>
-            <label className="cursor-pointer rounded-md border border-emerald-700/60 bg-emerald-950/40 px-4 py-2 text-sm font-semibold hover:bg-emerald-900/50">
-              {uploading ? "Working…" : "Upload PDF"}
-              <input
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                disabled={uploading}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void onUpload(file);
-                }}
-              />
-            </label>
-          </div>
-        </div>
-      </header>
+    <div className="landing-page papyrus-app min-h-screen overflow-x-hidden bg-[#fafafa]">
+      <LandingNav />
 
-      <main className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="space-y-4">
-          <PastAudits
-            refreshKey={auditsListKey}
-            activeAuditId={audit?.id ?? null}
-            onSelect={(id) => void loadAuditById(id)}
-            onDeleted={onAuditDeleted}
-          />
-          <AdminPanel />
+      <div className="mx-auto max-w-[1120px] px-5 lg:px-8">
+        <section id="audit-start" className="scroll-mt-[var(--lp-nav-h)] pb-6 lg:pb-8">
+          <div className="grid lg:grid-cols-2 lg:gap-10 mb-0">
+            <div className="min-w-0 mt-[70px]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#40916c]">
+                Citation integrity
+              </p>
+              <h1 className="font-serif-display mt-2 max-w-md text-[clamp(1.75rem,3.8vw,2.35rem)] font-bold leading-[1.14] tracking-[-0.02em] text-zinc-900">
+                Audit <em className="italic text-[#52b788]">every</em> citation.
+                <br />
+                Trust <em className="italic text-[#52b788]">every</em> claim.
+              </h1>
+              <p className="mt-3 max-w-md text-[14px] leading-relaxed text-zinc-500">
+                Run a full integrity pass on your manuscript—resolution trails, heatmaps, and
+                exportable reports in one place.
+              </p>
+            </div>
+            <AppHeroIllustration />
+          </div>
+
+          <div className="-mt-4 grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
+            <AppUploadCard
+              uploading={uploading}
+              onUploadPdf={(file) => void onUpload(file)}
+              onStartReference={(kind, value) => void onStartReference(kind, value)}
+              onBulkZip={(file) => void onBulkUpload(file)}
+              moreOptions={
+                <PastAudits
+                  embedded
+                  refreshKey={auditsListKey}
+                  activeAuditId={audit?.id ?? null}
+                  onSelect={(id) => void loadAuditById(id)}
+                  onDeleted={onAuditDeleted}
+                />
+              }
+            />
+            <AppFeaturesCard />
+          </div>
+        </section>
+
+        <main className="space-y-6 pb-8">
 
           {error && (
-            <p className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
-            </p>
+            </div>
           )}
+
           {bulkStatus && (
-            <div className="rounded-md border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">
-              <p>{bulkStatus}</p>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p className="font-medium">{bulkStatus}</p>
               {bulkEvents.length > 0 && (
-                <ul className="mt-2 max-h-24 overflow-y-auto font-audit text-[10px] leading-relaxed text-amber-100/80">
+                <ul className="mt-2 max-h-24 overflow-y-auto papyrus-scroll-hidden font-audit text-[10px] leading-relaxed text-amber-700/80">
                   {bulkEvents.slice(-12).map((event, index) => (
                     <li key={`${event.ts}-${index}`}>
                       {event.ts.slice(11, 19)} {event.type}: {event.message}
@@ -421,46 +366,44 @@ export default function App() {
           )}
 
           {bulkDashboard && (
-            <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
-              <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
-                Bulk analysis dashboard
-              </h3>
-              <p className="mt-1 text-xs text-[var(--papyrus-muted)]">{bulkDashboard.note}</p>
+            <div className="papyrus-card">
+              <h3 className="font-semibold text-zinc-900">Bulk analysis dashboard</h3>
+              <p className="mt-1 text-xs text-zinc-500">{bulkDashboard.note}</p>
               <div className="mt-2 flex flex-wrap gap-3 text-xs">
                 <a
-                  className="text-emerald-300 underline"
+                  className="papyrus-link"
                   href={`/api/bulk/${bulkDashboard.job.id}/dashboard.json`}
                 >
                   Export dashboard JSON
                 </a>
                 <a
-                  className="text-emerald-300 underline"
+                  className="papyrus-link"
                   href={`/api/bulk/${bulkDashboard.job.id}/events/log.txt`}
                 >
                   Bulk event log
                 </a>
               </div>
               {(bulkDashboard.pending_papers ?? 0) > 0 && (
-                <p className="mt-2 font-audit text-xs text-amber-200">
-                  {bulkDashboard.pending_papers} paper(s) still resolving…
+                <p className="mt-2 font-audit text-xs text-amber-700">
+                  {bulkDashboard.pending_papers} paper(s) still resolving...
                   {bulkDashboard.job.estimated_seconds_remaining != null && (
-                    <span className="text-stone-400">
+                    <span className="text-zinc-500">
                       {" "}
                       · ~{Math.ceil(bulkDashboard.job.estimated_seconds_remaining / 60)} min remaining
                     </span>
                   )}
                 </p>
               )}
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="text-xs text-[var(--papyrus-muted)]">
-                    <tr>
-                      <th className="py-1 pr-3">Paper</th>
-                      <th className="py-1 pr-3">First author</th>
-                      <th className="py-1 pr-3">Coverage</th>
-                      <th className="py-1 pr-3">Failure rate</th>
-                      <th className="py-1 pr-3">T1 / T7 / Ret</th>
-                      <th className="py-1">Risk</th>
+                  <thead>
+                    <tr className="border-b border-zinc-200 text-xs font-medium text-zinc-500">
+                      <th className="pb-2 pr-3">Paper</th>
+                      <th className="pb-2 pr-3">First author</th>
+                      <th className="pb-2 pr-3">Coverage</th>
+                      <th className="pb-2 pr-3">Failure rate</th>
+                      <th className="pb-2 pr-3">T1 / T7 / Ret</th>
+                      <th className="pb-2">Risk</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -470,27 +413,38 @@ export default function App() {
                       return (
                         <Fragment key={paper.audit_id}>
                           <tr
-                            className="cursor-pointer border-t border-white/5 hover:bg-white/5"
+                            className="cursor-pointer border-t border-zinc-100 hover:bg-zinc-50 transition-colors"
                             onClick={() => void openBulkPaper(paper.audit_id)}
                           >
-                            <td className="py-2 pr-3">
+                            <td className="py-2.5 pr-3 text-zinc-800">
                               {paper.title ?? paper.audit_id.slice(0, 8)}
                               {isExpanded && (
-                                <span className="ml-2 font-audit text-[10px] text-emerald-400">expanded</span>
+                                <span className="ml-2 font-audit text-[10px] text-[#2d6a4f]">
+                                  expanded
+                                </span>
                               )}
                             </td>
-                            <td className="py-2 pr-3 text-stone-400">
-                              {paper.first_author ?? "—"}
+                            <td className="py-2.5 pr-3 text-zinc-500">
+                              {paper.first_author ?? "-"}
                             </td>
-                            <td className="py-2 pr-3 font-audit">{paper.coverage_percent}%</td>
-                            <td className="py-2 pr-3 font-audit">{paper.confirmed_failure_rate}%</td>
-                            <td className="py-2 pr-3 font-audit text-xs text-stone-400">
+                            <td className="py-2.5 pr-3 font-audit text-zinc-800">
+                              {paper.coverage_percent}%
+                            </td>
+                            <td className="py-2.5 pr-3 font-audit text-zinc-800">
+                              {paper.confirmed_failure_rate}%
+                            </td>
+                            <td className="py-2.5 pr-3 font-audit text-xs text-zinc-500">
                               {paper.type_1 ?? 0} / {paper.type_7 ?? 0} / {paper.retraction ?? 0}
                             </td>
-                            <td className="py-2 font-audit uppercase">{paper.risk_level}</td>
+                            <td className="py-2.5 font-audit text-xs font-semibold uppercase text-zinc-700">
+                              {paper.risk_level}
+                            </td>
                           </tr>
                           {isExpanded && cached && (
-                            <tr key={`${paper.audit_id}-heat`} className="border-t border-white/5 bg-black/20">
+                            <tr
+                              key={`${paper.audit_id}-heat`}
+                              className="border-t border-zinc-100 bg-zinc-50"
+                            >
                               <td colSpan={6} className="py-3">
                                 <CitationHeatmap
                                   citations={cached.citations}
@@ -512,30 +466,36 @@ export default function App() {
           )}
 
           {audit && (
-            <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">{audit.paper_title ?? "Analyzing document…"}</h2>
-                  <p className="font-audit text-xs text-[var(--papyrus-muted)]">
+            <div className="papyrus-card">
+              <p className="papyrus-eyebrow">Current audit</p>
+              <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-serif-display text-xl font-bold leading-snug text-[#0a3d2e] sm:text-2xl">
+                    {audit.paper_title ?? "Analyzing document..."}
+                  </h2>
+                  <p className="mt-1 font-audit text-xs text-zinc-400">
                     Status: {audit.status} · Pipeline {audit.pipeline_version}
                   </p>
                   {audit.status === "failed" && audit.error && (
-                    <p className="mt-2 rounded border border-red-900/50 bg-red-950/40 px-2 py-1 text-xs text-red-200">
+                    <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                       {audit.error}
                     </p>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="font-display font-audit text-3xl font-semibold text-emerald-300">
+                <div className="shrink-0 text-right">
+                  <p className="font-audit text-3xl font-semibold text-[#0a3d2e]">
                     {audit.coverage.coverage_percent}%
                   </p>
-                  <p className="text-xs text-[var(--papyrus-muted)]">
-                    Coverage ({audit.coverage.tier_1 + audit.coverage.tier_2} of {audit.coverage.total} at Tier 2+)
+                  <p className="text-xs text-zinc-500">
+                    Coverage ({audit.coverage.tier_1 + audit.coverage.tier_2} of{" "}
+                    {audit.coverage.total} at Tier 2+)
                   </p>
-                  <p className="mt-2 font-audit text-sm uppercase text-amber-300">
+                  <p className="mt-1.5 font-audit text-sm font-semibold uppercase text-amber-700">
                     {audit.risk_level} risk
                     {audit.risk_confidence && (
-                      <span className="ml-1 text-xs text-stone-400">({audit.risk_confidence} confidence)</span>
+                      <span className="ml-1 text-xs font-normal text-zinc-500">
+                        ({audit.risk_confidence} confidence)
+                      </span>
                     )}
                   </p>
                 </div>
@@ -545,61 +505,84 @@ export default function App() {
               </div>
               <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
               <LimitationsPanel audit={audit} />
-              {audit.status === "complete" && (
-                <div className="mt-3 flex gap-3 text-sm">
-                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.txt`}>
-                    Export TXT
-                  </a>
-                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.json`}>
-                    Export JSON
-                  </a>
-                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.pdf`}>
-                    Export PDF
-                  </a>
-                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/events/log.txt`}>
-                    Event log
-                  </a>
+              <div className="mt-6 border-t border-zinc-100 pt-5">
+                <p className="papyrus-section-title">Citation heatmap</p>
+                <div className="mt-2">
+                  <HeatmapLegend />
                 </div>
+                <div className="mt-3">
+                  {filteredCitations.length > 0 ? (
+                    <CitationHeatmap
+                      citations={filteredCitations}
+                      selectedId={selected?.id}
+                      onSelect={setSelected}
+                    />
+                  ) : (
+                    <p className="text-sm text-zinc-500">No citations match this filter.</p>
+                  )}
+                </div>
+              </div>
+              {canShowPaperAnatomy(audit.status) && (
+                <div className="mt-4 border-t border-zinc-100 pt-4">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 text-sm font-semibold text-zinc-700 hover:text-[#2d6a4f] transition-colors"
+                    onClick={() => setShowAnatomy((value) => !value)}
+                  >
+                    <span className="font-audit text-xs">{showAnatomy ? "▾" : "▸"}</span>
+                    Paper anatomy
+                  </button>
+                  {showAnatomy && (
+                    <div className="mt-3">
+                      <PaperAnatomyView
+                        auditId={audit.id}
+                        text={audit.paper_text ?? ""}
+                        citations={audit.citations}
+                        onSelectCitation={setSelected}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              {audit.status === "complete" && (
+                <details className="mt-4 border-t border-zinc-100 pt-4 text-sm">
+                  <summary className="cursor-pointer font-medium text-zinc-700 hover:text-[#2d6a4f]">
+                    Export reports
+                  </summary>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <a className="papyrus-link" href={`/api/audits/${audit.id}/report.pdf`}>
+                      PDF
+                    </a>
+                    <a className="papyrus-link" href={`/api/audits/${audit.id}/report.txt`}>
+                      Text
+                    </a>
+                    <a className="papyrus-link" href={`/api/audits/${audit.id}/report.json`}>
+                      JSON
+                    </a>
+                    <a className="papyrus-link" href={`/api/audits/${audit.id}/events/log.txt`}>
+                      Event log
+                    </a>
+                  </div>
+                </details>
               )}
             </div>
           )}
 
-          <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
-            <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
-              Citation heatmap
-            </h3>
-            <HeatmapLegend />
-            <HeatmapFilterBar filter={filter} onFilter={setFilter} />
-            <div className="mt-3">
-              {filteredCitations.length > 0 ? (
-                <CitationHeatmap
-                  citations={filteredCitations}
-                  selectedId={selected?.id}
-                  onSelect={setSelected}
-                />
-              ) : (
-                <p className="text-sm text-[var(--papyrus-muted)]">No citations match this filter.</p>
-              )}
-            </div>
-          </div>
-
-          {audit && canShowPaperAnatomy(audit.status) && (
-            <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
+          {audit && (
+            <div className="papyrus-card !p-4">
               <button
                 type="button"
-                className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]"
-                onClick={() => setShowAnatomy((value) => !value)}
+                className="flex w-full items-center justify-between gap-2 text-sm font-semibold text-zinc-700 hover:text-zinc-900 transition-colors"
+                onClick={() => setActivityOpen((open) => !open)}
               >
-                Paper anatomy view {showAnatomy ? "▾" : "▸"}
+                <span>Activity log</span>
+                <span className="font-audit text-xs text-zinc-400">
+                  {activityOpen ? "▾" : "▸"} · {events.length} events
+                </span>
               </button>
-              {showAnatomy && (
+              {activityOpen && (
                 <div className="mt-3">
-                  <PaperAnatomyView
-                    auditId={audit.id}
-                    text={audit.paper_text ?? ""}
-                    citations={audit.citations}
-                    onSelectCitation={setSelected}
-                  />
+                  <LivePanel events={events} audit={audit} />
                 </div>
               )}
             </div>
@@ -618,17 +601,16 @@ export default function App() {
               onClose={() => setSelected(null)}
             />
           )}
-        </section>
+        </main>
 
-        <section className="rounded-xl border border-white/10 bg-[#0c100e] p-4 min-h-[70vh]">
-          <h3 className="font-audit text-sm uppercase tracking-wide text-[var(--papyrus-muted)]">
-            Live resolution panel
-          </h3>
-          <div className="mt-3 h-[calc(70vh-3rem)]">
-            <LivePanel events={events} audit={audit} />
-          </div>
-        </section>
-      </main>
+        <div className="mt-8">
+          <AdminPanel variant="app" />
+        </div>
+      </div>
+
+      <div className="mt-12">
+        <SiteFooter />
+      </div>
     </div>
   );
 }

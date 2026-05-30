@@ -25,7 +25,7 @@ export function highlightEvidencePassage(passage: string, claim: string | null |
   return (
     <>
       {parts[0]}
-      <mark className="rounded bg-emerald-900/50 px-0.5 text-emerald-50">{best}</mark>
+      <mark className="rounded bg-[#ecfdf3] px-0.5 text-[#1b4332] ring-1 ring-[#bbf7d0]">{best}</mark>
       {parts.slice(1).join(best)}
     </>
   );

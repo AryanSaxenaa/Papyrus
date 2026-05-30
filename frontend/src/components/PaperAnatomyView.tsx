@@ -15,28 +15,28 @@ export function PaperAnatomyView({ auditId, text = "", citations, onSelectCitati
   const [mode, setMode] = useState<"pdf" | "text">("pdf");
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2 font-audit text-xs">
+    <div className="space-y-3">
+      <div className="papyrus-segmented font-audit" role="tablist" aria-label="Anatomy view">
         <button
           type="button"
+          role="tab"
+          aria-selected={mode === "pdf"}
+          data-active={mode === "pdf"}
+          className="papyrus-segment"
           onClick={() => setMode("pdf")}
-          className={`rounded border px-2 py-1 ${
-            mode === "pdf" ? "border-emerald-600/60 bg-emerald-950/40 text-emerald-100" : "border-white/10 text-stone-400"
-          }`}
         >
           PDF overlay
         </button>
         <button
           type="button"
+          role="tab"
+          aria-selected={mode === "text"}
+          data-active={mode === "text"}
+          className="papyrus-segment disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => setMode("text")}
           disabled={!hasText}
-          className={`rounded border px-2 py-1 ${
-            mode === "text"
-              ? "border-emerald-600/60 bg-emerald-950/40 text-emerald-100"
-              : "border-white/10 text-stone-400"
-          } ${!hasText ? "cursor-not-allowed opacity-50" : ""}`}
         >
-          Text fallback
+          Text view
         </button>
       </div>
       {mode === "pdf" ? (
@@ -49,11 +49,11 @@ export function PaperAnatomyView({ auditId, text = "", citations, onSelectCitati
           }}
         />
       ) : hasText ? (
-        <div className="max-h-64 overflow-y-auto">
+        <div className="max-h-64 overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 papyrus-scroll-hidden">
           <PaperAnatomy text={text} citations={citations} onSelectCitation={onSelectCitation} />
         </div>
       ) : (
-        <p className="text-sm text-[var(--papyrus-muted)]">Extracted text is not available yet.</p>
+        <p className="text-sm text-zinc-500">Extracted text is not available yet.</p>
       )}
     </div>
   );
