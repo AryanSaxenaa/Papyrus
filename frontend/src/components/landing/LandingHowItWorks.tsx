@@ -4,7 +4,6 @@ import {
   motion,
   useMotionValueEvent,
   useScroll,
-  useTransform,
 } from "motion/react";
 import { PaperAnatomyMockup } from "./PaperAnatomyMockup";
 import { WorkflowStepIcon } from "./WorkflowStepIcons";
@@ -13,17 +12,17 @@ export const WORKFLOW_STEPS = [
   {
     n: 1,
     title: "Extract",
-    body: "We pull every citation from your paper or document.",
+    body: "GROBID parses your PDF and extracts every bibliography entry with surrounding context.",
   },
   {
     n: 2,
     title: "Verify",
-    body: "AI checks DOIs, metadata, and source credibility.",
+    body: "CrossRef, Semantic Scholar, and OpenAlex cross-reference every DOI and metadata field.",
   },
   {
     n: 3,
     title: "Check",
-    body: "We scan for retractions, contradictions, and supporting evidence.",
+    body: "Retraction flags, title drift, date impossibilities, and claim alignment via NLI on bounded inputs.",
   },
   {
     n: 4,
@@ -93,10 +92,10 @@ export function LandingHowItWorks() {
         <div className="mx-auto w-full max-w-6xl px-6 py-8">
           <div className="max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#40916c]">
-              Smart. Transparent. Reliable.
+              Verifiable. Transparent. Independent.
             </p>
             <h2 className="font-serif-display mt-3 text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-[2.65rem] lg:leading-[1.15]">
-              AI that works the way research should.
+              A citation integrity audit pipeline with receipts.
             </h2>
           </div>
 

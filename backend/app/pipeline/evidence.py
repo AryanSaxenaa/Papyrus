@@ -9,25 +9,64 @@ from app.domain.enums import EvidenceTier, ResolutionSource
 from app.domain.models import CitationRecord
 from app.text.sentences import split_sentences
 
+try:
+    import tiktoken
 
-def chunk_text(text: str, max_chars: int = 2048) -> list[str]:
+    _enc = tiktoken.get_encoding("cl100k_base")
+
+    def _token_count(text: str) -> int:
+        return len(_enc.encode(text, disallowed_special=()))
+except ImportError:
+    _enc = None
+
+    def _token_count(text: str) -> int:
+        return max(1, len(text.split()))
+
+
+def chunk_text(text: str, max_tokens: int = 512, overlap_tokens: int = 64) -> list[str]:
+    """Split text into overlapping chunks of approximately max_tokens tokens.
+
+    Respects sentence boundaries where possible. Overlap ensures claims
+    straddling chunk boundaries are still retrievable.
+    """
     sentences = split_sentences(text)
     if not sentences:
-        return [text[:max_chars]] if text else []
+        return [text[:max_tokens * 4]] if text else []
+
+    if _token_count(text) <= max_tokens:
+        return [text]
 
     chunks: list[str] = []
-    current: list[str] = []
-    length = 0
-    for sentence in sentences:
-        if length + len(sentence) > max_chars and current:
-            chunks.append(" ".join(current))
-            current = [sentence]
-            length = len(sentence)
-        else:
-            current.append(sentence)
-            length += len(sentence)
-    if current:
-        chunks.append(" ".join(current))
+    i = 0
+    while i < len(sentences):
+        chunk: list[str] = []
+        token_count = 0
+        j = i
+        while j < len(sentences):
+            s_tokens = _token_count(sentences[j])
+            if token_count + s_tokens > max_tokens and chunk:
+                break
+            chunk.append(sentences[j])
+            token_count += s_tokens
+            j += 1
+
+        if not chunk and j < len(sentences):
+            chunk.append(sentences[j])
+            j += 1
+
+        chunks.append(" ".join(chunk))
+
+        overlap_tok = 0
+        overlap_count = 0
+        for k in range(j - 1, i - 1, -1):
+            s_tokens = _token_count(sentences[k])
+            if overlap_tok + s_tokens > overlap_tokens and overlap_count > 0:
+                break
+            overlap_count += 1
+            overlap_tok += s_tokens
+
+        i = j - overlap_count
+
     return chunks
 
 

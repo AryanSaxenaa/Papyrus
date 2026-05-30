@@ -310,9 +310,9 @@ export default function App() {
                 Citation integrity
               </p>
               <h1 className="font-serif-display mt-2 max-w-md text-[clamp(1.75rem,3.8vw,2.35rem)] font-bold leading-[1.14] tracking-[-0.02em] text-zinc-900">
-                Audit <em className="italic text-[#52b788]">every</em> citation.
+                Audit <em className="italic text-[#1b4332]">every</em> citation.
                 <br />
-                Trust <em className="italic text-[#52b788]">every</em> claim.
+                Trust <em className="italic text-[#1b4332]">every</em> claim.
               </h1>
               <p className="mt-3 max-w-md text-[14px] leading-relaxed text-zinc-500">
                 Run a full integrity pass on your manuscript—resolution trails, heatmaps, and
@@ -582,7 +582,12 @@ export default function App() {
               </button>
               {activityOpen && (
                 <div className="mt-3">
-                  <LivePanel events={events} audit={audit} />
+                  <LivePanel
+                    events={events}
+                    audit={audit}
+                    citations={audit.citations}
+                    onSelect={setSelected}
+                  />
                 </div>
               )}
             </div>

@@ -45,7 +45,7 @@ export function coverageSegments(audit: AuditRun): CoverageSegment[] {
   return [
     { label: "Tier 1", value: tier1, color: "bg-emerald-600" },
     { label: "Tier 2", value: tier2, color: "bg-emerald-900" },
-    { label: "Tier 3", value: tier3, color: "bg-slate-600" },
+    { label: "Cannot assess", value: tier3, color: "bg-sky-700" },
     { label: "Unresolvable", value: unresolvable, color: "bg-stone-600" },
     { label: "Confirmed failure", value: failures, color: "bg-red-900" },
   ].filter((segment) => segment.value > 0);

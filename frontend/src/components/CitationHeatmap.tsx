@@ -36,11 +36,19 @@ export function CitationHeatmap({ citations, selectedId, onSelect }: Props) {
           data-citation-id={citation.id}
           id={`heatmap-citation-${citation.id}`}
           onClick={() => onSelect(citation)}
-          className={`${citationCardClass(citation)} transition hover:scale-[1.02] ${
+          className={`${citationCardClass(citation)} relative transition hover:scale-[1.02] ${
             selectedId === citation.id ? "ring-2 ring-[#86efac]" : ""
           }`}
           style={{ backgroundColor: citationFill(citation) }}
         >
+          {citation.quantitative_claim && (
+            <span
+              className="absolute right-1 top-1 rounded bg-white/25 px-1 font-audit text-[8px] font-bold leading-tight text-white"
+              title="Quantitative claim detected — NLI may not detect numerical discrepancies"
+            >
+              #±
+            </span>
+          )}
           <p className="font-audit text-xs opacity-80">#{citation.index}</p>
           <p className="truncate text-sm font-semibold">
             {citation.bibliography.authors[0] ?? "Unknown"}

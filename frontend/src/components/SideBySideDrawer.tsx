@@ -187,8 +187,7 @@ export function SideBySideDrawer({
           <Panel title="Evidence drawer">
             {citation.evidence_tier === "tier_2" && (
               <p className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-2 text-xs text-blue-700">
-                Analysis based on abstract only - full text unavailable. Numerical claims in the
-                body cannot be verified from the abstract alone.
+                Analysis based on abstract only — full text unavailable. Specific numerical claims, methods details, and supplementary results cannot be verified from the abstract alone.
               </p>
             )}
             {citation.evidence_tier === "tier_3" && (

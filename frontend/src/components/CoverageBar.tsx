@@ -40,6 +40,8 @@ export function CoverageBar({ audit }: Props) {
     }
   }, [audit.id, segments, total]);
 
+  const cannotAssess = audit.coverage.tier_3;
+
   return (
     <div className="space-y-2">
       <svg ref={svgRef} className="h-2.5 w-full rounded-full overflow-hidden" />
@@ -49,6 +51,11 @@ export function CoverageBar({ audit }: Props) {
             {segment.label} {segment.value}
           </span>
         ))}
+        {cannotAssess > 0 && (
+          <span className="text-[#1e3a8a]">
+            Cannot assess {cannotAssess}
+          </span>
+        )}
       </div>
       <p className="text-xs text-zinc-500">
         Coverage confidence:{" "}
@@ -56,12 +63,17 @@ export function CoverageBar({ audit }: Props) {
           {audit.coverage.coverage_confidence ?? "medium"}
         </span>
         <span className="ml-2 text-zinc-400">
-          · Risk uses confirmed failures only (not unresolvable citations).
+          · Risk uses confirmed failures only (not unresolvable or cannot-assess citations).
         </span>
         {audit.coverage.tier_4 > 0 && (
           <span className="ml-2 text-zinc-400">
-            · {audit.coverage.tier_4} unresolvable - may reflect database limits, not citation
+            · {audit.coverage.tier_4} unresolvable — may reflect database limits, not citation
             failure.
+          </span>
+        )}
+        {cannotAssess > 0 && (
+          <span className="ml-2 text-zinc-400">
+            · {cannotAssess} metadata-only (cannot assess) — not scored as failures.
           </span>
         )}
       </p>

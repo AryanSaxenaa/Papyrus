@@ -21,23 +21,23 @@ export function LandingHero() {
                 className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#52b788]"
               >
                 <SparkIcon className="h-3.5 w-3.5 shrink-0 text-[#52b788]" />
-                AI-powered citation audit
+                Citation integrity audit
               </motion.p>
 
               <motion.h1
                 variants={fadeUp}
                 className="mt-5 text-[clamp(1.875rem,5.5vw,3.5rem)] font-bold leading-[1.1] tracking-[-0.03em] text-zinc-900"
               >
-                <span className="block sm:whitespace-nowrap">Audit every citation.</span>
-                <span className="block sm:whitespace-nowrap">Trust every claim.</span>
+                <span className="block sm:whitespace-nowrap">Audit <span className="text-[#1b4332]">every</span> citation.</span>
+                <span className="block sm:whitespace-nowrap">Trust <span className="text-[#1b4332]">every</span> claim.</span>
               </motion.h1>
 
               <motion.p
                 variants={fadeUp}
                 className="mt-5 max-w-[440px] text-[17px] leading-[1.65] text-zinc-500"
               >
-                Papyrus uses AI to detect hallucinations, retractions, and mismatches—so you can
-                publish with confidence.
+                Papyrus verifies every cited source through multi-database cross-referencing and
+                checks whether evidentiary claims are supported by the sources they point to.
               </motion.p>
 
               <motion.div variants={fadeUp} className="mt-8 flex flex-wrap items-center gap-3">
@@ -59,7 +59,7 @@ export function LandingHero() {
               </motion.div>
 
               <motion.ul variants={fadeUp} className="mt-6 flex flex-wrap gap-x-7 gap-y-2">
-                {["Free forever", "No credit card", "Setup in 60 seconds"].map((item) => (
+                {["Free plan available", "No credit card", "Setup in 60 seconds"].map((item) => (
                   <li key={item} className="flex items-center gap-2 text-[14px] text-zinc-600">
                     <CheckIcon />
                     {item}
@@ -79,17 +79,30 @@ export function LandingHero() {
             <div
               className="pointer-events-none absolute bottom-5 right-[-156px] z-10 hidden md:block lg:bottom-5 lg:right-[-156px]"
             >
-              <div
-                className="h-[18.792rem] w-[19.44rem] overflow-hidden lg:h-[22.032rem] lg:w-[22.68rem]"
-              >
-                <img
-                  src="/images/L1A.png"
-                  alt=""
-                  width={362}
-                  height={467}
-                  decoding="async"
-                  className="h-[145%] w-full object-contain object-bottom mix-blend-screen"
-                />
+              <div className="relative h-[18.792rem] w-[19.44rem] lg:h-[22.032rem] lg:w-[22.68rem]">
+                <div className="absolute inset-0 overflow-hidden opacity-40" aria-hidden>
+                  <img
+                    src="/images/L1A.png"
+                    alt=""
+                    className="h-[145%] w-full translate-y-[25px] scale-105 object-contain object-bottom blur-xl"
+                  />
+                </div>
+                <div
+                  className="relative h-full w-full overflow-hidden"
+                  style={{
+                    maskImage: "radial-gradient(ellipse 75% 70% at 50% 70%, black 50%, transparent 82%)",
+                    WebkitMaskImage: "radial-gradient(ellipse 75% 70% at 50% 70%, black 50%, transparent 82%)",
+                  }}
+                >
+                  <img
+                    src="/images/L1A.png"
+                    alt=""
+                    width={362}
+                    height={467}
+                    decoding="async"
+                    className="h-[145%] w-full translate-y-[25px] object-contain object-bottom mix-blend-screen"
+                  />
+                </div>
               </div>
             </div>
           </motion.div>

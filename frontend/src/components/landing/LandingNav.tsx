@@ -86,16 +86,16 @@ export function LandingNav() {
             {onApp ? (
               <a
                 href="#audit-start"
-                className="inline-block rounded-[10px] bg-[#1a1a1a] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 sm:px-4 sm:py-2.5 sm:text-[15px]"
+                className="inline-block rounded-[10px] bg-[#1b4332] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#163724] sm:px-4 sm:py-2.5 sm:text-[15px]"
               >
                 New audit
               </a>
             ) : (
               <Link
                 to="/app"
-                className="inline-block rounded-[10px] bg-[#1a1a1a] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 sm:px-4 sm:py-2.5 sm:text-[15px]"
+                className="inline-block rounded-[10px] bg-[#1b4332] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#163724] sm:px-4 sm:py-2.5 sm:text-[15px]"
               >
-                Get started free
+                Get started
               </Link>
             )}
           </MagneticLinkButton>
@@ -141,7 +141,7 @@ export function LandingNav() {
                 <a
                   href="#audit-start"
                   onClick={closeMenu}
-                  className="mt-2 inline-block rounded-[10px] bg-[#1a1a1a] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="mt-2 inline-block rounded-[10px] bg-[#1b4332] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#163724]"
                 >
                   New audit
                 </a>

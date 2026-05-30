@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: ChartIcon,
     title: "Live audit",
-    body: "Audit as you write. Get real-time feedback as citations resolve in the background.",
+    body: "Upload a manuscript and watch citations resolve in real time with full transparency.",
   },
   {
     icon: LinkIcon,
@@ -77,7 +77,7 @@ export default function LandingPage() {
         <div className="relative mx-auto max-w-6xl px-6">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#40916c]">
-              Designed for researchers
+              For editors, integrity offices, and researchers
             </p>
             <h2 className="font-serif-display mt-3 max-w-lg text-3xl font-bold tracking-tight text-[#0a3d2e] sm:text-4xl">
               Built for research.
@@ -123,9 +123,9 @@ export default function LandingPage() {
               </motion.div>
               <div className="text-center lg:text-left lg:ml-12">
                 <h2 className="font-serif-display text-2xl font-bold tracking-tight text-[#0a3d2e] sm:text-3xl">
-                  <span className="sm:whitespace-nowrap">You focus on discovery.</span>
+                  <span className="sm:whitespace-nowrap">You focus on the research.</span>
                   <br />
-                  <span className="sm:whitespace-nowrap">Papyrus keeps your citations solid.</span>
+                  <span className="sm:whitespace-nowrap">Papyrus audits the reference layer.</span>
                 </h2>
                 <div className="mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
                   <MagneticLinkButton>

@@ -66,7 +66,7 @@ export function AppUploadCard({
     <div className="min-w-0 rounded-xl border border-zinc-100 bg-white p-4 sm:p-5">
       <p className="text-[13px] leading-relaxed text-zinc-600">
         Upload a PDF, or paste a DOI or open-access URL. We verify citations and evidential support —{" "}
-        <strong className="font-semibold text-[#1a3d32]">not AI authorship.</strong>
+        <strong className="font-semibold text-[#1a3d32]">not authorship detection.</strong>
       </p>
 
       <div

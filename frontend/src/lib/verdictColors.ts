@@ -15,7 +15,7 @@ const VERDICT_FILL: Record<string, string> = {
 export const COVERAGE_FILL: Record<string, string> = {
   "bg-emerald-600": "#16a34a",
   "bg-emerald-900": "#166534",
-  "bg-slate-600": "#475569",
+  "bg-sky-700": "#0369a1",
   "bg-stone-600": "#78716c",
   "bg-red-900": "#991b1b",
 };
