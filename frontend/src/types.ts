@@ -52,6 +52,7 @@ export type CitationRecord = {
   hallucination_type: string;
   verdict_color: string;
   status: string;
+  inline_markers?: Array<{ marker: string; context_window: string }>;
   extracted_claim?: string | null;
   claim_user_corrected?: string | null;
   evidence_passage?: string | null;

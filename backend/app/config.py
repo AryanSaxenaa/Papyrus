@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     openalex_mailto: str = "contact@example.com"
     exa_api_key: str | None = None
     firecrawl_api_key: str | None = None
+    apify_api_token: str | None = None
+    apify_actor_arxiv: str = "datapilot/arxiv-research-paper-scraper"
+    apify_actor_openalex: str = "parseforge/openalex-scraper"
+    apify_actor_europe_pmc: str = "parseforge/europepmc-scraper"
+    apify_actor_crossref_journals: str = "parseforge/crossref-journals-scraper"
     deepseek_api_key: str | None = None
     openai_api_key: str | None = None
     huggingface_api_key: str | None = None

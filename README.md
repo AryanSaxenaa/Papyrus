@@ -7,7 +7,7 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 ## Stack
 
 - **Backend:** FastAPI, Redis cache, Celery (bulk stub), GROBID + PyMuPDF ingestion
-- **Resolution:** CrossRef, Semantic Scholar, OpenAlex (Exa/Apify hooks planned)
+- **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Europe PMC, Exa, Apify fallbacks
 - **Frontend:** React + Vite + Tailwind (live SSE panel + heatmap)
 
 ## Quick start
@@ -70,6 +70,9 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits/bulk` | ZIP of PDFs (async bulk job) |
 | `GET` | `/api/bulk/{id}` | Bulk job status |
 | `GET` | `/api/bulk/{id}/dashboard` | Bulk papers ranked by failure rate |
+| `GET` | `/api/audits/{id}/events/log.txt` | Download resolution event log |
+| `GET` | `/api/admin/rate-limits` | API usage vs daily budgets |
+| `GET` | `/api/admin/config` | Integration feature flags |
 
 ## Implementation status (v1 slice)
 
@@ -90,6 +93,8 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Open-access full-text PDF fetch for Tier 1 evidence
 - [x] CrossRef DOI content negotiation
 - [x] Bulk dashboard + paper anatomy view
-- [ ] Apify actors (arXiv, OpenAlex bulk, Europe PMC scrapers)
+- [x] Apify actor fallback layer (arxiv, OpenAlex, Europe PMC scrapers)
+- [x] Rate-limit tracking + admin dashboard endpoint
+- [x] CrossRef journal ISSN check for Type 5 (date impossible)
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.

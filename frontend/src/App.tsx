@@ -404,6 +404,9 @@ export default function App() {
                   <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.pdf`}>
                     Export PDF
                   </a>
+                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/events/log.txt`}>
+                    Event log
+                  </a>
                 </div>
               )}
             </div>
@@ -475,6 +478,26 @@ export default function App() {
                 Citation #{selected.index}
               </h3>
               <p className="mt-2 text-sm">{selected.bibliography.title ?? selected.bibliography.raw.slice(0, 240)}</p>
+
+              {selected.inline_markers?.[0]?.context_window && (
+                <p className="mt-3 rounded border border-white/10 bg-black/20 p-2 text-xs leading-relaxed">
+                  {selected.inline_markers[0].context_window}
+                </p>
+              )}
+
+              <div className="mt-3">
+                <p className="text-xs text-[var(--papyrus-muted)]">Resolution provenance</p>
+                <ul className="mt-1 space-y-1 font-audit text-xs">
+                  {selected.resolution_attempts.map((attempt, index) => (
+                    <li key={`${attempt.source}-${index}`} className="text-stone-300">
+                      <span className={attempt.success ? "text-emerald-400" : "text-stone-500"}>
+                        {attempt.success ? "✓" : "✗"}
+                      </span>{" "}
+                      {attempt.source}: {attempt.summary}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
               <label className="mt-3 block text-xs text-[var(--papyrus-muted)]">
                 Intent

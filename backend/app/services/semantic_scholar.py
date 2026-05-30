@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.rate_limits import rate_limit_service
 
 
 class SemanticScholarClient:
@@ -18,6 +19,8 @@ class SemanticScholarClient:
         self._headers = headers
 
     async def search_title(self, title: str) -> dict[str, Any] | None:
+        if not await rate_limit_service.allow("semantic_scholar"):
+            return None
         params = {
             "query": title,
             "limit": 1,
@@ -25,6 +28,7 @@ class SemanticScholarClient:
         }
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(f"{self.BASE}/paper/search", params=params, headers=self._headers)
+            await rate_limit_service.record("semantic_scholar")
             if response.status_code != 200:
                 return None
             data = response.json().get("data") or []

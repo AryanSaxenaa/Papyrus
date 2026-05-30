@@ -16,6 +16,8 @@ from app.services.openalex import openalex_client
 from app.services.semantic_scholar import semantic_scholar_client
 from app.services.firecrawl import firecrawl_client
 from app.services.fulltext import fulltext_service
+from app.services.apify_client import apify_fallback_resolve
+from app.services.journals import is_year_impossible, journal_client
 from app.services.unpaywall import unpaywall_client
 
 
@@ -26,10 +28,11 @@ def merge_resolved(
     arxiv: dict | None,
     unpaywall: dict | None,
     europe_pmc: dict | None = None,
+    apify: dict | None = None,
 ) -> dict[str, Any]:
-    base = crossref or scholar or openalex or arxiv or europe_pmc or {}
+    base = crossref or scholar or openalex or arxiv or europe_pmc or apify or {}
     merged = dict(base)
-    for extra in (scholar, openalex, arxiv, europe_pmc):
+    for extra in (scholar, openalex, arxiv, europe_pmc, apify):
         if not extra:
             continue
         merged.setdefault("title", extra.get("title"))
@@ -52,6 +55,7 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
     openalex = None
     arxiv = None
     unpaywall = None
+    apify = None
 
     if cited.doi:
         crossref = await cache_service.get_json("doi", cited.doi)
@@ -143,7 +147,26 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
                 success=openalex is not None,
             )
 
-    merged = merge_resolved(crossref, scholar, openalex, arxiv, unpaywall, europe_pmc)
+    if not crossref and not scholar and not openalex:
+        arxiv_id = arxiv_client.extract_id(cited.doi) or arxiv_client.extract_id(cited.raw)
+        apify = await apify_fallback_resolve(cited.title, cited.authors, arxiv_id)
+        record.resolution_attempts.append(
+            _attempt(
+                ResolutionSource.APIFY,
+                cited.title or cited.doi or cited.raw[:80],
+                apify is not None,
+                apify,
+            )
+        )
+        event_bus.emit(
+            audit_id,
+            "apify",
+            "Apify actor retrieval",
+            citation_index=record.index,
+            success=apify is not None,
+        )
+
+    merged = merge_resolved(crossref, scholar, openalex, arxiv, unpaywall, europe_pmc, apify)
 
     pdf_url = (merged or {}).get("open_access_pdf") or record.oa_pdf_url
     if pdf_url and not (merged or {}).get("full_text"):
@@ -173,6 +196,20 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
             event_bus.emit(audit_id, "firecrawl", "Landing page abstract retrieved", citation_index=record.index)
 
     detect_hallucination(record, crossref, scholar, openalex, merged_override=merged or None)
+
+    if crossref and cited.year and crossref.get("issn"):
+        journal_meta = await journal_client.lookup_issn(crossref["issn"])
+        if is_year_impossible(cited.year, journal_meta):
+            record.hallucination_type = HallucinationType.DATE_IMPOSSIBLE
+            record.verdict_color = "failure"
+            event_bus.emit(
+                audit_id,
+                "journal",
+                "Type 5 — journal did not publish in cited year",
+                citation_index=record.index,
+                issn=crossref.get("issn"),
+                cited_year=cited.year,
+            )
 
     if (
         record.hallucination_type == HallucinationType.NONE

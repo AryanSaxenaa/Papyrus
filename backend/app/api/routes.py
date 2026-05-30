@@ -177,6 +177,16 @@ async def bulk_dashboard(job_id: UUID) -> dict:
     }
 
 
+@router.get("/audits/{audit_id}/events/log.txt")
+async def export_event_log(audit_id: UUID) -> StreamingResponse:
+    if not audit_store.get(audit_id):
+        raise HTTPException(status_code=404, detail="Audit not found")
+    lines = []
+    for event in event_bus.history(audit_id):
+        lines.append(f"{event.get('ts', '')} [{event.get('type', '')}] {event.get('message', '')}")
+    return StreamingResponse(iter(["\n".join(lines)]), media_type="text/plain")
+
+
 @router.get("/audits/{audit_id}/events")
 async def stream_events(audit_id: UUID) -> EventSourceResponse:
     if not audit_store.get(audit_id):

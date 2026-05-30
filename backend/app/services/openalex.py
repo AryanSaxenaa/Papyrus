@@ -6,6 +6,7 @@ from urllib.parse import quote
 import httpx
 
 from app.config import get_settings
+from app.services.rate_limits import rate_limit_service
 
 
 class OpenAlexClient:
@@ -16,11 +17,14 @@ class OpenAlexClient:
         self._params = {"mailto": settings.openalex_mailto}
 
     async def search_title(self, title: str) -> dict[str, Any] | None:
+        if not await rate_limit_service.allow("openalex"):
+            return None
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{self.BASE}/works",
                 params={**self._params, "search": title, "per_page": 1},
             )
+            await rate_limit_service.record("openalex")
             if response.status_code != 200:
                 return None
             results = response.json().get("results") or []

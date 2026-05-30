@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.rate_limits import rate_limit_service
 
 
 class CrossRefClient:
@@ -18,9 +19,12 @@ class CrossRefClient:
         }
 
     async def resolve_doi(self, doi: str) -> dict[str, Any] | None:
+        if not await rate_limit_service.allow("crossref"):
+            return None
         normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(f"{self.BASE}/{normalized}", headers=self._headers)
+            await rate_limit_service.record("crossref")
             if response.status_code == 404:
                 return None
             response.raise_for_status()
@@ -63,6 +67,7 @@ class CrossRefClient:
             update.get("type") == "retraction"
             for update in message.get("update-to", [])
         ) or message.get("update-type") == "retraction"
+        issn_list = message.get("ISSN") or []
         return {
             "title": title,
             "authors": authors,
@@ -71,6 +76,7 @@ class CrossRefClient:
             "volume": message.get("volume"),
             "issue": message.get("issue"),
             "doi": message.get("DOI"),
+            "issn": issn_list[0] if issn_list else None,
             "abstract": message.get("abstract"),
             "retracted": retracted,
             "raw": message,

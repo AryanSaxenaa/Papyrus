@@ -56,6 +56,7 @@ class ResolutionSource(StrEnum):
     EUROPE_PMC = "europe_pmc"
     FIRECRAWL = "firecrawl"
     FULLTEXT = "fulltext"
+    APIFY = "apify"
     DEEPSEEK = "deepseek"
     GROBID = "grobid"
     PYMUPDF = "pymupdf"
