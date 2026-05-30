@@ -9,10 +9,11 @@ import httpx
 from app.config import get_settings
 from app.domain.enums import ResolutionSource
 from app.services.cache import cache_service
-from app.pipeline.verdicts import compare_titles
+from app.text.similarity import compare_titles
 from app.services.rate_limits import rate_limit_service
 
 APIFY_BASE = "https://api.apify.com/v2"
+_ARXIV_MERGE_FIELDS = ("abstract", "authors", "doi", "open_access_pdf")
 
 
 class ApifyClient:
@@ -84,20 +85,33 @@ class ApifyClient:
     async def resolve_arxiv(self, arxiv_id: str) -> dict[str, Any] | None:
         settings = get_settings()
         primary = await self._resolve_arxiv_actor(settings.apify_actor_arxiv, arxiv_id)
+        if not primary:
+            return await self._resolve_arxiv_actor(settings.apify_actor_arxiv_secondary, arxiv_id)
+        if all(primary.get(field) for field in _ARXIV_MERGE_FIELDS):
+            return primary
         secondary = await self._resolve_arxiv_actor(settings.apify_actor_arxiv_secondary, arxiv_id)
-        if primary and secondary:
-            p_title = primary.get("title") or ""
-            s_title = secondary.get("title") or ""
-            if p_title and s_title:
-                ratio, _ = compare_titles(p_title, s_title)
-                primary["arxiv_cross_validation"] = {
-                    "secondary_actor": settings.apify_actor_arxiv_secondary,
-                    "title_similarity": round(ratio, 3),
-                }
-            for field in ("abstract", "authors", "doi", "open_access_pdf"):
-                if not primary.get(field) and secondary.get(field):
-                    primary[field] = secondary.get(field)
-        return primary or secondary
+        return self._merge_arxiv_results(primary, secondary, settings.apify_actor_arxiv_secondary)
+
+    def _merge_arxiv_results(
+        self,
+        primary: dict[str, Any],
+        secondary: dict[str, Any] | None,
+        secondary_actor: str,
+    ) -> dict[str, Any]:
+        if not secondary:
+            return primary
+        p_title = primary.get("title") or ""
+        s_title = secondary.get("title") or ""
+        if p_title and s_title:
+            ratio, _ = compare_titles(p_title, s_title)
+            primary["arxiv_cross_validation"] = {
+                "secondary_actor": secondary_actor,
+                "title_similarity": round(ratio, 3),
+            }
+        for field in _ARXIV_MERGE_FIELDS:
+            if not primary.get(field) and secondary.get(field):
+                primary[field] = secondary.get(field)
+        return primary
 
     async def _resolve_arxiv_actor(self, actor_id: str, arxiv_id: str) -> dict[str, Any] | None:
         items = await self.run_actor(actor_id, {"searchQuery": arxiv_id, "maxItems": 1})

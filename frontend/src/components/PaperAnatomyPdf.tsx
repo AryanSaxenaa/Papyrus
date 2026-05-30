@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import type { CitationRecord } from "../types";
+import { collectAnatomyMarkers, findMarkerInString } from "../lib/anatomyMarkers";
 import { citationFill, isRetraction } from "../lib/verdictColors";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -15,27 +16,50 @@ type Props = {
   onUnavailable?: () => void;
 };
 
+function applyCitationStyles(button: HTMLButtonElement, citation: CitationRecord) {
+  button.style.backgroundColor = citationFill(citation);
+  if (isRetraction(citation)) {
+    button.classList.add("ring-1", "ring-amber-400");
+  } else {
+    button.classList.remove("ring-1", "ring-amber-400");
+  }
+}
+
 export function PaperAnatomyPdf({ auditId, citations, onSelectCitation, onUnavailable }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayButtonsRef = useRef<HTMLButtonElement[]>([]);
+  const onSelectRef = useRef(onSelectCitation);
+  const onUnavailableRef = useRef(onUnavailable);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const markerKey = useMemo(
+    () =>
+      citations
+        .map((c) => `${c.index}:${(c.inline_markers ?? []).map((m) => m.marker).join("|")}`)
+        .join(";"),
+    [citations],
+  );
+
+  onSelectRef.current = onSelectCitation;
+  onUnavailableRef.current = onUnavailable;
+
   useEffect(() => {
     let cancelled = false;
-    const byIndex = new Map(citations.map((c) => [c.index, c]));
+    const markers = collectAnatomyMarkers(citations);
 
-    async function render() {
+    async function renderPdf() {
       const container = containerRef.current;
       if (!container) return;
 
       setLoading(true);
       setError(null);
       container.innerHTML = "";
+      overlayButtonsRef.current = [];
 
       try {
         const pdf = await pdfjsLib.getDocument(`/api/audits/${auditId}/paper.pdf`).promise;
         const scale = 1.15;
-        const markerPattern = /\[(\d+)\]/g;
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
           if (cancelled) return;
@@ -57,30 +81,29 @@ export function PaperAnatomyPdf({ auditId, citations, onSelectCitation, onUnavai
           const textContent = await page.getTextContent();
           for (const item of textContent.items) {
             if (!("str" in item) || typeof item.str !== "string") continue;
-            let match: RegExpExecArray | null;
-            markerPattern.lastIndex = 0;
-            while ((match = markerPattern.exec(item.str)) !== null) {
-              const citationIndex = Number(match[1]);
-              const citation = byIndex.get(citationIndex);
-              if (!citation) continue;
-              const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-              const x = tx[4];
-              const y = viewport.height - tx[5] - 12;
+            const hit = findMarkerInString(item.str, markers);
+            if (!hit) continue;
 
-              const button = document.createElement("button");
-              button.type = "button";
-              button.textContent = match[0];
-              button.title = `Citation #${citation.index}`;
-              button.className = `absolute z-10 rounded px-1 font-audit text-[10px] font-bold text-white ${
-                isRetraction(citation) ? "ring-1 ring-amber-400" : ""
-              }`;
-              button.style.left = `${x}px`;
-              button.style.top = `${y}px`;
-              button.style.backgroundColor = citationFill(citation);
-              button.onclick = () => onSelectCitation(citation);
-              pageWrap.appendChild(button);
-            }
+            const citation = hit.marker.citation;
+            const label = item.str.slice(hit.start, hit.end);
+            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+            const x = tx[4];
+            const y = viewport.height - tx[5] - 12;
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = label;
+            button.dataset.citationIndex = String(citation.index);
+            button.title = `Citation #${citation.index}`;
+            button.className = "absolute z-10 rounded px-1 font-audit text-[10px] font-bold text-white";
+            button.style.left = `${x}px`;
+            button.style.top = `${y}px`;
+            applyCitationStyles(button, citation);
+            button.onclick = () => onSelectRef.current(citation);
+            pageWrap.appendChild(button);
+            overlayButtonsRef.current.push(button);
           }
+
           if (!cancelled) container.appendChild(pageWrap);
         }
 
@@ -89,16 +112,26 @@ export function PaperAnatomyPdf({ auditId, citations, onSelectCitation, onUnavai
         if (!cancelled) {
           setError("Source PDF unavailable.");
           setLoading(false);
-          onUnavailable?.();
+          onUnavailableRef.current?.();
         }
       }
     }
 
-    void render();
+    void renderPdf();
     return () => {
       cancelled = true;
+      overlayButtonsRef.current = [];
     };
-  }, [auditId, citations, onSelectCitation, onUnavailable]);
+  }, [auditId, markerKey]);
+
+  useEffect(() => {
+    const byIndex = new Map(citations.map((c) => [c.index, c]));
+    for (const button of overlayButtonsRef.current) {
+      const index = Number(button.dataset.citationIndex);
+      const citation = byIndex.get(index);
+      if (citation) applyCitationStyles(button, citation);
+    }
+  }, [citations]);
 
   return (
     <div className="max-h-[28rem] overflow-auto rounded border border-white/10 bg-stone-950/40 p-2">

@@ -100,7 +100,7 @@ export type CitationRecord = {
   hallucination_type: string;
   verdict_color: string;
   status: string;
-  inline_markers?: Array<{ marker: string; context_window: string }>;
+  inline_markers?: Array<{ marker: string; bibliography_index?: number; context_window: string }>;
   extracted_claim?: string | null;
   claim_user_corrected?: string | null;
   claim_pending_review?: boolean;

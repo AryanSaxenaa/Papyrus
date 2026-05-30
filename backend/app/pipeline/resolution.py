@@ -5,7 +5,8 @@ from uuid import UUID
 
 from app.domain.enums import EvidenceTier, HallucinationType, ResolutionSource
 from app.domain.models import CitationRecord, ResolutionAttempt
-from app.pipeline.verdicts import compare_titles, detect_hallucination
+from app.pipeline.verdicts import detect_hallucination
+from app.text.similarity import compare_titles
 from app.pipeline.title_drift import apply_title_drift_gate
 from app.pipeline.version_tracking import build_version_timeline, enrich_version_timeline
 from app.services.arxiv import arxiv_client
@@ -18,7 +19,7 @@ from app.services.openalex import openalex_client
 from app.services.semantic_scholar import semantic_scholar_client
 from app.services.firecrawl import firecrawl_client
 from app.services.fulltext import fulltext_service
-from app.services.apify_client import ApifyClient, apify_fallback_resolve
+from app.services.apify_client import apify_fallback_resolve
 from app.services.journals import is_year_impossible, journal_client
 from app.services.unpaywall import unpaywall_client
 
@@ -37,11 +38,9 @@ def merge_resolved(
     for extra in (scholar, openalex, arxiv, europe_pmc, apify):
         if not extra:
             continue
-        merged.setdefault("title", extra.get("title"))
-        merged.setdefault("abstract", extra.get("abstract"))
-        merged.setdefault("authors", extra.get("authors"))
-        merged.setdefault("year", extra.get("year"))
-        merged.setdefault("doi", extra.get("doi"))
+        for field in ("title", "abstract", "authors", "year", "doi"):
+            if extra.get(field) and not merged.get(field):
+                merged[field] = extra[field]
     if unpaywall and unpaywall.get("open_access_pdf"):
         merged["open_access_pdf"] = unpaywall["open_access_pdf"]
         merged["oa_url"] = unpaywall.get("oa_url")
@@ -182,18 +181,14 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
         )
         if not scholar:
             openalex = await openalex_client.search_title(cited.title)
-            via_secondary = False
-            if not openalex:
-                openalex = await ApifyClient().resolve_openalex_secondary(cited.title)
-                via_secondary = openalex is not None
             record.resolution_attempts.append(
                 _attempt(ResolutionSource.OPENALEX, cited.title, openalex is not None, openalex)
             )
+            via = (openalex or {}).get("via")
             event_bus.emit(
                 audit_id,
                 "openalex",
-                "OpenAlex title search"
-                + (" (shahidirfan/openalex-scraper)" if via_secondary else ""),
+                "OpenAlex title search" + (f" ({via})" if via else ""),
                 citation_index=record.index,
                 success=openalex is not None,
             )
@@ -249,8 +244,9 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
 
     detect_hallucination(record, crossref, scholar, openalex, merged_override=merged or None)
 
-    if record.hallucination_type == HallucinationType.NONE and cited.title and crossref:
-        await apply_title_drift_gate(record, cited.title, crossref)
+    metadata_for_drift = crossref or merged
+    if record.hallucination_type == HallucinationType.NONE and cited.title and metadata_for_drift:
+        await apply_title_drift_gate(record, cited.title, metadata_for_drift)
         if record.hallucination_type == HallucinationType.TITLE_DRIFT:
             event_bus.emit(
                 audit_id,
@@ -260,7 +256,12 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
                 edit_distance=record.title_edit_distance,
             )
 
-    if crossref and cited.year and crossref.get("issn"):
+    if (
+        record.hallucination_type == HallucinationType.NONE
+        and crossref
+        and cited.year
+        and crossref.get("issn")
+    ):
         journal_meta = await journal_client.lookup_issn(crossref["issn"])
         if not journal_meta:
             journal_meta = await journal_client.lookup_issn_apify(crossref["issn"])

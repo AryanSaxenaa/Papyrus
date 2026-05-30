@@ -3,7 +3,7 @@ from __future__ import annotations
 import difflib
 
 from app.domain.models import VersionEntry, VersionMismatchInfo
-from app.pipeline.verdicts import compare_titles
+from app.text.similarity import compare_titles
 from app.services.apify_client import ApifyClient
 from app.services.arxiv import arxiv_client
 

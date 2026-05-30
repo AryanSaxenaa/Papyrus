@@ -7,6 +7,7 @@ import { LimitationsPanel } from "./components/LimitationsPanel";
 import { CitationHeatmap } from "./components/CitationHeatmap";
 import { HeatmapFilterBar } from "./components/HeatmapFilterBar";
 import { PaperAnatomyView } from "./components/PaperAnatomyView";
+import { canShowPaperAnatomy } from "./lib/anatomyMarkers";
 import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
@@ -36,7 +37,6 @@ export default function App() {
     if (!response.ok) return;
     const next = (await response.json()) as AuditRun;
     setAudit(next);
-    setEvents([]);
     if (selected) {
       const updated = next.citations.find((c) => c.id === selected.id);
       if (updated) setSelected(updated);
@@ -587,7 +587,7 @@ export default function App() {
             </div>
           </div>
 
-          {audit && (audit.paper_text || audit.status !== "queued") && (
+          {audit && canShowPaperAnatomy(audit.status) && (
             <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
               <button
                 type="button"
@@ -596,18 +596,15 @@ export default function App() {
               >
                 Paper anatomy view {showAnatomy ? "▾" : "▸"}
               </button>
-              {showAnatomy && audit.paper_text && (
+              {showAnatomy && (
                 <div className="mt-3">
                   <PaperAnatomyView
                     auditId={audit.id}
-                    text={audit.paper_text}
+                    text={audit.paper_text ?? ""}
                     citations={audit.citations}
                     onSelectCitation={setSelected}
                   />
                 </div>
-              )}
-              {showAnatomy && !audit.paper_text && (
-                <p className="mt-3 text-sm text-[var(--papyrus-muted)]">Waiting for PDF text extraction…</p>
               )}
             </div>
           )}

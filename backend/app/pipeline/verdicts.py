@@ -12,6 +12,7 @@ from app.domain.enums import (
 )
 from app.domain.models import CitationRecord
 from app.pipeline import nli as nli_pipeline
+from app.text.similarity import author_sets_equal, compare_titles
 
 
 QUANT_PATTERN = re.compile(
@@ -19,33 +20,6 @@ QUANT_PATTERN = re.compile(
     r"\bcauses?\b|\bcausal\b)",
     re.I,
 )
-
-
-def normalize_author_set(authors: list[str]) -> set[str]:
-    result: set[str] = set()
-    for author in authors:
-        collapsed = re.sub(r"[^a-z0-9]", "", author.lower())
-        if collapsed:
-            result.add(collapsed)
-    return result
-
-
-def author_lists_match_exactly(cited: list[str], resolved: list[str]) -> bool:
-    cited_set = normalize_author_set(cited)
-    resolved_set = normalize_author_set(resolved)
-    if not cited_set or not resolved_set:
-        return True
-    return cited_set == resolved_set
-
-
-def compare_titles(cited: str | None, resolved: str | None) -> tuple[float, float]:
-    if not cited or not resolved:
-        return 0.0, 0.0
-    cited_tokens = " ".join(sorted(cited.lower().split()))
-    resolved_tokens = " ".join(sorted(resolved.lower().split()))
-    ratio = difflib.SequenceMatcher(None, cited_tokens, resolved_tokens).ratio()
-    partial = difflib.SequenceMatcher(None, cited.lower(), resolved.lower()).ratio()
-    return ratio, partial
 
 
 def detect_hallucination(
@@ -81,20 +55,20 @@ def detect_hallucination(
         record.evidence_tier = _tier_from_text(resolved)
         return
 
-    if cited.doi and crossref:
+    doi_metadata = crossref or (merged_override if cited.doi else None)
+    if cited.doi and doi_metadata:
         title_mismatch = False
-        if cited.title and crossref.get("title"):
-            ratio, _partial = compare_titles(cited.title, crossref.get("title"))
+        if cited.title and doi_metadata.get("title"):
+            ratio, _partial = compare_titles(cited.title, doi_metadata.get("title"))
             record.title_edit_distance = round((1 - ratio) * 100, 1)
             title_mismatch = ratio < 0.35
-        resolved_authors = crossref.get("authors") or []
-        author_mismatch = bool(cited.authors) and bool(resolved_authors) and not author_lists_match_exactly(
-            cited.authors, resolved_authors
-        )
+        resolved_authors = doi_metadata.get("authors") or []
+        author_equal = author_sets_equal(cited.authors, resolved_authors)
+        author_mismatch = author_equal is False
         if title_mismatch or author_mismatch:
             record.hallucination_type = HallucinationType.DOI_REDIRECT
             record.verdict_color = "failure"
-            record.evidence_tier = _tier_from_text(crossref)
+            record.evidence_tier = _tier_from_text(doi_metadata)
             return
 
     record.hallucination_type = HallucinationType.NONE

@@ -1,4 +1,4 @@
-from app.pipeline.verdicts import compare_titles
+from app.text.similarity import compare_titles
 
 
 def test_compare_titles_identical() -> None:

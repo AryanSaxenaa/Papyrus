@@ -3,7 +3,8 @@ from __future__ import annotations
 from app.config import get_settings
 from app.domain.enums import EvidenceTier, HallucinationType
 from app.domain.models import CitationRecord
-from app.pipeline.verdicts import _tier_from_text, compare_titles
+from app.pipeline.verdicts import _tier_from_text
+from app.text.similarity import compare_titles
 from app.services.embeddings import embedding_similarity
 
 

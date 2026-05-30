@@ -142,6 +142,8 @@ async def get_audit(audit_id: UUID) -> AuditRun:
 
 @router.get("/audits/{audit_id}/paper.pdf")
 async def get_audit_paper_pdf(audit_id: UUID) -> FileResponse:
+    if not audit_store.get(audit_id):
+        raise HTTPException(status_code=404, detail="Audit not found")
     settings = get_settings()
     pdf_path = Path(settings.upload_dir) / f"{audit_id}.pdf"
     if not pdf_path.is_file():
@@ -519,8 +521,13 @@ async def _run_url_audit(audit_id: UUID, url: str, destination: Path) -> None:
 async def _run_bulk_job(job_id: UUID, zip_path: Path) -> None:
     try:
         await process_bulk_zip(job_id, zip_path)
-    except Exception:
-        return
+    except Exception as exc:  # noqa: BLE001
+        job = bulk_job_store.get(job_id)
+        if job and job.status not in {"complete", "failed"}:
+            job.status = "failed"
+            job.error = str(exc)
+            bulk_job_store.save(job)
+        event_bus.emit(job_id, "error", f"Bulk job failed: {exc}")
 
 
 def _fail_audit(audit_id: UUID, exc: Exception) -> None:

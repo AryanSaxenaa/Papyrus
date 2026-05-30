@@ -5,12 +5,13 @@ import type { CitationRecord } from "../types";
 
 type Props = {
   auditId: string;
-  text: string;
+  text?: string;
   citations: CitationRecord[];
   onSelectCitation: (citation: CitationRecord) => void;
 };
 
-export function PaperAnatomyView({ auditId, text, citations, onSelectCitation }: Props) {
+export function PaperAnatomyView({ auditId, text = "", citations, onSelectCitation }: Props) {
+  const hasText = text.trim().length > 0;
   const [mode, setMode] = useState<"pdf" | "text">("pdf");
 
   return (
@@ -28,9 +29,12 @@ export function PaperAnatomyView({ auditId, text, citations, onSelectCitation }:
         <button
           type="button"
           onClick={() => setMode("text")}
+          disabled={!hasText}
           className={`rounded border px-2 py-1 ${
-            mode === "text" ? "border-emerald-600/60 bg-emerald-950/40 text-emerald-100" : "border-white/10 text-stone-400"
-          }`}
+            mode === "text"
+              ? "border-emerald-600/60 bg-emerald-950/40 text-emerald-100"
+              : "border-white/10 text-stone-400"
+          } ${!hasText ? "cursor-not-allowed opacity-50" : ""}`}
         >
           Text fallback
         </button>
@@ -40,12 +44,16 @@ export function PaperAnatomyView({ auditId, text, citations, onSelectCitation }:
           auditId={auditId}
           citations={citations}
           onSelectCitation={onSelectCitation}
-          onUnavailable={() => setMode("text")}
+          onUnavailable={() => {
+            if (hasText) setMode("text");
+          }}
         />
-      ) : (
+      ) : hasText ? (
         <div className="max-h-64 overflow-y-auto">
           <PaperAnatomy text={text} citations={citations} onSelectCitation={onSelectCitation} />
         </div>
+      ) : (
+        <p className="text-sm text-[var(--papyrus-muted)]">Extracted text is not available yet.</p>
       )}
     </div>
   );

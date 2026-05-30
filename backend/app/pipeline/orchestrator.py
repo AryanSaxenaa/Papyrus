@@ -28,6 +28,7 @@ class AuditOrchestrator:
             raise ValueError("Audit not found")
 
         audit.status = "running"
+        audit_store.save(audit)
         event_bus.emit(audit_id, "ingestion", "PDF upload received", path=str(pdf_path))
 
         bibliography, inline, paper_title, paper_authors = await self._parse_pdf(audit_id, pdf_path)
@@ -70,6 +71,7 @@ class AuditOrchestrator:
 
         normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
         audit.status = "running"
+        audit_store.save(audit)
         audit.paper_title = f"DOI verification: {normalized}"
         event_bus.emit(audit_id, "ingestion", "Single DOI verification started", doi=normalized)
 

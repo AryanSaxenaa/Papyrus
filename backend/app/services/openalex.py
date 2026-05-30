@@ -8,6 +8,8 @@ import httpx
 from app.config import get_settings
 from app.services.rate_limits import rate_limit_service
 
+_OPENALEX_FALLBACK_STATUSES = {429, 403}
+
 
 class OpenAlexClient:
     BASE = "https://api.openalex.org"
@@ -17,43 +19,53 @@ class OpenAlexClient:
         self._params = {"mailto": settings.openalex_mailto}
 
     async def lookup_doi(self, doi: str) -> dict[str, Any] | None:
-        if not await rate_limit_service.allow("openalex"):
-            return None
         normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        if await rate_limit_service.allow("openalex"):
+            native = await self._lookup_doi_native(normalized)
+            if native is not None:
+                return native
+        return await self._apify_secondary_fallback(normalized)
+
+    async def search_title(self, title: str) -> dict[str, Any] | None:
+        if await rate_limit_service.allow("openalex"):
+            native = await self._search_title_native(title)
+            if native is not None:
+                return native
+        return await self._apify_secondary_fallback(title)
+
+    async def _lookup_doi_native(self, normalized_doi: str) -> dict[str, Any] | None:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{self.BASE}/works/https://doi.org/{quote(normalized, safe='')}",
+                f"{self.BASE}/works/https://doi.org/{quote(normalized_doi, safe='')}",
                 params=self._params,
             )
             await rate_limit_service.record("openalex")
-            if response.status_code in {429, 403}:
-                return await self._apify_secondary_fallback(normalized)
+            if response.status_code in _OPENALEX_FALLBACK_STATUSES:
+                return None
             if response.status_code != 200:
                 return None
             return self._normalize_work(response.json())
 
-    async def _apify_secondary_fallback(self, title_or_query: str) -> dict[str, Any] | None:
-        from app.services.apify_client import ApifyClient
-
-        return await ApifyClient().resolve_openalex_secondary(title_or_query)
-
-    async def search_title(self, title: str) -> dict[str, Any] | None:
-        if not await rate_limit_service.allow("openalex"):
-            return None
+    async def _search_title_native(self, title: str) -> dict[str, Any] | None:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{self.BASE}/works",
                 params={**self._params, "search": title, "per_page": 1},
             )
             await rate_limit_service.record("openalex")
-            if response.status_code in {429, 403}:
-                return await self._apify_secondary_fallback(title)
+            if response.status_code in _OPENALEX_FALLBACK_STATUSES:
+                return None
             if response.status_code != 200:
                 return None
             results = response.json().get("results") or []
             if not results:
                 return None
             return self._normalize_work(results[0])
+
+    async def _apify_secondary_fallback(self, title_or_query: str) -> dict[str, Any] | None:
+        from app.services.apify_client import ApifyClient
+
+        return await ApifyClient().resolve_openalex_secondary(title_or_query)
 
     def _normalize_work(self, work: dict[str, Any]) -> dict[str, Any]:
         doi = (work.get("doi") or "").removeprefix("https://doi.org/")
