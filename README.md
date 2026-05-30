@@ -65,6 +65,10 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits/doi` | Verify a single DOI |
 | `GET` | `/api/audits/{id}/report.txt` | Plain-text audit summary |
 | `GET` | `/api/audits/{id}/report.json` | JSON audit export |
+| `GET` | `/api/audits/{id}/report.pdf` | PDF audit export |
+| `POST` | `/api/audits/url` | Audit paper from arXiv/DOI/PDF URL |
+| `POST` | `/api/audits/bulk` | ZIP of PDFs (async bulk job) |
+| `GET` | `/api/bulk/{id}` | Bulk job status |
 
 ## Implementation status (v1 slice)
 
@@ -76,9 +80,11 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Evidence passage retrieval (lexical + optional OpenAI embeddings)
 - [x] Coverage + risk scoring, JSON/TXT reports, disk persistence
 - [x] SSE live panel + heatmap UI (DOI verify, filters, claim rerun)
-- [ ] Production NLI model (HuggingFace / dedicated service)
-- [ ] Europe PMC / Apify actors, bulk ZIP queue
+- [x] Europe PMC biomedical lookup
+- [x] NLI via Hugging Face Inference API (fallback: lexical heuristic)
+- [x] Bulk ZIP queue, URL ingestion (arXiv + direct PDF)
+- [x] PDF export report
 - [ ] PostgreSQL persistence
-- [ ] PDF export report
+- [ ] Apify actors, Firecrawl landing pages, full-text PDF fetch for Tier 1
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.

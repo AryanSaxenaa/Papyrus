@@ -68,6 +68,18 @@ def render_text_report(audit: AuditRun) -> str:
     return "\n".join(lines)
 
 
+def render_pdf_bytes(audit: AuditRun) -> bytes:
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=11)
+    text = render_text_report(audit).encode("latin-1", errors="replace").decode("latin-1")
+    pdf.multi_cell(0, 6, text)
+    return bytes(pdf.output())
+
+
 def render_json_report(audit: AuditRun) -> str:
     payload = {
         "audit": audit.model_dump(mode="json"),

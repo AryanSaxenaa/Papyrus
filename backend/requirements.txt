@@ -9,3 +9,4 @@ celery==5.4.0
 pymupdf==1.24.14
 sse-starlette==2.2.1
 python-dotenv==1.0.1
+fpdf2==2.8.2

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import re
-
 import difflib
+import re
 
 from app.config import get_settings
 from app.domain.enums import (
@@ -13,6 +12,7 @@ from app.domain.enums import (
     NliVerdict,
 )
 from app.domain.models import CitationRecord
+from app.pipeline import nli as nli_pipeline
 
 
 QUANT_PATTERN = re.compile(
@@ -122,8 +122,7 @@ def has_quantitative_language(claim: str) -> bool:
     return bool(QUANT_PATTERN.search(claim))
 
 
-def run_claim_alignment_stub(record: CitationRecord) -> None:
-    """Placeholder NLI until model integration; uses lexical overlap heuristic."""
+async def run_claim_alignment_async(record: CitationRecord) -> None:
     if record.intent != CitationIntent.EVIDENTIARY:
         record.nli_verdict = NliVerdict.SKIPPED
         return
@@ -140,6 +139,36 @@ def run_claim_alignment_stub(record: CitationRecord) -> None:
         record.confidence = ConfidenceLevel.LOW
         return
 
+    nli_result = await nli_pipeline.classify_entailment(claim, evidence)
+    if nli_result is None:
+        _apply_lexical_fallback(record, claim, evidence)
+    else:
+        _apply_nli_verdict(record, nli_result)
+
+    if has_quantitative_language(claim):
+        record.quantitative_claim = True
+        record.quantitative_caveat = (
+            "Quantitative claim detected. NLI reasoning is reliable for logical contradiction "
+            "and topic mismatch but may not detect numerical discrepancies or differences between "
+            "causal and correlational language. Manual verification of the specific figures is recommended."
+        )
+
+
+def _apply_nli_verdict(record: CitationRecord, nli_result: NliVerdict) -> None:
+    record.nli_verdict = nli_result
+    verdict_label, confidence_token = nli_pipeline.confidence_for_verdict(nli_result, record.evidence_tier)
+    record.claim_alignment_verdict = verdict_label
+    record.confidence = ConfidenceLevel(confidence_token)
+    if nli_result == NliVerdict.CONTRADICTS:
+        record.hallucination_type = HallucinationType.CLAIM_CONTRADICTION
+        record.verdict_color = "failure"
+    elif nli_result == NliVerdict.ENTAILS:
+        record.verdict_color = "supported"
+    else:
+        record.verdict_color = "amber" if record.evidence_tier == EvidenceTier.TIER_1 else "cannot_assess"
+
+
+def _apply_lexical_fallback(record: CitationRecord, claim: str, evidence: str) -> None:
     overlap = difflib.SequenceMatcher(None, claim.lower(), evidence.lower()).ratio()
     if overlap >= 0.55:
         record.nli_verdict = NliVerdict.ENTAILS
@@ -160,10 +189,9 @@ def run_claim_alignment_stub(record: CitationRecord) -> None:
         record.confidence = ConfidenceLevel.MEDIUM
         record.verdict_color = "amber"
 
-    if has_quantitative_language(claim):
-        record.quantitative_claim = True
-        record.quantitative_caveat = (
-            "Quantitative claim detected. NLI reasoning is reliable for logical contradiction "
-            "and topic mismatch but may not detect numerical discrepancies or differences between "
-            "causal and correlational language. Manual verification of the specific figures is recommended."
-        )
+
+def run_claim_alignment_stub(record: CitationRecord) -> None:
+    """Sync fallback for callers without an event loop."""
+    import asyncio
+
+    asyncio.run(run_claim_alignment_async(record))

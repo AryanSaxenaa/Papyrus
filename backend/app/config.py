@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     exa_api_key: str | None = None
     deepseek_api_key: str | None = None
     openai_api_key: str | None = None
+    huggingface_api_key: str | None = None
 
     cache_ttl_seconds: int = 60 * 60 * 24 * 30
     title_drift_ratio_threshold: float = 0.72

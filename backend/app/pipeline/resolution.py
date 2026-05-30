@@ -5,9 +5,9 @@ from uuid import UUID
 
 from app.domain.enums import EvidenceTier, HallucinationType, ResolutionSource
 from app.domain.models import CitationRecord, ResolutionAttempt
-from app.domain.enums import HallucinationType
 from app.pipeline.verdicts import compare_titles, detect_hallucination
 from app.services.arxiv import arxiv_client
+from app.services.europe_pmc import europe_pmc_client
 from app.services.cache import cache_service
 from app.services.crossref import crossref_client
 from app.services.events import event_bus
@@ -23,10 +23,11 @@ def merge_resolved(
     openalex: dict | None,
     arxiv: dict | None,
     unpaywall: dict | None,
+    europe_pmc: dict | None = None,
 ) -> dict[str, Any]:
-    base = crossref or scholar or openalex or arxiv or {}
+    base = crossref or scholar or openalex or arxiv or europe_pmc or {}
     merged = dict(base)
-    for extra in (scholar, openalex, arxiv):
+    for extra in (scholar, openalex, arxiv, europe_pmc):
         if not extra:
             continue
         merged.setdefault("title", extra.get("title"))
@@ -89,6 +90,30 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
             success=arxiv is not None,
         )
 
+    europe_pmc = None
+    epmc_key = cited.doi or cited.title or ""
+    if epmc_key:
+        europe_pmc = await cache_service.get_json("epmc", epmc_key)
+        if europe_pmc is None:
+            if cited.doi:
+                europe_pmc = await europe_pmc_client.lookup_doi(cited.doi)
+            if not europe_pmc and cited.title:
+                europe_pmc = await europe_pmc_client.lookup_title(cited.title)
+            if europe_pmc:
+                await cache_service.set_json("epmc", epmc_key, europe_pmc)
+        record.resolution_attempts.append(
+            _attempt(ResolutionSource.EUROPE_PMC, epmc_key, europe_pmc is not None, europe_pmc)
+        )
+        if europe_pmc:
+            event_bus.emit(
+                audit_id,
+                "europe_pmc",
+                "Europe PMC lookup",
+                citation_index=record.index,
+                success=True,
+                pmcid=europe_pmc.get("pmcid"),
+            )
+
     if not crossref and cited.title:
         scholar = await semantic_scholar_client.search_title(cited.title)
         record.resolution_attempts.append(
@@ -114,7 +139,7 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
                 success=openalex is not None,
             )
 
-    merged = merge_resolved(crossref, scholar, openalex, arxiv, unpaywall)
+    merged = merge_resolved(crossref, scholar, openalex, arxiv, unpaywall, europe_pmc)
     detect_hallucination(record, crossref, scholar, openalex, merged_override=merged or None)
 
     if (

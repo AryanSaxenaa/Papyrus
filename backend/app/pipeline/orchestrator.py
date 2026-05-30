@@ -12,7 +12,7 @@ from app.pipeline.evidence import retrieve_passage
 from app.pipeline.intent import apply_negation_override, classify_intent
 from app.pipeline.resolution import resolve_record
 from app.pipeline.scoring import finalize_scores
-from app.pipeline.verdicts import extract_claim, run_claim_alignment_stub
+from app.pipeline.verdicts import extract_claim, run_claim_alignment_async
 from app.services.deepseek import deepseek_client
 from app.services.events import event_bus
 from app.services.fallback_parser import parse_pdf_fallback
@@ -123,7 +123,15 @@ class AuditOrchestrator:
                 record.extracted_claim = claim or extract_claim(context)
             text = self._full_evidence_text(record)
             record.evidence_passage = await retrieve_passage(record.extracted_claim or "", text)
-            run_claim_alignment_stub(record)
+            await run_claim_alignment_async(record)
+
+    async def run_from_url(self, audit_id: UUID, source_url: str, pdf_path: Path) -> AuditRun:
+        audit = audit_store.get(audit_id)
+        if not audit:
+            raise ValueError("Audit not found")
+        audit.source_url = source_url
+        audit_store.save(audit)
+        return await self.run(audit_id, pdf_path)
 
     async def _parse_pdf(self, audit_id: UUID, pdf_path: Path):
         settings = get_settings()

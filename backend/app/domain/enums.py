@@ -53,6 +53,7 @@ class ResolutionSource(StrEnum):
     UNPAYWALL = "unpaywall"
     ARXIV = "arxiv"
     EXA = "exa"
+    EUROPE_PMC = "europe_pmc"
     DEEPSEEK = "deepseek"
     GROBID = "grobid"
     PYMUPDF = "pymupdf"

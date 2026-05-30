@@ -21,6 +21,8 @@ export default function App() {
   const [selected, setSelected] = useState<CitationRecord | null>(null);
   const [uploading, setUploading] = useState(false);
   const [doiInput, setDoiInput] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
   const [filter, setFilter] = useState<HeatmapFilter>("all");
   const [claimDraft, setClaimDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,61 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
+      setUploading(false);
+    }
+  };
+
+  const onAuditUrl = async () => {
+    if (!urlInput.trim()) return;
+    setUploading(true);
+    setError(null);
+    setEvents([]);
+    setSelected(null);
+    try {
+      await startAudit(
+        await fetch("/api/audits/url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: urlInput.trim() }),
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "URL audit failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onBulkUpload = async (file: File) => {
+    setUploading(true);
+    setError(null);
+    setBulkStatus(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch("/api/audits/bulk", { method: "POST", body });
+      if (!response.ok) throw new Error(await response.text());
+      const job = (await response.json()) as { id: string; total: number };
+      setBulkStatus(`Bulk job ${job.id} queued (${job.total} papers)`);
+      const poll = window.setInterval(async () => {
+        const statusRes = await fetch(`/api/bulk/${job.id}`);
+        if (!statusRes.ok) return;
+        const status = (await statusRes.json()) as {
+          status: string;
+          completed: number;
+          failed: number;
+          total: number;
+        };
+        setBulkStatus(
+          `Bulk: ${status.completed}/${status.total} complete, ${status.failed} failed (${status.status})`,
+        );
+        if (status.status === "complete" || status.status === "failed") {
+          window.clearInterval(poll);
+          setUploading(false);
+        }
+      }, 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk upload failed");
       setUploading(false);
     }
   };
@@ -184,6 +241,20 @@ export default function App() {
               placeholder="10.1038/..."
               className="rounded-md border border-white/15 bg-black/30 px-3 py-2 font-audit text-sm"
             />
+            <input
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://arxiv.org/abs/..."
+              className="rounded-md border border-white/15 bg-black/30 px-3 py-2 font-audit text-sm min-w-[200px]"
+            />
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={() => void onAuditUrl()}
+              className="rounded-md border border-stone-600 bg-stone-900/60 px-4 py-2 text-sm font-semibold hover:bg-stone-800/80"
+            >
+              Audit URL
+            </button>
             <button
               type="button"
               disabled={uploading}
@@ -192,6 +263,19 @@ export default function App() {
             >
               Verify DOI
             </button>
+            <label className="cursor-pointer rounded-md border border-amber-800/60 bg-amber-950/30 px-4 py-2 text-sm font-semibold hover:bg-amber-900/40">
+              Bulk ZIP
+              <input
+                type="file"
+                accept="application/zip"
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void onBulkUpload(file);
+                }}
+              />
+            </label>
             <label className="cursor-pointer rounded-md border border-emerald-700/60 bg-emerald-950/40 px-4 py-2 text-sm font-semibold hover:bg-emerald-900/50">
               {uploading ? "Working…" : "Upload PDF"}
               <input
@@ -214,6 +298,11 @@ export default function App() {
           {error && (
             <p className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
               {error}
+            </p>
+          )}
+          {bulkStatus && (
+            <p className="rounded-md border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-100">
+              {bulkStatus}
             </p>
           )}
 
@@ -242,6 +331,9 @@ export default function App() {
                   </a>
                   <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.json`}>
                     Export JSON
+                  </a>
+                  <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.pdf`}>
+                    Export PDF
                   </a>
                 </div>
               )}
