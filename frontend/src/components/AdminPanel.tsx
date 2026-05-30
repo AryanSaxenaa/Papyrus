@@ -123,6 +123,12 @@ export function AdminPanel() {
               Reindex citation analytics
             </button>
             {reindexStatus && <span className="text-stone-400">{reindexStatus}</span>}
+            <a
+              href="/api/admin/corrections/export.csv"
+              className="rounded border border-stone-600 px-3 py-1 text-stone-200 hover:bg-white/5"
+            >
+              Export corrections CSV
+            </a>
           </div>
         </div>
       )}

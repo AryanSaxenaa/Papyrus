@@ -14,7 +14,7 @@ type Props = {
   audit: AuditRun | null;
 };
 
-const EVENT_TYPES = ["all", "crossref", "nli", "claim", "verdict", "version", "bulk", "error"] as const;
+const EVENT_TYPES = ["all", "crossref", "nli", "claim", "verdict", "version", "circular", "bulk", "error"] as const;
 
 export function LivePanel({ events, audit }: Props) {
   const [search, setSearch] = useState("");

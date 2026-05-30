@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     enable_deepseek: bool = True
     use_celery_bulk: bool = False
     nli_requires_claim_approval: bool = False
+    enable_circular_check: bool = False
+    circular_check_max_citations: int = 20
 
 
 @lru_cache

@@ -4,6 +4,7 @@ import { CoverageSummary } from "./components/CoverageSummary";
 import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
 import { LimitationsPanel } from "./components/LimitationsPanel";
+import { QualityFlagsPanel } from "./components/QualityFlagsPanel";
 import { PaperAnatomy } from "./components/PaperAnatomy";
 import { AdminPanel } from "./components/AdminPanel";
 import { CitationAnalytics } from "./components/CitationAnalytics";
@@ -426,6 +427,20 @@ export default function App() {
                 Bulk analysis dashboard
               </h3>
               <p className="mt-1 text-xs text-[var(--papyrus-muted)]">{bulkDashboard.note}</p>
+              <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                <a
+                  className="text-emerald-300 underline"
+                  href={`/api/bulk/${bulkDashboard.job.id}/dashboard.json`}
+                >
+                  Export dashboard JSON
+                </a>
+                <a
+                  className="text-emerald-300 underline"
+                  href={`/api/bulk/${bulkDashboard.job.id}/events/log.txt`}
+                >
+                  Bulk event log
+                </a>
+              </div>
               {(bulkDashboard.pending_papers ?? 0) > 0 && (
                 <p className="mt-2 font-audit text-xs text-amber-200">
                   {bulkDashboard.pending_papers} paper(s) still resolving…
@@ -534,6 +549,7 @@ export default function App() {
                 <CoverageBar audit={audit} />
               </div>
               <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
+              <QualityFlagsPanel audit={audit} />
               <LimitationsPanel audit={audit} />
               {audit.status === "complete" && (
                 <div className="mt-3 flex gap-3 text-sm">

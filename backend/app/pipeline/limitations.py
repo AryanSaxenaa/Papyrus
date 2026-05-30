@@ -30,6 +30,8 @@ def build_limitations(audit: AuditRun) -> dict[str, Any]:
             "AI authorship detection",
             "Self-citation manipulation",
             "Research quality beyond reference integrity",
-            "Circular citation loops (v2)",
         ],
+        "quality_signals": audit.quality_summary,
+        "duplicate_doi_count": len((audit.quality_summary or {}).get("duplicate_dois", [])),
+        "circular_pair_count": len((audit.quality_summary or {}).get("circular_pairs", [])),
     }

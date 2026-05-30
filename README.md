@@ -88,6 +88,9 @@ Open http://localhost:5173 and upload a PDF.
 | `DELETE` | `/api/audits/{id}` | Remove audit and indexed rows |
 | `GET` | `/api/admin/citations/stats` | Cross-audit citation failure rates |
 | `POST` | `/api/admin/citations/reindex` | Rebuild citation index from completed audits |
+| `GET` | `/api/admin/corrections/export.csv` | Ground-truth corrections as CSV |
+| `GET` | `/api/bulk/{id}/events/log.txt` | Bulk job event log download |
+| `GET` | `/api/bulk/{id}/dashboard.json` | Bulk dashboard JSON export |
 
 ## Implementation status (v1 slice)
 
@@ -150,13 +153,20 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Admin corrections log in UI; Docker Compose `web` service for frontend
 - [x] Spec-aligned coverage bar (tiers + confirmed failures + unresolvable)
 - [x] Resolution trail in claim viewer centre column; bulk job SSE + failure-type columns
+- [x] Duplicate DOI quality signals; optional circular-pair preview (`ENABLE_CIRCULAR_CHECK`)
+- [x] Bulk log/JSON export; admin corrections CSV export
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 
-### Still out of scope / v2
+### v2 preview (optional)
+
+- **Duplicate DOI detection** — flags when the same DOI appears on multiple bibliography entries (always on).
+- **Circular citation signal** — reciprocal DOI pairs within one paper via Semantic Scholar references (`ENABLE_CIRCULAR_CHECK=true`). Methodological signal only; not a hallucination verdict.
+
+### Still out of scope
 
 - Full relational audit schema (audit bodies remain JSON blobs; citations indexed separately)
-- Circular citation detection (spec § excluded from v1)
+- Deep multi-hop circular analysis across external literature (beyond bounded v2 preview)
 
 ### Tests
 

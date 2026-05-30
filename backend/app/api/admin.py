@@ -1,4 +1,8 @@
+import csv
+import io
+
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
 from app.services.citations_index import failure_rate_by_audit, reindex_all_audits
@@ -31,6 +35,34 @@ async def list_corrections(limit: int = 50) -> dict:
     return {"corrections": rows, "count": len(rows)}
 
 
+@router.get("/corrections/export.csv")
+async def export_corrections_csv(limit: int = 500) -> StreamingResponse:
+    rows = correction_store.list_recent(limit=min(limit, 2000))
+    buffer = io.StringIO()
+    writer = csv.DictWriter(
+        buffer,
+        fieldnames=[
+            "id",
+            "audit_id",
+            "citation_id",
+            "citation_index",
+            "field",
+            "original_value",
+            "corrected_value",
+            "created_at",
+        ],
+    )
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=papyrus-corrections.csv"},
+    )
+
+
 @router.get("/config")
 async def get_public_config() -> dict:
     settings = get_settings()
@@ -49,5 +81,6 @@ async def get_public_config() -> dict:
             "firecrawl": bool(settings.firecrawl_api_key),
             "apify": bool(settings.apify_api_token),
             "semantic_scholar": bool(settings.semantic_scholar_api_key),
+            "circular_check": settings.enable_circular_check,
         },
     }

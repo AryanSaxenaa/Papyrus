@@ -262,6 +262,23 @@ async def bulk_dashboard(job_id: UUID) -> dict:
     }
 
 
+@router.get("/bulk/{job_id}/events/log.txt")
+async def export_bulk_event_log(job_id: UUID) -> StreamingResponse:
+    job = bulk_job_store.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Bulk job not found")
+    lines = []
+    for event in event_bus.history(job_id):
+        lines.append(f"{event.get('ts', '')} [{event.get('type', '')}] {event.get('message', '')}")
+    return StreamingResponse(iter(["\n".join(lines)]), media_type="text/plain")
+
+
+@router.get("/bulk/{job_id}/dashboard.json")
+async def export_bulk_dashboard_json(job_id: UUID) -> JSONResponse:
+    payload = await bulk_dashboard(job_id)
+    return JSONResponse(content=payload)
+
+
 @router.get("/audits/{audit_id}/events/log.txt")
 async def export_event_log(audit_id: UUID) -> StreamingResponse:
     if not audit_store.get(audit_id):

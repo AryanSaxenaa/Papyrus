@@ -49,6 +49,13 @@ export type AuditRun = {
     nli_quantitative_caveat?: string;
     out_of_scope?: string[];
     unresolvable_count?: number;
+    duplicate_doi_count?: number;
+    circular_pair_count?: number;
+  } | null;
+  quality_summary?: {
+    duplicate_dois?: Array<{ doi: string; citation_indices: number[] }>;
+    circular_pairs?: Array<{ citation_a: number; citation_b: number; note?: string }>;
+    circular_check_enabled?: boolean;
   } | null;
   paper_text?: string | null;
   citations: CitationRecord[];
@@ -119,6 +126,7 @@ export type CitationRecord = {
     success: boolean;
     summary: string;
   }>;
+  quality_flags?: string[];
 };
 
 export type StreamEvent = {

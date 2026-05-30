@@ -91,6 +91,13 @@ export function SideBySideDrawer({
                 {citation.quantitative_caveat}
               </p>
             )}
+            {citation.quality_flags && citation.quality_flags.length > 0 && (
+              <ul className="mt-3 space-y-1 rounded border border-violet-800/40 bg-violet-950/30 p-2 text-xs text-violet-100">
+                {citation.quality_flags.map((flag) => (
+                  <li key={flag}>{flag}</li>
+                ))}
+              </ul>
+            )}
             {citation.version_mismatch && (
               <VersionTimeline info={citation.version_mismatch} />
             )}

@@ -34,6 +34,29 @@ class SemanticScholarClient:
                 return None
             return self._normalize_paper(response.json())
 
+    async def reference_dois(self, doi: str, limit: int = 50) -> list[str]:
+        """Outbound reference DOIs for a resolved paper (bounded list)."""
+        if not await rate_limit_service.allow("semantic_scholar"):
+            return []
+        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            response = await client.get(
+                f"{self.BASE}/paper/DOI:{normalized}",
+                params={"fields": "references.externalIds", "limit": limit},
+                headers=self._headers,
+            )
+            await rate_limit_service.record("semantic_scholar")
+            if response.status_code != 200:
+                return []
+            refs = response.json().get("references") or []
+            dois: list[str] = []
+            for ref in refs:
+                external = ref.get("externalIds") or {}
+                ref_doi = external.get("DOI")
+                if ref_doi:
+                    dois.append(ref_doi.strip().removeprefix("https://doi.org/"))
+            return dois
+
     async def search_title(self, title: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("semantic_scholar"):
             return None
