@@ -1,26 +1,5 @@
 type IconProps = { className?: string };
 
-export function PlusIcon({ className = "h-3.5 w-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function HomeIcon({ className = "h-3.5 w-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M2.5 6.5 8 2l5.5 4.5V13a1 1 0 0 1-1 1h-3v-4H6.5v4h-3a1 1 0 0 1-1-1V6.5z"
-        stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function UploadCloudIcon({ className = "h-5 w-5" }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -37,37 +16,6 @@ export function UploadCloudIcon({ className = "h-5 w-5" }: IconProps) {
         strokeWidth="1.35"
         strokeLinecap="round"
         strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-export function GlobeIcon({ className = "h-3.5 w-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
-      <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.25" />
-      <path d="M2.5 8h11M8 2.5c1.8 1.8 1.8 9.2 0 11M8 2.5c-1.8 1.8-1.8 9.2 0 11" stroke="currentColor" strokeWidth="1.1" />
-    </svg>
-  );
-}
-
-export function PdfTabIcon({ className = "h-3.5 w-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M5 2h5l3 3v9H5V2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-      <path d="M10 2v3h3M7 8h4M7 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function LinkTabIcon({ className = "h-3.5 w-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M6.5 9.5a3 3 0 0 1 0-4.2l.8-.8a3 3 0 0 1 4.2 4.2l-.8.8M9.5 6.5a3 3 0 0 1 0 4.2l-.8.8a3 3 0 0 1-4.2-4.2l.8-.8"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
       />
     </svg>
   );
@@ -129,16 +77,4 @@ export function LockSmallIcon({ className = "h-3 w-3" }: IconProps) {
   );
 }
 
-export function SunIcon({ className = "h-3.5 w-3.5" }: IconProps) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" aria-hidden>
-      <circle cx="8" cy="8" r="2.75" stroke="currentColor" strokeWidth="1.2" />
-      <path
-        d="M8 1.5v1.5M8 13v1.5M14.5 8H13M3 8H1.5M12.7 3.3l-1 1M4.3 11.7l-1 1M12.7 12.7l-1-1M4.3 4.3l-1-1"
-        stroke="currentColor"
-        strokeWidth="1.15"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+

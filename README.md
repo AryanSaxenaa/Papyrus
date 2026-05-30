@@ -6,9 +6,9 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 
 ## Stack
 
-- **Backend:** FastAPI, Redis cache, Celery (bulk stub), GROBID + PyMuPDF ingestion
+- **Backend:** FastAPI, Redis (cache + Celery broker), Celery (async bulk worker), GROBID + PyMuPDF ingestion
 - **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Europe PMC, Exa, Apify fallbacks
-- **Frontend:** React + Vite + Tailwind (live SSE panel + heatmap)
+- **Frontend:** React + Vite + Tailwind + motion, D3 (heatmap/timeline), pdf.js (paper anatomy)
 
 ## Quick start
 
@@ -76,13 +76,18 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits/bulk` | ZIP of PDFs (async bulk job) |
 | `GET` | `/api/bulk/{id}` | Bulk job status |
 | `GET` | `/api/bulk/{id}/dashboard` | Bulk papers ranked by failure rate |
+| `GET` | `/api/bulk/{id}/audits` | Full audit results for each paper in batch |
 | `GET` | `/api/bulk/{id}/events` | SSE live log for bulk job progress |
 | `GET` | `/api/audits/{id}/events/log.txt` | Download resolution event log |
 | `GET` | `/api/admin/rate-limits` | API usage vs daily budgets |
 | `GET` | `/api/admin/config` | Integration feature flags |
 | `GET` | `/api/admin/corrections` | Recent user intent/claim corrections (ground truth) |
+| `GET` | `/api/health` | Basic health check |
 | `GET` | `/api/health/detailed` | Postgres, Redis, GROBID connectivity |
+| `GET` | `/api/audits` | List all audits |
 | `GET` | `/api/audits/summaries` | Indexed audit list (Postgres summaries table) |
+| `PATCH` | `/api/audits/{id}/citations/{cid}/intent` | Reclassify citation intent • reruns NLI |
+| `PATCH` | `/api/audits/{id}/citations/{cid}/claim` | Correct extracted claim • reruns NLI |
 | `POST` | `/api/audits/{id}/citations/{cid}/rerun` | Re-resolve one citation |
 | `POST` | `/api/audits/{id}/citations/{cid}/approve-claim` | Run NLI after claim approval |
 | `DELETE` | `/api/audits/{id}` | Remove audit and indexed rows |

@@ -1,9 +1,8 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useRef } from "react";
 import {
   motion,
   useInView,
   useReducedMotion,
-  useScroll,
   type Variants,
 } from "motion/react";
 
@@ -87,62 +86,6 @@ export function Stagger({
       {children}
     </motion.div>
   );
-}
-
-export function CountUp({
-  end,
-  suffix = "",
-  decimals = 0,
-  className,
-}: {
-  end: number;
-  suffix?: string;
-  decimals?: number;
-  className?: string;
-}) {
-  const reduce = useReducedMotion();
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-10% 0px" });
-  const [value, setValue] = useState(0);
-
-  useEffect(() => {
-    if (reduce) {
-      setValue(end);
-      return;
-    }
-    if (!inView) return;
-    const duration = 1400;
-    const startAt = performance.now();
-    let frame = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - startAt) / duration);
-      const eased = 1 - (1 - t) ** 3;
-      setValue(end * eased);
-      if (t < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [inView, end, reduce]);
-
-  const text =
-    decimals > 0 ? `${value.toFixed(decimals)}${suffix}` : `${Math.round(value)}${suffix}`;
-
-  return (
-    <span ref={ref} className={className}>
-      {text}
-    </span>
-  );
-}
-
-export function useNavScrolled(threshold = 24) {
-  const { scrollY } = useScroll();
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    return scrollY.on("change", (y) => setScrolled(y > threshold));
-  }, [scrollY, threshold]);
-
-  return scrolled;
 }
 
 export function MagneticLinkButton({

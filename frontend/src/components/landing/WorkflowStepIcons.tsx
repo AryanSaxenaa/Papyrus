@@ -1,6 +1,6 @@
 type IconProps = { active?: boolean };
 
-export function StepExtractIcon({ active }: IconProps) {
+function StepExtractIcon({ active }: IconProps) {
   const stroke = active ? "#2d6a4f" : "#18181b";
   const fill = active ? "#d8f3dc" : "none";
   return (
@@ -11,7 +11,7 @@ export function StepExtractIcon({ active }: IconProps) {
   );
 }
 
-export function StepVerifyIcon({ active }: IconProps) {
+function StepVerifyIcon({ active }: IconProps) {
   const stroke = active ? "#2d6a4f" : "#18181b";
   return (
     <svg className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -26,7 +26,7 @@ export function StepVerifyIcon({ active }: IconProps) {
   );
 }
 
-export function StepCheckIcon({ active }: IconProps) {
+function StepCheckIcon({ active }: IconProps) {
   const stroke = active ? "#2d6a4f" : "#18181b";
   return (
     <svg className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -36,7 +36,7 @@ export function StepCheckIcon({ active }: IconProps) {
   );
 }
 
-export function StepClassifyIcon({ active }: IconProps) {
+function StepClassifyIcon({ active }: IconProps) {
   const stroke = active ? "#2d6a4f" : "#18181b";
   return (
     <svg className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -46,7 +46,7 @@ export function StepClassifyIcon({ active }: IconProps) {
   );
 }
 
-export function StepReportIcon({ active }: IconProps) {
+function StepReportIcon({ active }: IconProps) {
   const stroke = active ? "#2d6a4f" : "#18181b";
   return (
     <svg className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" viewBox="0 0 24 24" fill="none" aria-hidden>

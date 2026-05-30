@@ -68,9 +68,6 @@ export type FailureSummary = {
 };
 
 export type AuditLimitations = {
-  not_ai_detection?: boolean;
-  exa_absence_not_verdict?: boolean;
-  unresolvable_count?: number;
   field_coverage_note?: string | null;
   misappropriation_not_detected?: string;
   nli_quantitative_caveat?: string;
@@ -115,7 +112,6 @@ export type CitationRecord = {
 export type AuditRun = {
   id: string;
   paper_title?: string | null;
-  paper_authors?: string[];
   status: string;
   error?: string | null;
   pipeline_version: string;
