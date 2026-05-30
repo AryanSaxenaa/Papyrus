@@ -366,7 +366,7 @@ export default function App() {
             <AppHeroIllustration />
           </div>
 
-          <div className="-mt-4 grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
             <AppUploadCard
               uploading={uploading}
               onUploadPdf={(file) => void onUpload(file)}
