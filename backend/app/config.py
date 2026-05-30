@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     firecrawl_api_key: str | None = None
     apify_api_token: str | None = None
     apify_actor_arxiv: str = "datapilot/arxiv-research-paper-scraper"
+    apify_actor_arxiv_secondary: str = "openclawmara/arxiv-paper-scraper"
     apify_actor_openalex: str = "parseforge/openalex-scraper"
+    apify_actor_openalex_secondary: str = "shahidirfan/openalex-scraper"
     apify_actor_europe_pmc: str = "parseforge/europepmc-scraper"
     apify_actor_crossref_journals: str = "parseforge/crossref-journals-scraper"
     apify_actor_academic_mcp: str = "nexgendata/academic-research-mcp-server"

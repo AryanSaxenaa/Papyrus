@@ -6,7 +6,7 @@ import { LivePanel } from "./components/LivePanel";
 import { LimitationsPanel } from "./components/LimitationsPanel";
 import { CitationHeatmap } from "./components/CitationHeatmap";
 import { HeatmapFilterBar } from "./components/HeatmapFilterBar";
-import { PaperAnatomy } from "./components/PaperAnatomy";
+import { PaperAnatomyView } from "./components/PaperAnatomyView";
 import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
@@ -587,7 +587,7 @@ export default function App() {
             </div>
           </div>
 
-          {audit?.paper_text && (
+          {audit && (audit.paper_text || audit.status !== "queued") && (
             <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
               <button
                 type="button"
@@ -596,14 +596,18 @@ export default function App() {
               >
                 Paper anatomy view {showAnatomy ? "▾" : "▸"}
               </button>
-              {showAnatomy && (
-                <div className="mt-3 max-h-64 overflow-y-auto">
-                  <PaperAnatomy
+              {showAnatomy && audit.paper_text && (
+                <div className="mt-3">
+                  <PaperAnatomyView
+                    auditId={audit.id}
                     text={audit.paper_text}
                     citations={audit.citations}
                     onSelectCitation={setSelected}
                   />
                 </div>
+              )}
+              {showAnatomy && !audit.paper_text && (
+                <p className="mt-3 text-sm text-[var(--papyrus-muted)]">Waiting for PDF text extraction…</p>
               )}
             </div>
           )}

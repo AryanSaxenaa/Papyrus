@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -138,6 +138,19 @@ async def get_audit(audit_id: UUID) -> AuditRun:
     if not audit:
         raise HTTPException(status_code=404, detail="Audit not found")
     return audit
+
+
+@router.get("/audits/{audit_id}/paper.pdf")
+async def get_audit_paper_pdf(audit_id: UUID) -> FileResponse:
+    settings = get_settings()
+    pdf_path = Path(settings.upload_dir) / f"{audit_id}.pdf"
+    if not pdf_path.is_file():
+        raise HTTPException(status_code=404, detail="Source PDF not available for this audit")
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=f"papyrus-audit-{audit_id}.pdf",
+    )
 
 
 @router.post("/audits", status_code=202)

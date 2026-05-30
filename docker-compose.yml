@@ -36,6 +36,7 @@ services:
       CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@example.com}
       OPENALEX_MAILTO: ${OPENALEX_MAILTO:-dev@example.com}
       UNPAYWALL_EMAIL: ${UNPAYWALL_EMAIL:-dev@example.com}
+      USE_CELERY_BULK: "true"
     ports:
       - "8000:8000"
     volumes:
@@ -58,6 +59,7 @@ services:
       CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@example.com}
       OPENALEX_MAILTO: ${OPENALEX_MAILTO:-dev@example.com}
       UNPAYWALL_EMAIL: ${UNPAYWALL_EMAIL:-dev@example.com}
+      USE_CELERY_BULK: "true"
     volumes:
       - ./backend:/app
       - papyrus_uploads:/app/data/uploads
@@ -65,7 +67,7 @@ services:
       - postgres
       - redis
       - grobid
-    command: celery -A app.worker.celery_app worker -l info -Q audits
+    command: celery -A app.worker.celery_app worker -l info -Q audits --concurrency=1
 
   web:
     image: node:22-alpine

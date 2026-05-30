@@ -26,9 +26,16 @@ class OpenAlexClient:
                 params=self._params,
             )
             await rate_limit_service.record("openalex")
+            if response.status_code in {429, 403}:
+                return await self._apify_secondary_fallback(normalized)
             if response.status_code != 200:
                 return None
             return self._normalize_work(response.json())
+
+    async def _apify_secondary_fallback(self, title_or_query: str) -> dict[str, Any] | None:
+        from app.services.apify_client import ApifyClient
+
+        return await ApifyClient().resolve_openalex_secondary(title_or_query)
 
     async def search_title(self, title: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("openalex"):
@@ -39,6 +46,8 @@ class OpenAlexClient:
                 params={**self._params, "search": title, "per_page": 1},
             )
             await rate_limit_service.record("openalex")
+            if response.status_code in {429, 403}:
+                return await self._apify_secondary_fallback(title)
             if response.status_code != 200:
                 return None
             results = response.json().get("results") or []

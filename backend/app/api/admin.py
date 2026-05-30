@@ -68,6 +68,8 @@ async def get_public_config() -> dict:
             "exa": bool(settings.exa_api_key),
             "firecrawl": bool(settings.firecrawl_api_key),
             "apify": bool(settings.apify_api_token),
+            "apify_arxiv_secondary": settings.apify_actor_arxiv_secondary,
+            "apify_openalex_secondary": settings.apify_actor_openalex_secondary,
             "semantic_scholar": bool(settings.semantic_scholar_api_key),
             "embeddings_backend": settings.embeddings_backend,
             "nli_requires_claim_approval": settings.nli_requires_claim_approval,

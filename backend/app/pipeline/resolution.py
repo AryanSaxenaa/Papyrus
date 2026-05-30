@@ -18,7 +18,7 @@ from app.services.openalex import openalex_client
 from app.services.semantic_scholar import semantic_scholar_client
 from app.services.firecrawl import firecrawl_client
 from app.services.fulltext import fulltext_service
-from app.services.apify_client import apify_fallback_resolve
+from app.services.apify_client import ApifyClient, apify_fallback_resolve
 from app.services.journals import is_year_impossible, journal_client
 from app.services.unpaywall import unpaywall_client
 
@@ -182,13 +182,18 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
         )
         if not scholar:
             openalex = await openalex_client.search_title(cited.title)
+            via_secondary = False
+            if not openalex:
+                openalex = await ApifyClient().resolve_openalex_secondary(cited.title)
+                via_secondary = openalex is not None
             record.resolution_attempts.append(
                 _attempt(ResolutionSource.OPENALEX, cited.title, openalex is not None, openalex)
             )
             event_bus.emit(
                 audit_id,
                 "openalex",
-                "OpenAlex title search",
+                "OpenAlex title search"
+                + (" (shahidirfan/openalex-scraper)" if via_secondary else ""),
                 citation_index=record.index,
                 success=openalex is not None,
             )

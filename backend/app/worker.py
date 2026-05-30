@@ -12,7 +12,12 @@ from app.pipeline.bulk import process_bulk_zip
 settings = get_settings()
 
 celery_app = Celery("papyrus", broker=settings.redis_url, backend=settings.redis_url)
-celery_app.conf.task_routes = {"app.worker.run_bulk_audit": {"queue": "audits"}}
+celery_app.conf.update(
+    task_routes={"app.worker.run_bulk_audit": {"queue": "audits"}},
+    task_track_started=True,
+    worker_prefetch_multiplier=1,
+    task_acks_late=True,
+)
 
 
 @celery_app.task(name="app.worker.run_bulk_audit")

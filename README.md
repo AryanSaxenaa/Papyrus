@@ -90,6 +90,7 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/bulk/{id}/events/log.txt` | Bulk job event log download |
 | `GET` | `/api/bulk/{id}/dashboard.json` | Bulk dashboard JSON export |
 | `GET` | `/api/audits/{id}/citations/{cid}/attempts` | Resolution attempts from relational DB |
+| `GET` | `/api/audits/{id}/paper.pdf` | Source PDF for paper anatomy overlay view |
 
 ## Implementation status (v1 slice)
 
@@ -154,6 +155,10 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Bulk log/JSON export; admin corrections CSV export
 - [x] Claim approval before NLI (default on, per spec live panel)
 - [x] Snowflake Arctic embedding backend option (`EMBEDDINGS_BACKEND=snowflake`)
+- [x] PDF paper anatomy with pdf.js citation badge overlays (`PaperAnatomyView`)
+- [x] Type 2 DOI redirect via title drift and exact author-list comparison
+- [x] Apify secondary actors: `openclawmara/arxiv-paper-scraper`, `shahidirfan/openalex-scraper`
+- [x] Celery bulk queue (`USE_CELERY_BULK=true` in Docker Compose)
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 

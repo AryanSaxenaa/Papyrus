@@ -1,16 +1,5 @@
 import type { CitationRecord } from "../types";
-
-const verdictColors: Record<string, string> = {
-  supported: "#1f6b4a",
-  failure: "#8b1e2f",
-  retraction: "#8b1e2f",
-  cannot_assess: "#3d5a73",
-  neutral: "#5c6460",
-  unresolvable: "#4a524e",
-  resolving: "#b8860b",
-  pending: "#2a312e",
-  amber: "#b8860b",
-};
+import { citationFill, isRetraction } from "../lib/verdictColors";
 
 type Props = {
   text: string;
@@ -33,13 +22,14 @@ export function PaperAnatomy({ text, citations, onSelectCitation }: Props) {
         if (!citation) {
           return <span key={`${index}-raw`}>{part}</span>;
         }
-        const color = verdictColors[citation.verdict_color] ?? verdictColors.pending;
+        const color = citationFill(citation);
+        const ring = isRetraction(citation) ? "ring-1 ring-amber-400" : "";
         return (
           <button
             key={`${index}-cite`}
             type="button"
             onClick={() => onSelectCitation(citation)}
-            className="mx-0.5 inline rounded px-1 font-audit text-xs font-semibold text-white transition hover:opacity-90"
+            className={`mx-0.5 inline rounded px-1 font-audit text-xs font-semibold text-white transition hover:opacity-90 ${ring}`}
             style={{ background: color }}
             title={`Citation #${citation.index}: ${citation.bibliography.title ?? "Reference"}`}
           >

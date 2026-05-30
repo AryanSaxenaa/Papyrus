@@ -9,6 +9,7 @@ import httpx
 from app.config import get_settings
 from app.domain.enums import ResolutionSource
 from app.services.cache import cache_service
+from app.pipeline.verdicts import compare_titles
 from app.services.rate_limits import rate_limit_service
 
 APIFY_BASE = "https://api.apify.com/v2"
@@ -82,10 +83,24 @@ class ApifyClient:
 
     async def resolve_arxiv(self, arxiv_id: str) -> dict[str, Any] | None:
         settings = get_settings()
-        items = await self.run_actor(
-            settings.apify_actor_arxiv,
-            {"searchQuery": arxiv_id, "maxItems": 1},
-        )
+        primary = await self._resolve_arxiv_actor(settings.apify_actor_arxiv, arxiv_id)
+        secondary = await self._resolve_arxiv_actor(settings.apify_actor_arxiv_secondary, arxiv_id)
+        if primary and secondary:
+            p_title = primary.get("title") or ""
+            s_title = secondary.get("title") or ""
+            if p_title and s_title:
+                ratio, _ = compare_titles(p_title, s_title)
+                primary["arxiv_cross_validation"] = {
+                    "secondary_actor": settings.apify_actor_arxiv_secondary,
+                    "title_similarity": round(ratio, 3),
+                }
+            for field in ("abstract", "authors", "doi", "open_access_pdf"):
+                if not primary.get(field) and secondary.get(field):
+                    primary[field] = secondary.get(field)
+        return primary or secondary
+
+    async def _resolve_arxiv_actor(self, actor_id: str, arxiv_id: str) -> dict[str, Any] | None:
+        items = await self.run_actor(actor_id, {"searchQuery": arxiv_id, "maxItems": 1})
         if not items:
             return None
         row = items[0]
@@ -97,7 +112,21 @@ class ApifyClient:
             "doi": row.get("doi"),
             "open_access_pdf": row.get("pdfUrl") or row.get("pdf_url"),
             "source": ResolutionSource.APIFY.value,
+            "apify_actor": actor_id,
         }
+
+    async def resolve_openalex_secondary(self, title: str) -> dict[str, Any] | None:
+        settings = get_settings()
+        items = await self.run_actor(
+            settings.apify_actor_openalex_secondary,
+            {"searchTerms": title, "search": title, "query": title, "maxItems": 1},
+        )
+        if not items:
+            return None
+        normalized = _normalize_openalex_item(items[0])
+        normalized["via"] = "openalex_apify_secondary"
+        normalized["apify_actor"] = settings.apify_actor_openalex_secondary
+        return normalized
 
 
 async def apify_fallback_resolve(
