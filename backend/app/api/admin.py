@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.config import get_settings
+from app.services.corrections import correction_store
 from app.services.rate_limits import rate_limit_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -10,6 +11,12 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 async def get_rate_limits() -> dict:
     snapshot = await rate_limit_service.snapshot()
     return {"sources": snapshot, "meta": await rate_limit_service.meta()}
+
+
+@router.get("/corrections")
+async def list_corrections(limit: int = 50) -> dict:
+    rows = correction_store.list_recent(limit=min(limit, 200))
+    return {"corrections": rows, "count": len(rows)}
 
 
 @router.get("/config")

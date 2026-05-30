@@ -18,6 +18,22 @@ class SemanticScholarClient:
             headers["x-api-key"] = settings.semantic_scholar_api_key
         self._headers = headers
 
+    async def lookup_doi(self, doi: str) -> dict[str, Any] | None:
+        if not await rate_limit_service.allow("semantic_scholar"):
+            return None
+        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        fields = "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf,publicationVenue"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{self.BASE}/paper/DOI:{normalized}",
+                params={"fields": fields},
+                headers=self._headers,
+            )
+            await rate_limit_service.record("semantic_scholar")
+            if response.status_code != 200:
+                return None
+            return self._normalize_paper(response.json())
+
     async def search_title(self, title: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("semantic_scholar"):
             return None
@@ -34,16 +50,20 @@ class SemanticScholarClient:
             data = response.json().get("data") or []
             if not data:
                 return None
-            paper = data[0]
-            external = paper.get("externalIds") or {}
-            return {
-                "title": paper.get("title"),
-                "authors": [a.get("name", "") for a in paper.get("authors") or []],
-                "year": paper.get("year"),
-                "doi": external.get("DOI"),
-                "abstract": paper.get("abstract"),
-                "open_access_pdf": (paper.get("openAccessPdf") or {}).get("url"),
-            }
+            return self._normalize_paper(data[0])
+
+    def _normalize_paper(self, paper: dict[str, Any]) -> dict[str, Any]:
+        external = paper.get("externalIds") or {}
+        venue = paper.get("publicationVenue") or {}
+        return {
+            "title": paper.get("title"),
+            "authors": [a.get("name", "") for a in paper.get("authors") or []],
+            "year": paper.get("year"),
+            "doi": external.get("DOI"),
+            "abstract": paper.get("abstract"),
+            "journal": venue.get("name"),
+            "open_access_pdf": (paper.get("openAccessPdf") or {}).get("url"),
+        }
 
 
 semantic_scholar_client = SemanticScholarClient()

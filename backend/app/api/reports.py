@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from app.domain.models import AuditRun
+from app.pipeline.limitations import build_limitations
 
 
 def render_text_report(audit: AuditRun) -> str:
@@ -113,6 +114,7 @@ def render_pdf_bytes(audit: AuditRun) -> bytes:
 def render_json_report(audit: AuditRun) -> str:
     payload = {
         "audit": audit.model_dump(mode="json"),
+        "limitations": audit.limitations or build_limitations(audit),
         "disclaimer": {
             "scope": "citation_integrity_only",
             "not_ai_detection": True,

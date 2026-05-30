@@ -73,6 +73,7 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/audits/{id}/events/log.txt` | Download resolution event log |
 | `GET` | `/api/admin/rate-limits` | API usage vs daily budgets |
 | `GET` | `/api/admin/config` | Integration feature flags |
+| `GET` | `/api/admin/corrections` | Recent user intent/claim corrections (ground truth) |
 
 ## Implementation status (v1 slice)
 
@@ -108,11 +109,17 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Spec-aligned TXT report (coverage confidence, claim breakdown, version timeline)
 - [x] Coverage bar with confidence note; clickable paper anatomy markers
 - [x] Bulk dashboard inline heatmap expand; optional Celery bulk (`USE_CELERY_BULK=true`)
+- [x] Semantic Scholar DOI lookup + abstract enrichment
+- [x] SSRN URL ingestion via Firecrawl
+- [x] Bulk job ETA (`estimated_seconds_remaining`)
+- [x] User correction ground-truth log (Postgres table or `corrections.jsonl`)
+- [x] Audit limitations panel (coverage bias, NLI caveats, out-of-scope list)
+- [x] Medium-confidence review flag in claim viewer
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 
 ### Still out of scope / v2
 
-- Normalized PostgreSQL schema (current: JSON blob per audit)
+- Fully normalized PostgreSQL schema (audits remain JSON blobs; corrections table is normalized)
 - Local/on-prem NLI model (current: Hugging Face API + lexical fallback)
 - Circular citation detection (spec § excluded from v1)

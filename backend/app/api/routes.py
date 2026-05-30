@@ -21,6 +21,7 @@ from app.pipeline.orchestrator import audit_orchestrator
 from app.pipeline.scoring import finalize_scores
 from app.pipeline.verdicts import run_claim_alignment_async
 from app.services.events import event_bus
+from app.services.corrections import correction_store
 from app.services.url_fetch import url_fetch_service
 from app.store import audit_store
 
@@ -217,10 +218,20 @@ async def update_intent(audit_id: UUID, citation_id: str, body: IntentUpdate) ->
     if not audit:
         raise HTTPException(status_code=404, detail="Audit not found")
     record = _get_citation(audit, citation_id)
+    previous = record.intent.value
     record.intent = CitationIntent(body.intent)
     record.intent_user_override = True
+    correction_store.record(
+        str(audit_id),
+        citation_id,
+        record.index,
+        "intent",
+        previous,
+        body.intent,
+    )
     finalize_scores(audit)
     audit_store.save(audit)
+    event_bus.emit(audit_id, "user", "Intent reclassified", citation_index=record.index, intent=body.intent)
     return record
 
 
@@ -230,10 +241,26 @@ async def update_claim(audit_id: UUID, citation_id: str, body: ClaimUpdate) -> C
     if not audit:
         raise HTTPException(status_code=404, detail="Audit not found")
     record = _get_citation(audit, citation_id)
+    original = record.extracted_claim
     record.claim_user_corrected = body.claim
+    correction_store.record(
+        str(audit_id),
+        citation_id,
+        record.index,
+        "claim",
+        original,
+        body.claim,
+    )
     await run_claim_alignment_async(record)
     finalize_scores(audit)
     audit_store.save(audit)
+    event_bus.emit(
+        audit_id,
+        "nli",
+        "Claim alignment rerun after user correction",
+        citation_index=record.index,
+        verdict=record.claim_alignment_verdict,
+    )
     return record
 
 

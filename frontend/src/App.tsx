@@ -3,6 +3,7 @@ import { CoverageBar } from "./components/CoverageBar";
 import { CoverageSummary } from "./components/CoverageSummary";
 import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
+import { LimitationsPanel } from "./components/LimitationsPanel";
 import { PaperAnatomy } from "./components/PaperAnatomy";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
@@ -70,6 +71,10 @@ export default function App() {
   useEffect(() => {
     if (!selected) return;
     setClaimDraft(selected.claim_user_corrected ?? selected.extracted_claim ?? "");
+    document.getElementById(`heatmap-citation-${selected.id}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
   }, [selected]);
 
   const startAudit = async (response: Response) => {
@@ -134,9 +139,14 @@ export default function App() {
           completed: number;
           failed: number;
           total: number;
+          estimated_seconds_remaining?: number | null;
         };
+        const eta =
+          status.estimated_seconds_remaining != null
+            ? ` · ~${Math.ceil(status.estimated_seconds_remaining / 60)} min left`
+            : "";
         setBulkStatus(
-          `Bulk: ${status.completed}/${status.total} complete, ${status.failed} failed (${status.status})`,
+          `Bulk: ${status.completed}/${status.total} complete, ${status.failed} failed (${status.status})${eta}`,
         );
         if (status.status === "complete" || status.status === "failed") {
           window.clearInterval(poll);
@@ -413,6 +423,7 @@ export default function App() {
                 <CoverageBar audit={audit} />
               </div>
               <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
+              <LimitationsPanel audit={audit} />
               {audit.status === "complete" && (
                 <div className="mt-3 flex gap-3 text-sm">
                   <a className="text-emerald-300 underline" href={`/api/audits/${audit.id}/report.txt`}>
@@ -441,9 +452,12 @@ export default function App() {
               {filteredCitations.map((citation) => (
                 <button
                   key={citation.id}
+                  id={`heatmap-citation-${citation.id}`}
                   type="button"
                   onClick={() => setSelected(citation)}
                   className={`rounded-md border border-white/10 p-2 text-left transition hover:scale-[1.02] ${
+                    selected?.id === citation.id ? "ring-2 ring-emerald-400" : ""
+                  } ${
                     verdictClass[citation.verdict_color] ?? verdictClass.pending
                   }`}
                 >

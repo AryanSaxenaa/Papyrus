@@ -1,5 +1,6 @@
 from app.domain.enums import ConfidenceLevel, EvidenceTier, HallucinationType, RiskLevel
 from app.domain.models import AuditRun, CoverageSummary, FailureSummary
+from app.pipeline.limitations import build_limitations
 
 
 FAILURE_TYPES = {
@@ -85,3 +86,5 @@ def finalize_scores(audit: AuditRun) -> None:
         audit.risk_level = RiskLevel.ELEVATED
     else:
         audit.risk_level = RiskLevel.LOW
+
+    audit.limitations = build_limitations(audit)

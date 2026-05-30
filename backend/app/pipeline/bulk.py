@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import zipfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -19,6 +20,7 @@ async def process_bulk_zip(job_id: UUID, zip_path: Path) -> BulkAuditJob:
         raise ValueError("Bulk job not found")
 
     job.status = "running"
+    job.started_at = datetime.now(timezone.utc)
     bulk_job_store.save(job)
     event_bus.emit(job_id, "bulk", "Bulk job started", job_id=str(job_id))
 
@@ -31,7 +33,9 @@ async def process_bulk_zip(job_id: UUID, zip_path: Path) -> BulkAuditJob:
         job.total = len(pdf_files)
         bulk_job_store.save(job)
 
+        paper_durations: list[float] = []
         for pdf_file in pdf_files:
+            paper_started = time.monotonic()
             audit = AuditRun(bulk_job_id=job_id, paper_title=pdf_file.stem)
             audit_store.create(audit)
             job.audit_ids.append(audit.id)
@@ -49,6 +53,12 @@ async def process_bulk_zip(job_id: UUID, zip_path: Path) -> BulkAuditJob:
                     audit_store.save(failed)
                 event_bus.emit(job_id, "bulk", f"Paper failed: {pdf_file.name}", error=str(exc))
 
+            paper_durations.append(time.monotonic() - paper_started)
+            remaining = job.total - job.completed - job.failed
+            if paper_durations:
+                job.avg_seconds_per_paper = round(sum(paper_durations) / len(paper_durations), 1)
+                job.estimated_seconds_remaining = int(job.avg_seconds_per_paper * remaining)
+
             bulk_job_store.save(job)
             event_bus.emit(
                 job_id,
@@ -57,6 +67,7 @@ async def process_bulk_zip(job_id: UUID, zip_path: Path) -> BulkAuditJob:
                 completed=job.completed,
                 failed=job.failed,
                 total=job.total,
+                eta_seconds=job.estimated_seconds_remaining,
             )
 
         job.status = "complete"

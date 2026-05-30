@@ -137,6 +137,7 @@ class AuditRun(BaseModel):
     risk_confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
 
     events: list[dict[str, Any]] = Field(default_factory=list)
+    limitations: dict[str, Any] | None = None
     bulk_job_id: UUID | None = None
     source_url: str | None = None
     paper_text: str | None = None
@@ -145,10 +146,13 @@ class AuditRun(BaseModel):
 class BulkAuditJob(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime | None = None
     completed_at: datetime | None = None
     status: str = "queued"  # queued | running | complete | failed
     total: int = 0
     completed: int = 0
     failed: int = 0
     audit_ids: list[UUID] = Field(default_factory=list)
+    avg_seconds_per_paper: float | None = None
+    estimated_seconds_remaining: int | None = None
     error: str | None = None

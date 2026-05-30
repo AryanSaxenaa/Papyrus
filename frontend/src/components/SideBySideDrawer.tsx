@@ -194,10 +194,21 @@ function VerdictBadge({ citation }: { citation: CitationRecord }) {
       : citation.verdict_color === "failure"
         ? "text-red-300"
         : "text-stone-300";
+  const needsReview =
+    citation.intent === "evidentiary" &&
+    citation.confidence &&
+    ["medium", "low"].includes(citation.confidence);
   return (
-    <p className={`font-audit text-2xl font-semibold uppercase ${color}`}>
-      {citation.claim_alignment_verdict ?? citation.verdict_color}
-    </p>
+    <div>
+      <p className={`font-audit text-2xl font-semibold uppercase ${color}`}>
+        {citation.claim_alignment_verdict ?? citation.verdict_color}
+      </p>
+      {needsReview && (
+        <p className="mt-2 rounded border border-amber-700/50 bg-amber-950/40 px-2 py-1 text-xs text-amber-100">
+          Medium/low confidence — human review recommended
+        </p>
+      )}
+    </div>
   );
 }
 

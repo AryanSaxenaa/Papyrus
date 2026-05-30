@@ -42,12 +42,27 @@ export type AuditRun = {
     version_mismatch: number;
   };
   risk_level: string;
+  limitations?: {
+    field_coverage_note?: string | null;
+    misappropriation_not_detected?: string;
+    nli_quantitative_caveat?: string;
+    out_of_scope?: string[];
+    unresolvable_count?: number;
+  } | null;
   paper_text?: string | null;
   citations: CitationRecord[];
 };
 
 export type BulkDashboard = {
-  job: { id: string; status: string; total: number; completed: number; failed: number };
+  job: {
+    id: string;
+    status: string;
+    total: number;
+    completed: number;
+    failed: number;
+    estimated_seconds_remaining?: number | null;
+    avg_seconds_per_paper?: number | null;
+  };
   note?: string;
   papers: Array<{
     audit_id: string;

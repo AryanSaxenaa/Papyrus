@@ -79,6 +79,8 @@ class UrlFetchService:
         host = urlparse(url).netloc.lower()
         if "ncbi.nlm.nih.gov" in host or "pubmed" in host:
             return await self._pubmed_pdf(url)
+        if "ssrn.com" in host:
+            return await self._ssrn_pdf(url)
         scraped = await firecrawl_client.scrape_landing_page(url)
         if not scraped:
             return None
@@ -88,6 +90,12 @@ class UrlFetchService:
         body = scraped.get("markdown") or scraped.get("abstract") or ""
         match = PMC_PDF.search(body)
         return match.group(1) if match else None
+
+    async def _ssrn_pdf(self, url: str) -> str | None:
+        scraped = await firecrawl_client.scrape_landing_page(url)
+        if scraped:
+            return self._pdf_from_scrape(scraped)
+        return None
 
     async def _pubmed_pdf(self, url: str) -> str | None:
         scraped = await firecrawl_client.scrape_landing_page(url)

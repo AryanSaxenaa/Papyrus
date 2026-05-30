@@ -86,6 +86,28 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
         if unpaywall and unpaywall.get("oa_url"):
             record.oa_pdf_url = unpaywall["oa_url"]
 
+        s2_doi = await cache_service.get_json("s2_doi", cited.doi)
+        if s2_doi is None:
+            s2_doi = await semantic_scholar_client.lookup_doi(cited.doi)
+            if s2_doi:
+                await cache_service.set_json("s2_doi", cited.doi, s2_doi)
+        record.resolution_attempts.append(
+            _attempt(ResolutionSource.SEMANTIC_SCHOLAR, f"DOI:{cited.doi}", s2_doi is not None, s2_doi)
+        )
+        if s2_doi:
+            scholar = s2_doi
+            event_bus.emit(
+                audit_id,
+                "semantic_scholar",
+                "Semantic Scholar DOI lookup",
+                citation_index=record.index,
+                success=True,
+            )
+            if crossref and not crossref.get("abstract") and s2_doi.get("abstract"):
+                crossref = {**crossref, "abstract": s2_doi["abstract"]}
+            elif not crossref:
+                crossref = s2_doi
+
     arxiv_id = arxiv_client.extract_id(cited.doi) or arxiv_client.extract_id(cited.raw)
     if arxiv_id:
         arxiv = await arxiv_client.fetch(arxiv_id)
