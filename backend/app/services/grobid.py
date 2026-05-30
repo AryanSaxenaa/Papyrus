@@ -33,7 +33,10 @@ class GrobidClient:
             response.raise_for_status()
             tei_xml = response.text
 
-        root = ET.fromstring(tei_xml)
+        try:
+            root = ET.fromstring(tei_xml)
+        except ET.ParseError as exc:
+            raise ValueError(f"Failed to parse GROBID XML response: {exc}") from exc
         title_el = root.find(".//tei:titleStmt/tei:title", NS)
         paper_title = title_el.text.strip() if title_el is not None and title_el.text else None
 
@@ -72,7 +75,7 @@ class GrobidClient:
             match = re.search(r"#b(\d+)", target)
             if not match:
                 continue
-            bib_index = int(match.group(1))
+            bib_index = int(match.group(1)) + 1  # Convert from 0-based to 1-based to match bibliography
             marker = "".join(ref.itertext()).strip() or target
             parent = ref
             context = _context_window(parent)

@@ -34,8 +34,10 @@ class EventBus:
             from app.services.relational_audit import persist_audit_event
 
             persist_audit_event(key, event)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Log database persistence errors but don't fail event emission
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to persist audit event: {exc}")
         return event
 
     def history(self, audit_id: UUID | str) -> list[AuditEventPayload]:
@@ -50,8 +52,10 @@ class EventBus:
             if loaded:
                 self._history[key] = list(loaded)
                 return list(loaded)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Log database loading errors but don't fail event history retrieval
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to load audit event history: {exc}")
         return []
 
     async def subscribe(self, audit_id: UUID | str) -> asyncio.Queue[AuditEventPayload]:

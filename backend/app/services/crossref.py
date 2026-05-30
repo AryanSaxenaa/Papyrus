@@ -23,32 +23,39 @@ class CrossRefClient:
         if not await rate_limit_service.allow("crossref"):
             return None
         normalized = normalize_doi(doi)
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{self.BASE}/{normalized}", headers=self._headers)
-            await rate_limit_service.record("crossref")
-            if response.status_code == 404:
-                return None
-            response.raise_for_status()
-            message = response.json().get("message", {})
-            result = self._normalize(message)
-            if not result.get("abstract"):
-                negotiated = await self._negotiate_doi(client, normalized)
-                if negotiated:
-                    result["abstract"] = negotiated.get("abstract") or result.get("abstract")
-                    result["title"] = result.get("title") or negotiated.get("title")
-            return result
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(f"{self.BASE}/{normalized}", headers=self._headers)
+                await rate_limit_service.record("crossref")
+                if response.status_code == 404:
+                    return None
+                response.raise_for_status()
+                message = response.json().get("message", {})
+                result = self._normalize(message)
+                if not result.get("abstract"):
+                    negotiated = await self._negotiate_doi(client, normalized)
+                    if negotiated:
+                        result["abstract"] = negotiated.get("abstract") or result.get("abstract")
+                        result["title"] = result.get("title") or negotiated.get("title")
+                return result
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError) as exc:
+            # Log error but don't crash the pipeline
+            return None
 
     async def _negotiate_doi(self, client: httpx.AsyncClient, doi: str) -> dict[str, Any] | None:
-        headers = {
-            **self._headers,
-            "Accept": "application/vnd.citationstyles.csl+json",
-        }
-        response = await client.get(f"https://doi.org/{doi}", headers=headers, follow_redirects=True)
-        if response.status_code != 200:
-            return None
         try:
-            payload = response.json()
-        except ValueError:
+            headers = {
+                **self._headers,
+                "Accept": "application/vnd.citationstyles.csl+json",
+            }
+            response = await client.get(f"https://doi.org/{doi}", headers=headers, follow_redirects=True)
+            if response.status_code != 200:
+                return None
+            try:
+                payload = response.json()
+            except ValueError:
+                return None
+        except (httpx.HTTPError, httpx.TimeoutException):
             return None
         title = payload.get("title")
         if isinstance(title, list):

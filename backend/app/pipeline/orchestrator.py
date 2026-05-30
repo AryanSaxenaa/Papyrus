@@ -124,9 +124,10 @@ class AuditOrchestrator:
 
     async def _align_claims(self, audit_id: UUID, audit: AuditRun) -> None:
         settings = get_settings()
-        for record in audit.citations:
+        
+        async def _process_claim(record: CitationRecord) -> None:
             if record.intent != CitationIntent.EVIDENTIARY:
-                continue
+                return
             context = record.inline_markers[0].context_window if record.inline_markers else ""
             if context:
                 claim = await deepseek_client.extract_claim(context)
@@ -148,9 +149,11 @@ class AuditOrchestrator:
                     "Awaiting user claim approval before NLI",
                     citation_index=record.index,
                 )
-                continue
+                return
             record.claim_pending_review = False
             await run_claim_alignment_async(record)
+        
+        await asyncio.gather(*(_process_claim(record) for record in audit.citations))
 
     async def run_from_url(self, audit_id: UUID, source_url: str, pdf_path: Path) -> AuditRun:
         audit = audit_store.get(audit_id)

@@ -22,8 +22,11 @@ class CacheService:
     async def ping(self) -> bool:
         if not self._client:
             return False
-        await self._client.ping()
-        return True
+        try:
+            await self._client.ping()
+            return True
+        except Exception:
+            return False
 
     def _key(self, prefix: str, value: str) -> str:
         digest = hashlib.sha256(value.encode()).hexdigest()[:24]

@@ -14,27 +14,30 @@ class DeepSeekClient:
         if not settings.enable_deepseek or not settings.deepseek_api_key:
             return None
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{settings.deepseek_base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.deepseek_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": settings.deepseek_model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    "temperature": 0,
-                    "response_format": {"type": "json_object"},
-                },
-            )
-            if response.status_code != 200:
-                return None
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{settings.deepseek_base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.deepseek_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": settings.deepseek_model,
+                        "messages": [
+                            {"role": "system", "content": system},
+                            {"role": "user", "content": user},
+                        ],
+                        "temperature": 0,
+                        "response_format": {"type": "json_object"},
+                    },
+                )
+                if response.status_code != 200:
+                    return None
+                data = response.json()
+                return data.get("choices", [{}])[0].get("message", {}).get("content")
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError, KeyError, IndexError):
+            return None
 
     async def classify_intent(self, context: str) -> CitationIntent | None:
         raw = await self._chat(

@@ -18,15 +18,25 @@ BUDGETS = {
 
 
 class RateLimitService:
+    def __init__(self) -> None:
+        # In-memory fallback when Redis is unavailable
+        self._fallback_counters: dict[str, dict[str, int]] = {}
+    
     def _day_key(self, source: str) -> str:
         day = datetime.now(timezone.utc).strftime("%Y%m%d")
         return f"ratelimit:{source}:{day}"
 
     async def record(self, source: str) -> None:
         key = self._day_key(source)
-        current = await cache_service.get_json("counter", key) or {"count": 0}
-        current["count"] = int(current.get("count", 0)) + 1
-        await cache_service.set_json("counter", key, current)
+        try:
+            current = await cache_service.get_json("counter", key) or {"count": 0}
+            current["count"] = int(current.get("count", 0)) + 1
+            await cache_service.set_json("counter", key, current)
+        except Exception:
+            # Fallback to in-memory counter when Redis is unavailable
+            if key not in self._fallback_counters:
+                self._fallback_counters[key] = {"count": 0}
+            self._fallback_counters[key]["count"] += 1
 
     async def snapshot(self) -> dict[str, dict[str, int | float]]:
         results: dict[str, dict[str, int | float]] = {}
@@ -52,8 +62,13 @@ class RateLimitService:
     async def allow(self, source: str) -> bool:
         budget = BUDGETS.get(source, 1000)
         key = self._day_key(source)
-        current = await cache_service.get_json("counter", key) or {"count": 0}
-        return int(current.get("count", 0)) < budget
+        try:
+            current = await cache_service.get_json("counter", key) or {"count": 0}
+            count = int(current.get("count", 0))
+        except Exception:
+            # Fallback to in-memory counter when Redis is unavailable
+            count = self._fallback_counters.get(key, {"count": 0}).get("count", 0)
+        return count < budget
 
 
 rate_limit_service = RateLimitService()
