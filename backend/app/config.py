@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     apify_actor_academic_mcp: str = "nexgendata/academic-research-mcp-server"
     deepseek_api_key: str | None = None
     openai_api_key: str | None = None
+    openrouter_api_key: str | None = None
     huggingface_api_key: str | None = None
     nli_backend: str = "auto"  # auto | hf | ollama | local | lexical
     ollama_base_url: str | None = None
@@ -67,12 +68,16 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
     enable_deepseek: bool = True
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "openrouter/owl-alpha"
+    openrouter_fallback_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
+    llm_backend: str = "deepseek"  # deepseek | openrouter
     # Prefer Celery for bulk ZIP jobs; auto-falls back to BackgroundTasks if no worker/Redis.
     use_celery_bulk: bool = True
     nli_requires_claim_approval: bool = True
     sync_relational_audits: bool = True
     use_relational_read: bool = True
-    embeddings_backend: str = "openai"  # openai | snowflake (HF inference)
+    embeddings_backend: str = "openai"  # openai | openrouter | snowflake (HF inference)
     snowflake_embedding_model: str = "Snowflake/snowflake-arctic-embed-m-v1.5"
 
     @field_validator("app_env")

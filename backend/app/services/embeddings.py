@@ -28,7 +28,18 @@ async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
             if isinstance(data, list) and data and isinstance(data[0], list):
                 return cast(list[list[float]], data)
 
-    if settings.openai_api_key:
+    if backend == "openrouter" and settings.openrouter_api_key:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{settings.openrouter_base_url}/embeddings",
+                headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
+                json={"model": "text-embedding-3-small", "input": texts},
+            )
+            if response.status_code != 200:
+                return None
+            return [row["embedding"] for row in response.json()["data"]]
+
+    if backend == "openai" and settings.openai_api_key:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 "https://api.openai.com/v1/embeddings",
@@ -38,6 +49,12 @@ async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
             if response.status_code != 200:
                 return None
             return [row["embedding"] for row in response.json()["data"]]
+
+    if backend == "openrouter" and not settings.openrouter_api_key:
+        pass
+    if backend == "openai" and not settings.openai_api_key:
+        pass
+
     return None
 
 

@@ -10,10 +10,14 @@ from app.domain.enums import CitationIntent, NliVerdict
 from app.domain.models import AuditRun, BibliographyEntry, CitationRecord
 from app.pipeline.evidence import refresh_evidence_passage
 from app.pipeline.intent import apply_negation_override, classify_intent
+from app.pipeline.llm import (
+    classify_intent as llm_classify_intent,
+    extract_claim as llm_extract_claim,
+    parse_pdf_citations as llm_parse_pdf_citations,
+)
 from app.pipeline.resolution import resolve_record
 from app.pipeline.scoring import finalize_scores
 from app.pipeline.verdicts import extract_claim, run_claim_alignment_async
-from app.services.deepseek import deepseek_client
 from app.services.events import event_bus
 from app.services.fallback_parser import parse_pdf_fallback
 from app.services.grobid import grobid_client
@@ -95,7 +99,7 @@ class AuditOrchestrator:
             context = " ".join(marker.context_window for marker in record.inline_markers)
             intent = None
             if context:
-                intent = await deepseek_client.classify_intent(context)
+                intent = await llm_classify_intent(context)
             record.intent = intent or classify_intent(record)
             record.intent = apply_negation_override(record)
 
@@ -130,7 +134,7 @@ class AuditOrchestrator:
                 return
             context = record.inline_markers[0].context_window if record.inline_markers else ""
             if context:
-                claim = await deepseek_client.extract_claim(context)
+                claim = await llm_extract_claim(context)
                 record.extracted_claim = claim or extract_claim(context)
                 event_bus.emit(
                     audit_id,
@@ -177,26 +181,26 @@ class AuditOrchestrator:
             except Exception as exc:  # noqa: BLE001
                 event_bus.emit(audit_id, "grobid", f"GROBID unavailable: {exc}")
         bibliography, inline, paper_title, paper_authors = parse_pdf_fallback(pdf_path)
-        if get_settings().enable_deepseek:
+        if settings.enable_deepseek:
             try:
                 import fitz
 
                 doc = fitz.open(pdf_path)
                 text = "\n".join(page.get_text() for page in doc)
                 doc.close()
-                parsed = await deepseek_client.parse_pdf_citations(text)
+                parsed = await llm_parse_pdf_citations(text)
                 if parsed:
                     return parsed
                 event_bus.emit(
                     audit_id,
                     "deepseek",
-                    "DeepSeek returned no usable bibliography — using fallback parser output",
+                    "LLM returned no usable bibliography — using fallback parser output",
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 event_bus.emit(
                     audit_id,
                     "deepseek",
-                    f"DeepSeek citation parse failed: {exc}",
+                    f"LLM citation parse failed: {exc}",
                 )
         return bibliography, inline, paper_title, paper_authors
 

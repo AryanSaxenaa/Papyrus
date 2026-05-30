@@ -65,6 +65,8 @@ async def get_public_config() -> dict:
         "celery_worker_available": celery_ready,
         "integrations": {
             "deepseek": bool(settings.deepseek_api_key),
+            "llm_backend": settings.llm_backend,
+            "openrouter": bool(settings.openrouter_api_key),
             "openai_embeddings": bool(settings.openai_api_key),
             "huggingface_nli": bool(settings.huggingface_api_key),
             "nli_backend": settings.nli_backend,

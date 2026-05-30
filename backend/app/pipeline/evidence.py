@@ -88,7 +88,7 @@ async def retrieve_passage(claim: str, text: str | None) -> str | None:
     if len(chunks) == 1:
         return chunks[0]
     settings = get_settings()
-    if settings.openai_api_key or (
+    if settings.openrouter_api_key or settings.openai_api_key or (
         settings.embeddings_backend.lower() == "snowflake" and settings.huggingface_api_key
     ):
         ranked = await embedding_rank_best_chunk(claim, chunks)
