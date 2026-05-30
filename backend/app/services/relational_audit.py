@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-from uuid import uuid4
-
 from datetime import datetime
+from uuid import UUID, uuid4
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -16,7 +15,25 @@ from app.db.models import (
     ResolutionAttemptRow,
 )
 from app.db.session import get_engine
-from app.domain.models import AuditRun, CitationRecord
+from app.domain.enums import (
+    CitationIntent,
+    ConfidenceLevel,
+    EvidenceTier,
+    HallucinationType,
+    NliVerdict,
+    ResolutionSource,
+    RiskLevel,
+)
+from app.domain.models import (
+    AuditRun,
+    BibliographyEntry,
+    CitationRecord,
+    CoverageSummary,
+    FailureSummary,
+    InlineCitation,
+    ResolutionAttempt,
+    VersionMismatchInfo,
+)
 
 
 def _should_sync() -> bool:
@@ -48,7 +65,6 @@ def sync_relational_audit(audit: AuditRun) -> None:
         meta.coverage_json = json.dumps(audit.coverage.model_dump(mode="json"))
         meta.failures_json = json.dumps(audit.failures.model_dump(mode="json"))
         meta.limitations_json = json.dumps(audit.limitations) if audit.limitations else None
-        meta.quality_summary_json = json.dumps(audit.quality_summary) if audit.quality_summary else None
         meta.source_url = audit.source_url
         meta.bulk_job_id = str(audit.bulk_job_id) if audit.bulk_job_id else None
         meta.error = audit.error
@@ -66,7 +82,6 @@ def sync_relational_audit(audit: AuditRun) -> None:
                 "version_mismatch": citation.version_mismatch.model_dump(mode="json")
                 if citation.version_mismatch
                 else None,
-                "quality_flags": citation.quality_flags,
                 "resolved_authors": citation.resolved_authors,
             }
             session.add(
@@ -179,6 +194,122 @@ def relational_schema_stats() -> dict:
             "resolution_attempts": _count(ResolutionAttemptRow),
             "audit_events": _count(AuditEventRow),
         }
+
+
+def load_audit_events(audit_id: str) -> list[dict]:
+    engine = get_engine()
+    if engine is None:
+        return []
+    with Session(engine) as session:
+        rows = session.scalars(
+            select(AuditEventRow)
+            .where(AuditEventRow.audit_id == audit_id)
+            .order_by(AuditEventRow.ts)
+        ).all()
+    events: list[dict] = []
+    for row in rows:
+        event = {
+            "ts": row.ts.isoformat() if row.ts else "",
+            "type": row.event_type,
+            "message": row.message,
+        }
+        if row.extra_json:
+            event.update(json.loads(row.extra_json))
+        events.append(event)
+    return events
+
+
+def hydrate_audit_from_relational(audit_id: str) -> AuditRun | None:
+    settings = get_settings()
+    if not settings.use_relational_read or settings.persistence_backend not in {"postgres", "both"}:
+        return None
+    engine = get_engine()
+    if engine is None:
+        return None
+
+    with Session(engine) as session:
+        meta = session.get(AuditMetadataRecord, audit_id)
+        if meta is None:
+            return None
+        citation_rows = session.scalars(
+            select(CitationRow).where(CitationRow.audit_id == audit_id).order_by(CitationRow.citation_index)
+        ).all()
+        attempt_rows = session.scalars(
+            select(ResolutionAttemptRow).where(ResolutionAttemptRow.audit_id == audit_id)
+        ).all()
+
+    attempts_by_citation: dict[str, list[ResolutionAttemptRow]] = {}
+    for row in attempt_rows:
+        attempts_by_citation.setdefault(row.citation_id, []).append(row)
+
+    citations: list[CitationRecord] = []
+    for row in citation_rows:
+        extra = json.loads(row.extra_json or "{}")
+        bibliography = BibliographyEntry.model_validate(json.loads(row.bibliography_json))
+        inline = [InlineCitation.model_validate(item) for item in json.loads(row.inline_markers_json or "[]")]
+        version = extra.get("version_mismatch")
+        record = CitationRecord(
+            id=row.id,
+            index=row.citation_index,
+            bibliography=bibliography,
+            inline_markers=inline,
+            intent=CitationIntent(row.intent),
+            evidence_tier=EvidenceTier(row.evidence_tier),
+            verdict_color=row.verdict_color,
+            hallucination_type=HallucinationType(row.hallucination_type),
+            status=row.status,
+            resolved_title=row.resolved_title,
+            resolved_doi=row.resolved_doi,
+            resolved_year=row.resolved_year,
+            resolved_authors=extra.get("resolved_authors") or [],
+            retracted=row.retracted,
+            oa_pdf_url=extra.get("oa_pdf_url"),
+            exa_signal=extra.get("exa_signal"),
+            source_verify_url=extra.get("source_verify_url"),
+            extracted_claim=row.extracted_claim,
+            claim_user_corrected=row.claim_user_corrected,
+            evidence_passage=row.evidence_passage,
+            evidence_provenance=row.evidence_provenance,
+            nli_verdict=NliVerdict(extra.get("nli_verdict", NliVerdict.SKIPPED.value)),
+            quantitative_claim=bool(extra.get("quantitative_claim")),
+            quantitative_caveat=extra.get("quantitative_caveat"),
+            claim_pending_review=bool(extra.get("claim_pending_review")),
+            confidence=ConfidenceLevel(row.confidence) if row.confidence else None,
+            title_edit_distance=row.title_edit_distance,
+            claim_alignment_verdict=row.claim_alignment_verdict,
+            version_mismatch=VersionMismatchInfo.model_validate(version) if version else None,
+            resolution_attempts=[
+                ResolutionAttempt(
+                    source=ResolutionSource(attempt.source),
+                    query=attempt.query,
+                    success=attempt.success,
+                    summary=attempt.summary,
+                    payload=json.loads(attempt.payload_json) if attempt.payload_json else None,
+                )
+                for attempt in sorted(attempts_by_citation.get(row.id, []), key=lambda item: item.id)
+            ],
+        )
+        citations.append(record)
+
+    coverage = CoverageSummary.model_validate(json.loads(meta.coverage_json))
+    failures = FailureSummary.model_validate(json.loads(meta.failures_json))
+    return AuditRun(
+        id=UUID(audit_id),
+        paper_title=meta.paper_title,
+        status=meta.status,
+        pipeline_version=meta.pipeline_version,
+        risk_level=RiskLevel(meta.risk_level),
+        risk_confidence=ConfidenceLevel(meta.risk_confidence),
+        coverage=coverage,
+        failures=failures,
+        limitations=json.loads(meta.limitations_json) if meta.limitations_json else None,
+        source_url=meta.source_url,
+        bulk_job_id=UUID(meta.bulk_job_id) if meta.bulk_job_id else None,
+        error=meta.error,
+        completed_at=meta.completed_at,
+        created_at=meta.created_at or datetime.utcnow(),
+        citations=citations,
+    )
 
 
 def delete_relational_audit(audit_id: str) -> None:

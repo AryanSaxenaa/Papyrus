@@ -4,13 +4,11 @@ import { CoverageSummary } from "./components/CoverageSummary";
 import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
 import { LimitationsPanel } from "./components/LimitationsPanel";
-import { QualityFlagsPanel } from "./components/QualityFlagsPanel";
+import { CitationHeatmap } from "./components/CitationHeatmap";
 import { PaperAnatomy } from "./components/PaperAnatomy";
 import { AdminPanel } from "./components/AdminPanel";
-import { CitationAnalytics } from "./components/CitationAnalytics";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
-import { verdictBadgeLabel } from "./lib/verdictLabel";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
 const verdictClass: Record<string, string> = {
@@ -49,6 +47,7 @@ export default function App() {
     if (!response.ok) return;
     const next = (await response.json()) as AuditRun;
     setAudit(next);
+    setEvents([]);
     if (selected) {
       const updated = next.citations.find((c) => c.id === selected.id);
       if (updated) setSelected(updated);
@@ -330,6 +329,14 @@ export default function App() {
               Verifies whether references exist and whether evidentiary citations are supported.
               Does not detect AI authorship.
             </p>
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block text-xs text-emerald-300 underline"
+            >
+              API reference (OpenAPI)
+            </a>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -398,7 +405,6 @@ export default function App() {
             onSelect={(id) => void loadAuditById(id)}
             onDeleted={onAuditDeleted}
           />
-          <CitationAnalytics />
           <AdminPanel />
 
           {error && (
@@ -549,7 +555,6 @@ export default function App() {
                 <CoverageBar audit={audit} />
               </div>
               <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
-              <QualityFlagsPanel audit={audit} />
               <LimitationsPanel audit={audit} />
               {audit.status === "complete" && (
                 <div className="mt-3 flex gap-3 text-sm">
@@ -575,33 +580,15 @@ export default function App() {
               Citation heatmap
             </h3>
             <HeatmapLegend />
-            <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(88px,1fr))] gap-2">
-              {filteredCitations.map((citation) => (
-                <button
-                  key={citation.id}
-                  id={`heatmap-citation-${citation.id}`}
-                  type="button"
-                  onClick={() => setSelected(citation)}
-                  className={`rounded-md border border-white/10 p-2 text-left transition hover:scale-[1.02] ${
-                    selected?.id === citation.id ? "ring-2 ring-emerald-400" : ""
-                  } ${
-                    verdictClass[citation.verdict_color] ?? verdictClass.pending
-                  }`}
-                >
-                  <p className="font-audit text-xs opacity-80">#{citation.index}</p>
-                  <p className="truncate text-sm font-semibold">
-                    {citation.bibliography.authors[0] ?? "Unknown"}
-                  </p>
-                  <p className="text-xs opacity-80">{citation.bibliography.year ?? "—"}</p>
-                  <p className="mt-1 font-audit text-[9px] font-semibold uppercase tracking-wide opacity-90">
-                    {verdictBadgeLabel(citation)}
-                  </p>
-                </button>
-              ))}
-              {!filteredCitations.length && (
-                <p className="col-span-full text-sm text-[var(--papyrus-muted)]">
-                  No citations match this filter.
-                </p>
+            <div className="mt-3">
+              {filteredCitations.length > 0 ? (
+                <CitationHeatmap
+                  citations={filteredCitations}
+                  selectedId={selected?.id}
+                  onSelect={setSelected}
+                />
+              ) : (
+                <p className="text-sm text-[var(--papyrus-muted)]">No citations match this filter.</p>
               )}
             </div>
           </div>

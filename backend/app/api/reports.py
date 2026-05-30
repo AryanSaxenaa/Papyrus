@@ -95,25 +95,6 @@ def render_text_report(audit: AuditRun) -> str:
             lines.append(f"     Exa: {citation.exa_signal}")
         if citation.source_verify_url:
             lines.append(f"     Verify: {citation.source_verify_url}")
-        for flag in citation.quality_flags:
-            lines.append(f"     Quality signal: {flag}")
-        lines.append("")
-    if audit.quality_summary:
-        lines.extend(
-            [
-                " QUALITY SIGNALS (non-verdict)",
-                " ────────────────────────────────────────────────────────────",
-            ]
-        )
-        for entry in audit.quality_summary.get("duplicate_dois", []):
-            lines.append(f" Duplicate DOI {entry.get('doi')}: citations {entry.get('citation_indices')}")
-        for pair in audit.quality_summary.get("circular_pairs", []):
-            lines.append(
-                f" Circular pair: #{pair.get('citation_a')} ↔ #{pair.get('citation_b')} ({pair.get('doi_a')} / {pair.get('doi_b')})"
-            )
-        for cycle in audit.quality_summary.get("circular_cycles", []):
-            path = " → ".join(f"#{idx}" for idx in cycle.get("citation_indices", []))
-            lines.append(f" Circular cycle ({cycle.get('length')} hops): {path}")
         lines.append("")
     lines.extend(
         [

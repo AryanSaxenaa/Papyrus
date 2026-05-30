@@ -5,8 +5,6 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
-from app.services.citations_index import failure_rate_by_audit, reindex_all_audits
-from app.services.relational_audit import relational_schema_stats
 from app.services.corrections import correction_store
 from app.services.rate_limits import rate_limit_service
 
@@ -17,22 +15,6 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 async def get_rate_limits() -> dict:
     snapshot = await rate_limit_service.snapshot()
     return {"sources": snapshot, "meta": await rate_limit_service.meta()}
-
-
-@router.get("/citations/stats")
-async def citation_stats() -> dict:
-    ranked = failure_rate_by_audit(limit=25)
-    return {"audits_by_failure_rate": ranked}
-
-
-@router.post("/citations/reindex")
-async def reindex_citations() -> dict:
-    return reindex_all_audits()
-
-
-@router.get("/schema/stats")
-async def schema_stats() -> dict:
-    return relational_schema_stats()
 
 
 @router.get("/corrections")
@@ -87,8 +69,7 @@ async def get_public_config() -> dict:
             "firecrawl": bool(settings.firecrawl_api_key),
             "apify": bool(settings.apify_api_token),
             "semantic_scholar": bool(settings.semantic_scholar_api_key),
-            "circular_check": settings.enable_circular_check,
-            "relational_sync": settings.sync_relational_audits,
             "embeddings_backend": settings.embeddings_backend,
+            "nli_requires_claim_approval": settings.nli_requires_claim_approval,
         },
     }

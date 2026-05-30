@@ -49,11 +49,9 @@ class Settings(BaseSettings):
     deepseek_model: str = "deepseek-chat"
     enable_deepseek: bool = True
     use_celery_bulk: bool = False
-    nli_requires_claim_approval: bool = False
-    enable_circular_check: bool = False
-    circular_check_max_citations: int = 20
-    circular_check_depth: int = 2
+    nli_requires_claim_approval: bool = True
     sync_relational_audits: bool = True
+    use_relational_read: bool = True
     embeddings_backend: str = "openai"  # openai | snowflake (HF inference)
     snowflake_embedding_model: str = "Snowflake/snowflake-arctic-embed-m-v1.5"
 

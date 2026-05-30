@@ -41,6 +41,26 @@ async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
     return None
 
 
+async def embedding_rank_best_chunk(claim: str, chunks: list[str]) -> str | None:
+    """Pick the chunk most similar to the claim using the configured embedding backend."""
+    if not chunks or not claim.strip():
+        return None
+    if len(chunks) == 1:
+        return chunks[0]
+    vectors = await _embed_batch([claim[:500], *[c[:500] for c in chunks]])
+    if not vectors or len(vectors) < 2:
+        return None
+    claim_vec = vectors[0]
+    best_idx = 0
+    best_score = -1.0
+    for idx, chunk_vec in enumerate(vectors[1:]):
+        score = _cosine(claim_vec, chunk_vec)
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+    return chunks[best_idx]
+
+
 async def embedding_similarity(text_a: str, text_b: str) -> float | None:
     """Cosine similarity between two short texts via configured embedding backend."""
     if not text_a.strip() or not text_b.strip():

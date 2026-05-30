@@ -32,12 +32,25 @@ class EventBus:
         return event
 
     def history(self, audit_id: UUID | str) -> list[dict[str, Any]]:
-        return list(self._history[str(audit_id)])
+        key = str(audit_id)
+        mem = self._history[key]
+        if mem:
+            return list(mem)
+        try:
+            from app.services.relational_audit import load_audit_events
+
+            loaded = load_audit_events(key)
+            if loaded:
+                self._history[key] = list(loaded)
+                return list(loaded)
+        except Exception:
+            pass
+        return []
 
     async def subscribe(self, audit_id: UUID | str) -> asyncio.Queue[dict[str, Any]]:
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         key = str(audit_id)
-        for past in self._history[key]:
+        for past in self.history(audit_id):
             await queue.put(past)
         self._queues[key].append(queue)
         return queue

@@ -4,6 +4,7 @@ type RateLimitRow = {
   used_today: number;
   daily_budget: number;
   remaining: number;
+  utilization_percent?: number;
 };
 
 type ConfigPayload = {
@@ -27,8 +28,6 @@ export function AdminPanel() {
   const [limits, setLimits] = useState<Record<string, RateLimitRow> | null>(null);
   const [config, setConfig] = useState<ConfigPayload | null>(null);
   const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
-  const [reindexStatus, setReindexStatus] = useState<string | null>(null);
-  const [schemaStats, setSchemaStats] = useState<Record<string, number | boolean> | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -36,25 +35,12 @@ export function AdminPanel() {
       fetch("/api/admin/rate-limits").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/admin/config").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/admin/corrections?limit=15").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/admin/schema/stats").then((r) => (r.ok ? r.json() : null)),
-    ]).then(([limitsData, configData, correctionsData, schemaData]) => {
+    ]).then(([limitsData, configData, correctionsData]) => {
       setLimits(limitsData?.sources ?? null);
       setConfig(configData);
       setCorrections(correctionsData?.corrections ?? []);
-      setSchemaStats(schemaData);
     });
   }, [open]);
-
-  const onReindex = async () => {
-    setReindexStatus("Reindexing…");
-    const response = await fetch("/api/admin/citations/reindex", { method: "POST" });
-    if (!response.ok) {
-      setReindexStatus("Reindex failed (Postgres required).");
-      return;
-    }
-    const data = (await response.json()) as { audits_indexed: number };
-    setReindexStatus(`Indexed ${data.audits_indexed} completed audit(s).`);
-  };
 
   return (
     <div className="rounded-xl border border-white/10 bg-[var(--papyrus-panel)] p-4">
@@ -67,15 +53,6 @@ export function AdminPanel() {
       </button>
       {open && (
         <div className="mt-3 space-y-4 text-xs">
-          {schemaStats?.postgres && (
-            <div>
-              <p className="font-audit uppercase text-[var(--papyrus-muted)]">Relational schema (v2)</p>
-              <p className="mt-1 text-stone-400">
-                {String(schemaStats.citations ?? 0)} citations · {String(schemaStats.resolution_attempts ?? 0)}{" "}
-                attempts · {String(schemaStats.audit_events ?? 0)} events
-              </p>
-            </div>
-          )}
           {config && (
             <div>
               <p className="font-audit uppercase text-[var(--papyrus-muted)]">Pipeline</p>
@@ -99,14 +76,34 @@ export function AdminPanel() {
             <div>
               <p className="font-audit uppercase text-[var(--papyrus-muted)]">API budgets (today)</p>
               <ul className="mt-2 space-y-1 font-audit">
-                {Object.entries(limits).map(([source, row]) => (
-                  <li key={source} className="flex justify-between gap-2 text-stone-300">
-                    <span>{source}</span>
-                    <span>
-                      {row.used_today}/{row.daily_budget}
-                    </span>
-                  </li>
-                ))}
+                {Object.entries(limits).map(([source, row]) => {
+                  const utilization =
+                    row.utilization_percent ??
+                    (row.daily_budget ? (row.used_today / row.daily_budget) * 100 : 0);
+                  const warn = utilization >= 80;
+                  const critical = utilization >= 95;
+                  return (
+                    <li
+                      key={source}
+                      className={`flex justify-between gap-2 ${
+                        critical ? "text-amber-300" : warn ? "text-amber-200/90" : "text-stone-300"
+                      }`}
+                    >
+                      <span>
+                        {source}
+                        {warn && (
+                          <span className="ml-1 text-[10px] uppercase tracking-wide opacity-80">
+                            {critical ? "critical" : "high"}
+                          </span>
+                        )}
+                      </span>
+                      <span>
+                        {row.used_today}/{row.daily_budget}
+                        {warn && ` (${utilization.toFixed(0)}%)`}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -126,22 +123,12 @@ export function AdminPanel() {
               </ul>
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void onReindex()}
-              className="rounded border border-stone-600 px-3 py-1 text-stone-200 hover:bg-white/5"
-            >
-              Reindex citation analytics
-            </button>
-            {reindexStatus && <span className="text-stone-400">{reindexStatus}</span>}
-            <a
-              href="/api/admin/corrections/export.csv"
-              className="rounded border border-stone-600 px-3 py-1 text-stone-200 hover:bg-white/5"
-            >
-              Export corrections CSV
-            </a>
-          </div>
+          <a
+            href="/api/admin/corrections/export.csv"
+            className="inline-block rounded border border-stone-600 px-3 py-1 text-stone-200 hover:bg-white/5"
+          >
+            Export corrections CSV
+          </a>
         </div>
       )}
     </div>

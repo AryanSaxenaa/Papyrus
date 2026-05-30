@@ -86,13 +86,10 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits/{id}/citations/{cid}/rerun` | Re-resolve one citation |
 | `POST` | `/api/audits/{id}/citations/{cid}/approve-claim` | Run NLI after claim approval |
 | `DELETE` | `/api/audits/{id}` | Remove audit and indexed rows |
-| `GET` | `/api/admin/citations/stats` | Cross-audit citation failure rates |
-| `POST` | `/api/admin/citations/reindex` | Rebuild citation index from completed audits |
 | `GET` | `/api/admin/corrections/export.csv` | Ground-truth corrections as CSV |
 | `GET` | `/api/bulk/{id}/events/log.txt` | Bulk job event log download |
 | `GET` | `/api/bulk/{id}/dashboard.json` | Bulk dashboard JSON export |
 | `GET` | `/api/audits/{id}/citations/{cid}/attempts` | Resolution attempts from relational DB |
-| `GET` | `/api/admin/schema/stats` | Relational table row counts |
 
 ## Implementation status (v1 slice)
 
@@ -103,11 +100,11 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Types 1, 2, 5, 6, 7 (NLI claim alignment), retraction, version mismatch (preprint vs published)
 - [x] Evidence passage retrieval (lexical + optional OpenAI embeddings)
 - [x] Coverage + risk scoring, JSON/TXT reports, disk persistence
-- [x] SSE live panel + heatmap UI (DOI verify, filters, claim rerun)
+- [x] SSE live panel + D3 heatmap (verdict color transitions, filters, claim rerun)
 - [x] Side-by-side claim viewer (context / verdict / evidence drawer)
 - [x] Coverage summary chips + heatmap legend + contradiction filter
 - [x] Dual-column live panel (event log + resolving stack, citation search)
-- [x] Version mismatch timeline (arXiv preprint vs published)
+- [x] D3 version mismatch timeline (arXiv preprint vs published)
 - [x] PubMed/PMC URL → PDF via Firecrawl landing scrape
 - [x] Europe PMC biomedical lookup
 - [x] NLI via Hugging Face Inference API (fallback: lexical heuristic)
@@ -137,7 +134,7 @@ Open http://localhost:5173 and upload a PDF.
 - [x] OpenAlex DOI lookup + abstract enrichment
 - [x] Local NLI via Ollama or sentence-transformers (`NLI_BACKEND`, optional deps)
 - [x] Audit summaries index table (Postgres) for fast listing
-- [x] Optional claim approval gate before NLI (`NLI_REQUIRES_CLAIM_APPROVAL`)
+- [x] Claim approval gate before NLI (`NLI_REQUIRES_CLAIM_APPROVAL`, default true)
 - [x] Per-citation resolution rerun API
 - [x] Risk confidence scoring + detailed health check
 - [x] Citation-level Postgres index (`citation_index` table) for analytics
@@ -145,35 +142,26 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Live panel event-type filter; evidence sentence highlight
 - [x] Basic pytest suite (`backend/tests/`, `requirements-dev.txt`)
 - [x] Delete audit API + past-audits panel with removal
-- [x] Cross-audit citation failure analytics (`GET /api/admin/citations/stats`)
 - [x] Bulk dashboard pending-paper progress + ETA display
 - [x] Evidence provenance chain in claim viewer (tier, source, retrieved time)
-- [x] Admin panel (rate limits, integration flags, citation reindex)
+- [x] Admin panel (rate limits, integration flags, corrections export)
 - [x] Intent reclassification reruns claim alignment when set to evidentiary
 - [x] TXT/PDF reports include evidence provenance and per-source resolution trail
 - [x] Apify academic-research MCP actor in title-search fallback chain
 - [x] Admin corrections log in UI; Docker Compose `web` service for frontend
-- [x] Spec-aligned coverage bar (tiers + confirmed failures + unresolvable)
+- [x] D3 coverage bar (tiers + confirmed failures + unresolvable)
 - [x] Resolution trail in claim viewer centre column; bulk job SSE + failure-type columns
-- [x] Duplicate DOI quality signals; optional circular-pair preview (`ENABLE_CIRCULAR_CHECK`)
 - [x] Bulk log/JSON export; admin corrections CSV export
-- [x] Full relational citation + resolution_attempt + event tables (dual-write with JSON)
-- [x] Multi-hop circular cycle detection (depth-limited)
-- [x] Snowflake Arctic embedding backend option
+- [x] Claim approval before NLI (default on, per spec live panel)
+- [x] Snowflake Arctic embedding backend option (`EMBEDDINGS_BACKEND=snowflake`)
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 
-### v2 features
-
-- **Relational audit schema** — `audit_metadata`, `citations`, `resolution_attempts`, and `audit_events` tables sync on every save when Postgres is enabled (`SYNC_RELATIONAL_AUDITS=true`, default on).
-- **Duplicate DOI detection** — always on; methodological quality signal.
-- **Circular citation analysis** — reciprocal pairs and depth-limited multi-hop cycles within the bibliography via Semantic Scholar (`ENABLE_CIRCULAR_CHECK=true`, `CIRCULAR_CHECK_DEPTH=2`). Signals only; not hallucination verdicts.
-- **Snowflake Arctic embeddings** — optional Type 6 / title gate backend via Hugging Face (`EMBEDDINGS_BACKEND=snowflake`).
-
-### Intentionally not implemented (spec excluded)
+### Excluded per spec (not implemented)
 
 - **Author Ghost** — high false-positive rate on legitimate first publications and non-Western names.
 - **Journal Phantom (DOAJ)** — replaced by CrossRef ISSN + OpenAlex verification.
+- **Circular citation analysis** — documented as v2 in spec; excluded from v1.
 
 ### Tests
 

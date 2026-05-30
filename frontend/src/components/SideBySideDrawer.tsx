@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { ResolutionTrail } from "./ResolutionTrail";
+import { VersionMismatchTimeline } from "./VersionMismatchTimeline";
 import { highlightEvidencePassage } from "../lib/highlightEvidence";
-import type { AuditRun, CitationRecord, VersionMismatchInfo } from "../types";
+import type { AuditRun, CitationRecord } from "../types";
 
 const INTENT_OPTIONS = ["evidentiary", "methodological", "contrastive", "background"];
 
@@ -91,15 +92,8 @@ export function SideBySideDrawer({
                 {citation.quantitative_caveat}
               </p>
             )}
-            {citation.quality_flags && citation.quality_flags.length > 0 && (
-              <ul className="mt-3 space-y-1 rounded border border-violet-800/40 bg-violet-950/30 p-2 text-xs text-violet-100">
-                {citation.quality_flags.map((flag) => (
-                  <li key={flag}>{flag}</li>
-                ))}
-              </ul>
-            )}
             {citation.version_mismatch && (
-              <VersionTimeline info={citation.version_mismatch} />
+              <VersionMismatchTimeline info={citation.version_mismatch} />
             )}
             <div className="mt-4">
               <p className="text-xs text-[var(--papyrus-muted)]">Resolution sources</p>
@@ -294,43 +288,6 @@ function VerdictBadge({ citation }: { citation: CitationRecord }) {
           Medium/low confidence — human review recommended
         </p>
       )}
-    </div>
-  );
-}
-
-function AbstractBlock({ label, text }: { label: string; text: string }) {
-  return (
-    <div className="rounded border border-white/10 bg-black/20 p-2">
-      <p className="font-audit text-[10px] uppercase text-amber-300">{label}</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-stone-400">{text.slice(0, 400)}…</p>
-    </div>
-  );
-}
-
-function VersionTimeline({ info }: { info: VersionMismatchInfo }) {
-  const entries = [info.preprint, ...info.revisions, info.published].filter(Boolean);
-  return (
-    <div className="mt-4 space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Version timeline</p>
-      {info.material_difference && (
-        <p className="text-xs text-amber-100">Material difference detected between preprint and published versions.</p>
-      )}
-      {info.material_difference && info.preprint?.abstract && info.published?.abstract && (
-        <div className="grid gap-2 md:grid-cols-2">
-          <AbstractBlock label="Preprint abstract" text={info.preprint.abstract} />
-          <AbstractBlock label="Published abstract" text={info.published.abstract} />
-        </div>
-      )}
-      {entries.map((entry) => (
-        <div key={`${entry!.label}-${entry!.date}`} className="border-l-2 border-amber-700/60 pl-3">
-          <p className="font-audit text-xs text-amber-300">{entry!.label}</p>
-          {entry!.date && <p className="text-[10px] text-stone-500">{entry!.date}</p>}
-          {entry!.title && <p className="mt-1 text-xs font-semibold">{entry!.title}</p>}
-          {entry!.abstract && (
-            <p className="mt-1 text-[11px] leading-relaxed text-stone-400">{entry!.abstract.slice(0, 280)}…</p>
-          )}
-        </div>
-      ))}
     </div>
   );
 }

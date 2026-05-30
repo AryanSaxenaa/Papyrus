@@ -28,10 +28,10 @@ def build_limitations(audit: AuditRun) -> dict[str, Any]:
         ),
         "out_of_scope": [
             "AI authorship detection",
+            "Author Ghost (author publication history heuristics)",
+            "Journal Phantom via DOAJ",
+            "Circular citation analysis (v2)",
             "Self-citation manipulation",
             "Research quality beyond reference integrity",
         ],
-        "quality_signals": audit.quality_summary,
-        "duplicate_doi_count": len((audit.quality_summary or {}).get("duplicate_dois", [])),
-        "circular_pair_count": len((audit.quality_summary or {}).get("circular_pairs", [])),
     }

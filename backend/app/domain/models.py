@@ -95,7 +95,6 @@ class CitationRecord(BaseModel):
     quantitative_caveat: str | None = None
     confidence: ConfidenceLevel | None = None
     claim_alignment_verdict: str | None = None
-    quality_flags: list[str] = Field(default_factory=list)
 
     status: str = "pending"  # pending | resolving | complete
     verdict_color: str = "pending"  # UI token
@@ -142,7 +141,6 @@ class AuditRun(BaseModel):
 
     events: list[dict[str, Any]] = Field(default_factory=list)
     limitations: dict[str, Any] | None = None
-    quality_summary: dict[str, Any] | None = None
     bulk_job_id: UUID | None = None
     source_url: str | None = None
     paper_text: str | None = None

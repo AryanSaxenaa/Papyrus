@@ -122,9 +122,14 @@ class AuditStore:
             return None
         with Session(engine) as session:
             row = session.get(AuditRecord, str(audit_id))
-            if not row:
-                return None
-            return AuditRun.model_validate_json(row.payload)
+            if row:
+                return AuditRun.model_validate_json(row.payload)
+        settings = get_settings()
+        if settings.use_relational_read:
+            from app.services.relational_audit import hydrate_audit_from_relational
+
+            return hydrate_audit_from_relational(str(audit_id))
+        return None
 
     def _save_postgres(self, audit: AuditRun, payload: str) -> None:
         engine = get_engine()

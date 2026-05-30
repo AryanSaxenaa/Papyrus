@@ -11,7 +11,6 @@ from app.domain.models import AuditRun, BibliographyEntry, CitationRecord
 from app.pipeline.evidence import refresh_evidence_passage
 from app.pipeline.intent import apply_negation_override, classify_intent
 from app.pipeline.resolution import resolve_record
-from app.pipeline.quality_flags import apply_quality_flags
 from app.pipeline.scoring import finalize_scores
 from app.pipeline.verdicts import extract_claim, run_claim_alignment_async
 from app.services.deepseek import deepseek_client
@@ -48,7 +47,6 @@ class AuditOrchestrator:
         audit.citations = self._build_records(bibliography, inline)
         await self._classify_intents(audit_id, audit)
         await self._resolve_all(audit_id, audit)
-        await apply_quality_flags(audit_id, audit)
         await self._align_claims(audit_id, audit)
 
         finalize_scores(audit)

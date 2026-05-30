@@ -1,20 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as d3 from "d3";
+import { verdictBadgeLabel } from "../lib/verdictLabel";
+import { citationFill } from "../lib/verdictColors";
 import type { AuditRun, CitationRecord, StreamEvent } from "../types";
-
-const verdictClass: Record<string, string> = {
-  supported: "border-emerald-800/50 bg-emerald-950/30",
-  failure: "border-red-900/50 bg-red-950/30",
-  cannot_assess: "border-slate-700/50 bg-slate-900/40",
-  resolving: "border-amber-700/50 bg-amber-950/30",
-  pending: "border-white/10 bg-black/20",
-};
 
 type Props = {
   events: StreamEvent[];
   audit: AuditRun | null;
 };
 
-const EVENT_TYPES = ["all", "crossref", "nli", "claim", "verdict", "version", "circular", "bulk", "error"] as const;
+const EVENT_TYPES = ["all", "crossref", "nli", "claim", "verdict", "version", "bulk", "error"] as const;
 
 export function LivePanel({ events, audit }: Props) {
   const [search, setSearch] = useState("");
@@ -34,11 +29,9 @@ export function LivePanel({ events, audit }: Props) {
     });
   }, [events, search, eventType]);
 
-  const resolving = useMemo(() => {
-    const citations = audit?.citations ?? [];
-    return citations.filter(
-      (c) => c.status === "resolving" || c.verdict_color === "resolving" || c.status === "pending",
-    );
+  const stackCitations = useMemo(() => {
+    const citations = [...(audit?.citations ?? [])].sort((a, b) => a.index - b.index);
+    return citations;
   }, [audit?.citations]);
 
   return (
@@ -84,32 +77,49 @@ export function LivePanel({ events, audit }: Props) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-col">
-        <h4 className="font-audit text-xs uppercase tracking-wide text-[var(--papyrus-muted)]">Resolving stack</h4>
-        <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto">
-          {resolving.map((citation, index) => (
-            <ResolvingCard key={citation.id} citation={citation} delayMs={index * 120} />
-          ))}
-          {!resolving.length && (
-            <p className="text-xs text-[var(--papyrus-muted)]">No citations actively resolving.</p>
-          )}
-        </div>
-      </div>
+      <CitationStack citations={stackCitations} />
     </div>
   );
 }
 
-function ResolvingCard({ citation, delayMs }: { citation: CitationRecord; delayMs: number }) {
+function CitationStack({ citations }: { citations: CitationRecord[] }) {
+  const stackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!stackRef.current) return;
+    d3.select(stackRef.current)
+      .selectAll<HTMLDivElement, CitationRecord>("div[data-stack-id]")
+      .data(citations, (d) => d.id)
+      .transition()
+      .duration(500)
+      .style("background-color", (d) => citationFill(d));
+  }, [citations]);
+
   return (
-    <div
-      className={`animate-[fadeSlide_0.45s_ease-out_both] rounded-md border p-2 ${verdictClass[citation.verdict_color] ?? verdictClass.pending}`}
-      style={{ animationDelay: `${delayMs}ms` }}
-    >
-      <p className="font-audit text-xs text-[var(--papyrus-muted)]">#{citation.index}</p>
-      <p className="truncate text-sm font-semibold">
-        {citation.bibliography.authors[0] ?? "Unknown"} · {citation.bibliography.year ?? "—"}
-      </p>
-      <p className="mt-1 truncate text-xs opacity-80">{citation.bibliography.title ?? citation.bibliography.raw}</p>
+    <div className="flex min-h-0 flex-col">
+      <h4 className="font-audit text-xs uppercase tracking-wide text-[var(--papyrus-muted)]">Citation stack</h4>
+      <div ref={stackRef} className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {citations.map((citation, index) => (
+          <div
+            key={citation.id}
+            data-stack-id={citation.id}
+            className="animate-[fadeSlide_0.45s_ease-out_both] rounded-md border border-white/10 p-2"
+            style={{ animationDelay: `${index * 40}ms`, backgroundColor: citationFill(citation) }}
+          >
+            <p className="font-audit text-xs text-[var(--papyrus-muted)]">#{citation.index}</p>
+            <p className="truncate text-sm font-semibold">
+              {citation.bibliography.authors[0] ?? "Unknown"} · {citation.bibliography.year ?? "—"}
+            </p>
+            <p className="mt-1 truncate text-xs opacity-80">
+              {citation.bibliography.title ?? citation.bibliography.raw}
+            </p>
+            <p className="mt-1 font-audit text-[9px] uppercase opacity-90">{verdictBadgeLabel(citation)}</p>
+          </div>
+        ))}
+        {!citations.length && (
+          <p className="text-xs text-[var(--papyrus-muted)]">Citations appear here as the audit runs.</p>
+        )}
+      </div>
     </div>
   );
 }
