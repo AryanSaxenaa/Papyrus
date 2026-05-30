@@ -70,7 +70,7 @@ def finalize_scores(audit: AuditRun) -> None:
         1
         for c in resolvable
         if c.hallucination_type in FAILURE_TYPES
-        or c.claim_alignment_verdict in {"claim_contradiction", "not_addressed"}
+        or c.claim_alignment_verdict == "claim_contradiction"
     )
     failure_rate = (confirmed_failures / len(resolvable)) if resolvable else 0.0
     failures.confirmed_failure_rate = round(failure_rate * 100, 1)

@@ -13,6 +13,9 @@ type ConfigPayload = {
   pipeline_version: string;
   persistence_backend: string;
   grobid_enabled: boolean;
+  use_celery_bulk?: boolean;
+  bulk_queue_mode?: string;
+  celery_worker_available?: boolean;
   integrations: Record<string, boolean | string>;
 };
 
@@ -84,6 +87,15 @@ export function AdminPanel({ variant = "default" }: Props) {
               <p className="mt-1 text-zinc-700">
                 v{config.pipeline_version} · persistence {config.persistence_backend} · GROBID{" "}
                 {config.grobid_enabled ? "on" : "off"}
+              </p>
+              <p className="mt-1 text-zinc-600">
+                Bulk queue: {config.bulk_queue_mode ?? "unknown"}
+                {config.use_celery_bulk !== undefined && (
+                  <span className="text-zinc-400">
+                    {" "}
+                    (Celery {config.celery_worker_available ? "worker live" : "fallback to in-process"})
+                  </span>
+                )}
               </p>
               <ul className="mt-2 grid gap-1 sm:grid-cols-2">
                 {Object.entries(config.integrations).map(([key, enabled]) => (

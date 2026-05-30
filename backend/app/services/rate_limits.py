@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from app.config import get_settings
 from app.services.cache import cache_service
+
+logger = logging.getLogger(__name__)
 
 BUDGETS = {
     "crossref": 5000,
@@ -32,8 +35,8 @@ class RateLimitService:
             current = await cache_service.get_json("counter", key) or {"count": 0}
             current["count"] = int(current.get("count", 0)) + 1
             await cache_service.set_json("counter", key, current)
-        except Exception:
-            # Fallback to in-memory counter when Redis is unavailable
+        except Exception as exc:
+            logger.warning("Rate limit record: Redis unavailable (%s); using in-memory counter", exc)
             if key not in self._fallback_counters:
                 self._fallback_counters[key] = {"count": 0}
             self._fallback_counters[key]["count"] += 1
@@ -65,8 +68,8 @@ class RateLimitService:
         try:
             current = await cache_service.get_json("counter", key) or {"count": 0}
             count = int(current.get("count", 0))
-        except Exception:
-            # Fallback to in-memory counter when Redis is unavailable
+        except Exception as exc:
+            logger.debug("Rate limit allow: Redis unavailable (%s); using in-memory counter", exc)
             count = self._fallback_counters.get(key, {"count": 0}).get("count", 0)
         return count < budget
 

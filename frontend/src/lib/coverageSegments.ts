@@ -13,7 +13,7 @@ function isConfirmedFailure(citation: CitationRecord): boolean {
   return (
     citation.verdict_color === "failure" ||
     citation.verdict_color === "retraction" ||
-    citation.hallucination_type.startsWith("type_") ||
+    (citation.hallucination_type?.startsWith("type_") ?? false) ||
     citation.claim_alignment_verdict === "claim_contradiction" ||
     citation.claim_alignment_verdict === "not_addressed"
   );

@@ -33,6 +33,10 @@ docker compose up --build api web
 
 GROBID needs several GB RAM. Without it, the API falls back to PyMuPDF parsing.
 
+### Bulk ZIP jobs
+
+`USE_CELERY_BULK` defaults to **true**. The API uses Celery when Redis is up and a worker is listening; otherwise it runs the job in-process via FastAPI `BackgroundTasks` (safe for bare `uvicorn` without a worker). Docker Compose starts the `worker` service automatically.
+
 ### 3. API
 
 Use **Python 3.12** (3.14 lacks prebuilt wheels for some dependencies on Windows). Docker is the simplest path on Windows.
@@ -68,6 +72,7 @@ Open http://localhost:5173 and upload a PDF.
 | `POST` | `/api/audits` | Upload PDF, start audit (202) |
 | `GET` | `/api/audits/{id}` | Audit result |
 | `GET` | `/api/audits/{id}/events` | SSE live resolution log |
+| `GET` | `/api/audits/{id}/events/history` | JSON event history (past audits) |
 | `POST` | `/api/audits/doi` | Verify a single DOI |
 | `GET` | `/api/audits/{id}/report.txt` | Plain-text audit summary |
 | `GET` | `/api/audits/{id}/report.json` | JSON audit export |
@@ -78,6 +83,7 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/bulk/{id}/dashboard` | Bulk papers ranked by failure rate |
 | `GET` | `/api/bulk/{id}/audits` | Full audit results for each paper in batch |
 | `GET` | `/api/bulk/{id}/events` | SSE live log for bulk job progress |
+| `GET` | `/api/bulk/{id}/events/history` | JSON event history for bulk job |
 | `GET` | `/api/audits/{id}/events/log.txt` | Download resolution event log |
 | `GET` | `/api/admin/rate-limits` | API usage vs daily budgets |
 | `GET` | `/api/admin/config` | Integration feature flags |
@@ -88,6 +94,7 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/audits/summaries` | Indexed audit list (Postgres summaries table) |
 | `PATCH` | `/api/audits/{id}/citations/{cid}/intent` | Reclassify citation intent • reruns NLI |
 | `PATCH` | `/api/audits/{id}/citations/{cid}/claim` | Correct extracted claim • reruns NLI |
+| `POST` | `/api/audits/{id}/citations/{cid}/rerun-nli` | Rerun claim alignment (NLI only) |
 | `POST` | `/api/audits/{id}/citations/{cid}/rerun` | Re-resolve one citation |
 | `POST` | `/api/audits/{id}/citations/{cid}/approve-claim` | Run NLI after claim approval |
 | `DELETE` | `/api/audits/{id}` | Remove audit and indexed rows |
@@ -130,10 +137,12 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Apify CrossRef journals fallback for Type 5
 - [x] Spec-aligned TXT report (coverage confidence, claim breakdown, version timeline)
 - [x] Coverage bar with confidence note; clickable paper anatomy markers
-- [x] Bulk dashboard inline heatmap expand; optional Celery bulk (`USE_CELERY_BULK=true`)
+- [x] Bulk dashboard inline heatmap expand + resolution log; Celery bulk with BackgroundTasks fallback
 - [x] Semantic Scholar DOI lookup + abstract enrichment
 - [x] SSRN URL ingestion via Firecrawl
 - [x] Bulk job ETA (`estimated_seconds_remaining`)
+- [x] D3 force-layout citation heatmap (collision + grid targets)
+- [x] Celery bulk default on with auto-fallback to BackgroundTasks when no worker/Redis
 - [x] User correction ground-truth log (Postgres table or `corrections.jsonl`)
 - [x] Audit limitations panel (coverage bias, NLI caveats, out-of-scope list)
 - [x] Medium-confidence review flag in claim viewer
@@ -164,6 +173,13 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Type 2 DOI redirect via title drift and exact author-list comparison
 - [x] Apify secondary actors: `openclawmara/arxiv-paper-scraper`, `shahidirfan/openalex-scraper`
 - [x] Celery bulk queue (`USE_CELERY_BULK=true` in Docker Compose)
+- [x] Type 5 volume/year checks (CrossRef DOI metadata + journal volume filter)
+- [x] Semantic Scholar arXiv version linking for version mismatch
+- [x] OpenAlex ISSN journal catalog verification
+- [x] GROBID volume/issue/pages/URL extraction; three-sentence claim context
+- [x] Firecrawl + Europe PMC rate limits; `ryanclinton/europe-pmc-search` Apify fallback
+- [x] SSE named-event consumer; event history API; bulk expand with resolution log
+- [x] Limitations panel always visible; abstract-only + human-review fields in reports
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
 

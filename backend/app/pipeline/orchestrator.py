@@ -139,6 +139,7 @@ class AuditOrchestrator:
                     citation_index=record.index,
                     claim=(record.extracted_claim or "")[:120],
                 )
+            record.intent = apply_negation_override(record)
             await refresh_evidence_passage(record)
             if settings.nli_requires_claim_approval and not record.claim_user_corrected:
                 record.claim_pending_review = True
@@ -175,7 +176,29 @@ class AuditOrchestrator:
                 event_bus.emit(audit_id, "grobid", "Sparse GROBID output — routing to PyMuPDF fallback")
             except Exception as exc:  # noqa: BLE001
                 event_bus.emit(audit_id, "grobid", f"GROBID unavailable: {exc}")
-        return parse_pdf_fallback(pdf_path)
+        bibliography, inline, paper_title, paper_authors = parse_pdf_fallback(pdf_path)
+        if get_settings().enable_deepseek:
+            try:
+                import fitz
+
+                doc = fitz.open(pdf_path)
+                text = "\n".join(page.get_text() for page in doc)
+                doc.close()
+                parsed = await deepseek_client.parse_pdf_citations(text)
+                if parsed:
+                    return parsed
+                event_bus.emit(
+                    audit_id,
+                    "deepseek",
+                    "DeepSeek returned no usable bibliography — using fallback parser output",
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                event_bus.emit(
+                    audit_id,
+                    "deepseek",
+                    f"DeepSeek citation parse failed: {exc}",
+                )
+        return bibliography, inline, paper_title, paper_authors
 
     def _build_records(self, bibliography, inline) -> list[CitationRecord]:
         markers_by_index: dict[int, list] = {}

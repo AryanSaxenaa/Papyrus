@@ -16,6 +16,7 @@ import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
 import { MathGridBg } from "./components/app/MathGridBg";
+import { connectAuditEventSource } from "./lib/sse";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
 export default function App() {
@@ -61,26 +62,18 @@ export default function App() {
 
   useEffect(() => {
     if (!bulkJobId) return;
-    const source = new EventSource(`/api/bulk/${bulkJobId}/events`);
-    source.onmessage = (message) => {
-      try {
-        const payload = JSON.parse(message.data) as StreamEvent;
-        setBulkEvents((prev) => [...prev.slice(-80), payload]);
-      } catch {}
-    };
+    const source = connectAuditEventSource(`/api/bulk/${bulkJobId}/events`, (payload) => {
+      setBulkEvents((prev) => [...prev.slice(-80), payload]);
+    });
     source.onerror = () => source.close();
     return () => source.close();
   }, [bulkJobId]);
 
   useEffect(() => {
     if (!audit?.id) return;
-    const source = new EventSource(`/api/audits/${audit.id}/events`);
-    source.onmessage = (message) => {
-      try {
-        const payload = JSON.parse(message.data) as StreamEvent;
-        setEvents((prev) => [...prev, payload]);
-      } catch {}
-    };
+    const source = connectAuditEventSource(`/api/audits/${audit.id}/events`, (payload) => {
+      setEvents((prev) => [...prev, payload]);
+    });
     source.onerror = () => source.close();
     return () => source.close();
   }, [audit?.id]);
@@ -173,7 +166,7 @@ export default function App() {
         if (status.status === "complete" || status.status === "failed") {
           window.clearInterval(poll);
           setUploading(false);
-          setBulkJobId(null);
+          await hydrateBulkEvents(job.id);
           const dashRes = await fetch(`/api/bulk/${job.id}/dashboard`);
           if (dashRes.ok) setBulkDashboard((await dashRes.json()) as BulkDashboard);
         }
@@ -208,6 +201,15 @@ export default function App() {
     if (!audit || !selected) return;
     const response = await fetch(
       `/api/audits/${audit.id}/citations/${selected.id}/approve-claim`,
+      { method: "POST" },
+    );
+    if (response.ok) await refreshAudit(audit.id);
+  };
+
+  const rerunNli = async () => {
+    if (!audit || !selected) return;
+    const response = await fetch(
+      `/api/audits/${audit.id}/citations/${selected.id}/rerun-nli`,
       { method: "POST" },
     );
     if (response.ok) await refreshAudit(audit.id);
@@ -264,9 +266,18 @@ export default function App() {
     const response = await fetch(`/api/audits/${auditId}`);
     if (!response.ok) return;
     setAudit((await response.json()) as AuditRun);
-    setEvents([]);
     setSelected(null);
     setAuditsListKey((key) => key + 1);
+    try {
+      const historyRes = await fetch(`/api/audits/${auditId}/events/history`);
+      if (historyRes.ok) {
+        setEvents((await historyRes.json()) as StreamEvent[]);
+      } else {
+        setEvents([]);
+      }
+    } catch {
+      setEvents([]);
+    }
   };
 
   const onAuditDeleted = (auditId: string) => {
@@ -284,10 +295,32 @@ export default function App() {
     setAuditsListKey((key) => key + 1);
   };
 
+  const hydrateBulkEvents = async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/bulk/${jobId}/events/history`);
+      if (res.ok) {
+        setBulkEvents((await res.json()) as StreamEvent[]);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   const openBulkPaper = async (auditId: string) => {
+    if (bulkJobId) {
+      void hydrateBulkEvents(bulkJobId);
+    }
     if (bulkAuditCache[auditId]) {
       setAudit(bulkAuditCache[auditId]);
       setExpandedBulkId(auditId);
+      try {
+        const historyRes = await fetch(`/api/audits/${auditId}/events/history`);
+        if (historyRes.ok) {
+          setEvents((await historyRes.json()) as StreamEvent[]);
+        }
+      } catch {
+        setEvents([]);
+      }
       return;
     }
     const response = await fetch(`/api/audits/${auditId}`);
@@ -297,6 +330,14 @@ export default function App() {
     setAudit(data);
     setExpandedBulkId(auditId);
     setShowAnatomy(true);
+    try {
+      const historyRes = await fetch(`/api/audits/${auditId}/events/history`);
+      if (historyRes.ok) {
+        setEvents((await historyRes.json()) as StreamEvent[]);
+      }
+    } catch {
+      setEvents([]);
+    }
   };
 
   return (
@@ -448,7 +489,7 @@ export default function App() {
                               key={`${paper.audit_id}-heat`}
                               className="border-t border-zinc-100 bg-zinc-50"
                             >
-                              <td colSpan={6} className="py-3">
+                              <td colSpan={6} className="space-y-4 py-3">
                                 <CitationHeatmap
                                   citations={cached.citations}
                                   selectedId={selected?.id}
@@ -456,6 +497,18 @@ export default function App() {
                                     setSelected(citation);
                                   }}
                                 />
+                                <div className="rounded-lg border border-zinc-200 bg-white p-3">
+                                  <p className="mb-2 text-xs font-semibold text-zinc-600">
+                                    Resolution log
+                                  </p>
+                                  <LivePanel
+                                    events={events}
+                                    audit={cached}
+                                    auditId={cached.id}
+                                    citations={cached.citations}
+                                    onSelect={setSelected}
+                                  />
+                                </div>
                               </td>
                             </tr>
                           )}
@@ -465,6 +518,12 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+              {bulkDashboard && bulkJobId && (
+                <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-3">
+                  <p className="mb-2 text-xs font-semibold text-zinc-600">Bulk resolution log</p>
+                  <LivePanel events={bulkEvents} audit={null} auditId={undefined} />
+                </div>
+              )}
             </div>
           )}
 
@@ -478,6 +537,10 @@ export default function App() {
                   </h2>
                   <p className="mt-1 font-audit text-xs text-zinc-400">
                     Status: {audit.status} · Pipeline {audit.pipeline_version}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                    Citation integrity audit only — Papyrus does not detect AI authorship or
+                    writing style.
                   </p>
                   {audit.status === "failed" && audit.error && (
                     <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -588,6 +651,7 @@ export default function App() {
                   <LivePanel
                     events={events}
                     audit={audit}
+                    auditId={audit.id}
                     citations={audit.citations}
                     onSelect={setSelected}
                   />
@@ -605,6 +669,7 @@ export default function App() {
               onSaveIntent={(intent) => void saveIntent(intent)}
               onSaveClaim={() => void saveClaim()}
               onApproveClaim={() => void approveClaim()}
+              onRerunNli={() => void rerunNli()}
               onRerunCitation={() => void rerunCitation()}
               onClose={() => setSelected(null)}
             />

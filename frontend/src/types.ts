@@ -97,6 +97,8 @@ export type CitationRecord = {
   nli_verdict?: string;
   title_edit_distance?: number | null;
   confidence?: string | null;
+  needs_human_review?: boolean;
+  abstract_only_caveat?: string | null;
   version_mismatch?: VersionMismatchInfo | null;
   exa_signal?: string | null;
   source_verify_url?: string | null;

@@ -29,9 +29,11 @@ async def apply_title_drift_gate(
 
     edit_distance_gate = ratio < settings.title_drift_token_threshold
     similarity = await embedding_similarity(cited_title, resolved_title)
-    if similarity is None:
-        return
-    semantic_mismatch_gate = similarity < 0.82
+    if similarity is not None:
+        semantic_mismatch_gate = similarity < 0.82
+    else:
+        _, partial = compare_titles(cited_title, resolved_title)
+        semantic_mismatch_gate = partial < settings.title_drift_token_threshold
 
     if not (edit_distance_gate and semantic_mismatch_gate):
         return

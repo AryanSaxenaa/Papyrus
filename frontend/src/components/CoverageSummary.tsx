@@ -31,6 +31,12 @@ const CHIPS: Array<{
     category: "indicator",
   },
   {
+    key: "unresolvable",
+    label: "Unresolvable",
+    count: (a) => a.coverage.tier_4 ?? 0,
+    category: "neutral",
+  },
+  {
     key: "failures",
     label: "Confirmed failure",
     count: (a) => {

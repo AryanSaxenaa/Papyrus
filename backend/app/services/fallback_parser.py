@@ -8,6 +8,7 @@ from pathlib import Path
 import fitz
 
 from app.domain.models import BibliographyEntry, InlineCitation
+from app.text.context_window import three_sentence_window
 
 
 REFERENCES_HEADERS = re.compile(r"^(references|bibliography|works cited)\s*$", re.I)
@@ -53,13 +54,14 @@ def parse_pdf_fallback(
     for match in re.finditer(r"\[(\d{1,3})\]", text):
         marker = match.group(0)
         bib_index = int(match.group(1))
-        start = max(0, match.start() - 200)
-        end = min(len(text), match.end() + 200)
+        start = max(0, match.start() - 600)
+        end = min(len(text), match.end() + 600)
+        window = text[start:end].strip()
         inline.append(
             InlineCitation(
                 marker=marker,
                 bibliography_index=bib_index,
-                context_window=text[start:end].strip(),
+                context_window=three_sentence_window(window, marker),
             )
         )
 

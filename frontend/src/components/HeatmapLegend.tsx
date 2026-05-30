@@ -1,8 +1,10 @@
 const items = [
   { label: "Supported", color: "#166534" },
+  { label: "Uncertain (abstract)", color: "#b45309" },
   { label: "Failure", color: "#991b1b" },
   { label: "Retraction", color: "#991b1b", ring: true },
   { label: "Cannot assess", color: "#1e3a8a" },
+  { label: "Method / background", color: "#78716c" },
   { label: "Unresolvable", color: "#52525b" },
   { label: "Resolving", color: "#b45309" },
   { label: "Pending", color: "#a1a1aa" },

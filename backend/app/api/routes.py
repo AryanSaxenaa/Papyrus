@@ -32,9 +32,10 @@ from app.pipeline.evidence import refresh_evidence_passage
 from app.pipeline.resolution import resolve_record
 from app.pipeline.verdicts import extract_claim, run_claim_alignment_async
 from app.services.deepseek import deepseek_client
-from app.services.events import event_bus
+from app.services.events import EventHistoryLoadError, event_bus
 from app.services.corrections import correction_store
 from app.services.relational_audit import list_citation_attempts
+from app.services.bulk_dispatch import enqueue_bulk_zip
 from app.services.url_fetch import url_fetch_service
 from app.store import audit_store
 
@@ -99,6 +100,16 @@ async def health_detailed() -> dict:
         except httpx.HTTPError as exc:
             checks["grobid"] = {"ok": False, "error": str(exc)}
 
+    from app.services.bulk_dispatch import celery_worker_available
+
+    celery_ready = await celery_worker_available()
+    checks["bulk_queue"] = {
+        "ok": True,
+        "use_celery_bulk": settings.use_celery_bulk,
+        "celery_worker_available": celery_ready,
+        "effective_mode": "celery" if celery_ready else "background_tasks",
+    }
+
     return {"status": "ok" if all(c.get("ok") for c in checks.values()) else "degraded", "checks": checks}
 
 
@@ -136,9 +147,13 @@ async def get_citation_attempts(audit_id: UUID, citation_id: str) -> dict:
 
 @router.get("/audits/{audit_id}")
 async def get_audit(audit_id: UUID) -> AuditRun:
+    from app.pipeline.limitations import build_limitations
+
     audit = audit_store.get(audit_id)
     if not audit:
         raise HTTPException(status_code=404, detail="Audit not found")
+    if audit.status == "complete" and audit.limitations is None:
+        audit.limitations = build_limitations(audit)
     return audit
 
 
@@ -212,13 +227,13 @@ async def create_bulk_audit(background: BackgroundTasks, file: UploadFile) -> Bu
         shutil.copyfileobj(file.file, handle)
 
     bulk_job_store.create(job)
-    settings = get_settings()
-    if settings.use_celery_bulk:
-        from app.worker import run_bulk_audit
-
-        run_bulk_audit.delay(str(job.id), str(zip_path))
-    else:
-        background.add_task(_run_bulk_job, job.id, zip_path)
+    queue_mode = await enqueue_bulk_zip(job.id, zip_path, background, _run_bulk_job)
+    event_bus.emit(
+        job.id,
+        "bulk",
+        f"Bulk job queued ({queue_mode})",
+        job_id=str(job.id),
+    )
     return job
 
 
@@ -241,6 +256,19 @@ async def list_bulk_audits(job_id: UUID) -> list[AuditRun]:
         if audit:
             audits.append(audit)
     return audits
+
+
+@router.get("/bulk/{job_id}/events/history")
+async def bulk_events_history(job_id: UUID) -> list[dict[str, object]]:
+    if not bulk_job_store.get(job_id):
+        raise HTTPException(status_code=404, detail="Bulk job not found")
+    try:
+        return event_bus.history(job_id)
+    except EventHistoryLoadError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Event history temporarily unavailable",
+        ) from exc
 
 
 @router.get("/bulk/{job_id}/events")
@@ -310,8 +338,15 @@ async def export_bulk_event_log(job_id: UUID) -> StreamingResponse:
     job = bulk_job_store.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Bulk job not found")
+    try:
+        events = event_bus.history(job_id)
+    except EventHistoryLoadError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Event history temporarily unavailable",
+        ) from exc
     lines = []
-    for event in event_bus.history(job_id):
+    for event in events:
         lines.append(f"{event.get('ts', '')} [{event.get('type', '')}] {event.get('message', '')}")
     return StreamingResponse(iter(["\n".join(lines)]), media_type="text/plain")
 
@@ -326,10 +361,30 @@ async def export_bulk_dashboard_json(job_id: UUID) -> JSONResponse:
 async def export_event_log(audit_id: UUID) -> StreamingResponse:
     if not audit_store.get(audit_id):
         raise HTTPException(status_code=404, detail="Audit not found")
+    try:
+        events = event_bus.history(audit_id)
+    except EventHistoryLoadError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Event history temporarily unavailable",
+        ) from exc
     lines = []
-    for event in event_bus.history(audit_id):
+    for event in events:
         lines.append(f"{event.get('ts', '')} [{event.get('type', '')}] {event.get('message', '')}")
     return StreamingResponse(iter(["\n".join(lines)]), media_type="text/plain")
+
+
+@router.get("/audits/{audit_id}/events/history")
+async def audit_events_history(audit_id: UUID) -> list[dict[str, object]]:
+    if not audit_store.get(audit_id):
+        raise HTTPException(status_code=404, detail="Audit not found")
+    try:
+        return event_bus.history(audit_id)
+    except EventHistoryLoadError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Event history temporarily unavailable",
+        ) from exc
 
 
 @router.get("/audits/{audit_id}/events")
@@ -404,8 +459,7 @@ async def update_claim(audit_id: UUID, citation_id: str, body: ClaimUpdate) -> C
         original,
         body.claim,
     )
-    await refresh_evidence_passage(record)
-    await run_claim_alignment_async(record)
+    await _rerun_claim_alignment(record)
     finalize_scores(audit)
     audit_store.save(audit)
     event_bus.emit(
@@ -418,6 +472,17 @@ async def update_claim(audit_id: UUID, citation_id: str, body: ClaimUpdate) -> C
     return record
 
 
+async def _rerun_claim_alignment(record: CitationRecord) -> None:
+    if record.intent != CitationIntent.EVIDENTIARY:
+        record.nli_verdict = NliVerdict.SKIPPED
+        return
+    if not record.extracted_claim and not record.claim_user_corrected:
+        raise HTTPException(status_code=400, detail="No claim available for NLI")
+    record.claim_pending_review = False
+    await refresh_evidence_passage(record)
+    await run_claim_alignment_async(record)
+
+
 @router.post("/audits/{audit_id}/citations/{citation_id}/approve-claim")
 async def approve_claim(audit_id: UUID, citation_id: str) -> CitationRecord:
     audit = audit_store.get(audit_id)
@@ -426,15 +491,33 @@ async def approve_claim(audit_id: UUID, citation_id: str) -> CitationRecord:
     record = _get_citation(audit, citation_id)
     if not record.extracted_claim and not record.claim_user_corrected:
         raise HTTPException(status_code=400, detail="No claim to approve")
-    record.claim_pending_review = False
-    await refresh_evidence_passage(record)
-    await run_claim_alignment_async(record)
+    await _rerun_claim_alignment(record)
     finalize_scores(audit)
     audit_store.save(audit)
     event_bus.emit(
         audit_id,
         "nli",
         "NLI run after claim approval",
+        citation_index=record.index,
+        verdict=record.claim_alignment_verdict,
+    )
+    return record
+
+
+
+@router.post("/audits/{audit_id}/citations/{citation_id}/rerun-nli")
+async def rerun_nli(audit_id: UUID, citation_id: str) -> CitationRecord:
+    audit = audit_store.get(audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    record = _get_citation(audit, citation_id)
+    await _rerun_claim_alignment(record)
+    finalize_scores(audit)
+    audit_store.save(audit)
+    event_bus.emit(
+        audit_id,
+        "nli",
+        "NLI rerun (claim alignment only)",
         citation_index=record.index,
         verdict=record.claim_alignment_verdict,
     )

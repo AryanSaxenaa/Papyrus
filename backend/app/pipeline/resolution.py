@@ -8,7 +8,11 @@ from app.domain.models import CitationRecord, ResolutionAttempt
 from app.pipeline.verdicts import detect_hallucination
 from app.text.similarity import compare_titles
 from app.pipeline.title_drift import apply_title_drift_gate
-from app.pipeline.version_tracking import build_version_timeline, enrich_version_timeline
+from app.pipeline.version_tracking import (
+    build_version_timeline,
+    enrich_version_timeline,
+    merge_semantic_scholar_version,
+)
 from app.services.arxiv import arxiv_client
 from app.services.europe_pmc import europe_pmc_client
 from app.services.cache import cache_service
@@ -20,7 +24,8 @@ from app.services.semantic_scholar import semantic_scholar_client
 from app.services.firecrawl import firecrawl_client
 from app.services.fulltext import fulltext_service
 from app.services.apify_client import apify_fallback_resolve
-from app.services.journals import is_year_impossible, journal_client
+from app.pipeline.journal_checks import is_resolved_metadata_mismatch, is_year_impossible
+from app.services.journals import journal_client
 from app.services.unpaywall import unpaywall_client
 
 
@@ -256,6 +261,28 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
                 edit_distance=record.title_edit_distance,
             )
 
+    if record.hallucination_type == HallucinationType.NONE and crossref and cited.doi:
+        # Preprint/arXiv citations often cite an earlier year than the published DOI record — defer to version mismatch.
+        year_volume_mismatch = False
+        if arxiv:
+            if cited.volume and crossref.get("volume"):
+                year_volume_mismatch = (
+                    str(cited.volume).strip().lower() != str(crossref["volume"]).strip().lower()
+                )
+        else:
+            year_volume_mismatch = is_resolved_metadata_mismatch(cited.year, cited.volume, crossref)
+        if year_volume_mismatch:
+            record.hallucination_type = HallucinationType.DATE_IMPOSSIBLE
+            record.verdict_color = "failure"
+            event_bus.emit(
+                audit_id,
+                "journal",
+                "Type 5 — cited year/volume inconsistent with resolved DOI metadata",
+                citation_index=record.index,
+                cited_year=cited.year,
+                cited_volume=cited.volume,
+            )
+
     if (
         record.hallucination_type == HallucinationType.NONE
         and crossref
@@ -276,38 +303,77 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
                 issn=crossref.get("issn"),
                 cited_year=cited.year,
             )
-
-    if (
-        record.hallucination_type == HallucinationType.NONE
-        and arxiv
-        and crossref
-        and arxiv.get("title")
-        and crossref.get("title")
-    ):
-        ratio, _ = compare_titles(arxiv["title"], crossref["title"])
-        if ratio < 0.5:
-            record.hallucination_type = HallucinationType.VERSION_MISMATCH
-            record.verdict_color = "failure"
-            record.version_mismatch = build_version_timeline(arxiv, crossref)
-            if record.version_mismatch:
-                arxiv_id = arxiv.get("arxiv_id") or arxiv_client.extract_id(cited.doi) or arxiv_client.extract_id(cited.raw)
-                record.version_mismatch = await enrich_version_timeline(
-                    record.version_mismatch,
-                    arxiv_id,
-                )
-            event_bus.emit(
-                audit_id,
-                "version",
-                "Version mismatch timeline built",
-                citation_index=record.index,
-                material=record.version_mismatch.material_difference if record.version_mismatch else False,
-                revisions=len(record.version_mismatch.revisions) if record.version_mismatch else 0,
+        elif cited.volume and record.hallucination_type == HallucinationType.NONE:
+            volume_ok = await journal_client.volume_has_issue_in_year(
+                crossref["issn"], str(cited.volume), int(cited.year)
             )
+            if volume_ok is False:
+                record.hallucination_type = HallucinationType.DATE_IMPOSSIBLE
+                record.verdict_color = "failure"
+                event_bus.emit(
+                    audit_id,
+                    "journal",
+                    "Type 5 — no CrossRef works in cited volume/year for journal ISSN",
+                    citation_index=record.index,
+                    issn=crossref.get("issn"),
+                    cited_year=cited.year,
+                    cited_volume=cited.volume,
+                )
 
-    if record.evidence_tier == EvidenceTier.TIER_4 and cited.title:
-        exa = await exa_client.weak_signal_search(cited.title, cited.authors)
+    if crossref and crossref.get("issn"):
+        oa_source = await openalex_client.verify_journal_issn(crossref["issn"])
         record.resolution_attempts.append(
-            _attempt(ResolutionSource.EXA, cited.title, exa.get("found", False), exa)
+            _attempt(
+                ResolutionSource.OPENALEX,
+                f"ISSN verify:{crossref['issn']}",
+                oa_source is not None,
+                oa_source or {"note": "ISSN not found in OpenAlex sources catalog"},
+            )
+        )
+
+    arxiv_id = arxiv.get("arxiv_id") if arxiv else arxiv_client.extract_id(cited.doi) or arxiv_client.extract_id(cited.raw)
+    scholar_version = None
+    if arxiv_id and record.hallucination_type == HallucinationType.NONE:
+        scholar_version = await semantic_scholar_client.lookup_arxiv(arxiv_id)
+
+    version_signal = False
+    if record.hallucination_type == HallucinationType.NONE and arxiv and crossref and arxiv.get("title") and crossref.get("title"):
+        ratio, _ = compare_titles(arxiv["title"], crossref["title"])
+        version_signal = ratio < 0.5
+    if (
+        not version_signal
+        and scholar_version
+        and crossref
+        and scholar_version.get("doi")
+        and crossref.get("doi")
+    ):
+        s_doi = scholar_version["doi"].strip().lower()
+        c_doi = crossref["doi"].strip().lower()
+        version_signal = s_doi != c_doi
+
+    if record.hallucination_type == HallucinationType.NONE and version_signal and arxiv and crossref:
+        record.hallucination_type = HallucinationType.VERSION_MISMATCH
+        record.verdict_color = "failure"
+        record.version_mismatch = build_version_timeline(arxiv, crossref)
+        if record.version_mismatch:
+            record.version_mismatch = merge_semantic_scholar_version(
+                record.version_mismatch, scholar_version, crossref
+            )
+            record.version_mismatch = await enrich_version_timeline(record.version_mismatch, arxiv_id)
+        event_bus.emit(
+            audit_id,
+            "version",
+            "Version mismatch timeline built",
+            citation_index=record.index,
+            material=record.version_mismatch.material_difference if record.version_mismatch else False,
+            revisions=len(record.version_mismatch.revisions) if record.version_mismatch else 0,
+        )
+
+    exa_query = cited.title or cited.raw[:240] if cited.raw else None
+    if record.evidence_tier == EvidenceTier.TIER_4 and exa_query:
+        exa = await exa_client.weak_signal_search(exa_query, cited.authors)
+        record.resolution_attempts.append(
+            _attempt(ResolutionSource.EXA, exa_query, exa.get("found", False), exa)
         )
         record.exa_signal = exa.get("message")
         event_bus.emit(
@@ -316,6 +382,22 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
             exa.get("message", "Exa search complete"),
             citation_index=record.index,
             found=exa.get("found", False),
+        )
+
+    if (
+        record.evidence_tier == EvidenceTier.TIER_4
+        and cited.doi
+        and record.hallucination_type == HallucinationType.NONE
+        and not (merged and (merged.get("title") or merged.get("doi")))
+    ):
+        record.hallucination_type = HallucinationType.DOI_404
+        record.verdict_color = "failure"
+        event_bus.emit(
+            audit_id,
+            "verdict",
+            "Type 1 — DOI 404 (no indexed record after full resolution chain)",
+            citation_index=record.index,
+            hallucination=record.hallucination_type.value,
         )
 
     doi = record.resolved_doi or cited.doi

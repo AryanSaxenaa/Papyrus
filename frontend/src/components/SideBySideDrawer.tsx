@@ -14,6 +14,7 @@ type Props = {
   onSaveIntent: (intent: string) => void;
   onSaveClaim: () => void;
   onApproveClaim?: () => void;
+  onRerunNli?: () => void;
   onRerunCitation?: () => void;
   onClose: () => void;
 };
@@ -26,6 +27,7 @@ export function SideBySideDrawer({
   onSaveIntent,
   onSaveClaim,
   onApproveClaim,
+  onRerunNli,
   onRerunCitation,
   onClose,
 }: Props) {
@@ -94,6 +96,11 @@ export function SideBySideDrawer({
                 <span className="font-audit uppercase font-medium">{citation.confidence}</span>
               </p>
             )}
+            {citation.abstract_only_caveat && (
+              <p className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900">
+                {citation.abstract_only_caveat}
+              </p>
+            )}
             {citation.quantitative_caveat && (
               <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
                 {citation.quantitative_caveat}
@@ -156,6 +163,15 @@ export function SideBySideDrawer({
                   className="papyrus-btn papyrus-btn-accent px-3 py-1.5 text-xs"
                 >
                   Save & re-check
+                </button>
+              )}
+              {onRerunNli && citation.intent === "evidentiary" && (
+                <button
+                  type="button"
+                  onClick={onRerunNli}
+                  className="text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-800 hover:underline"
+                >
+                  Rerun NLI
                 </button>
               )}
               {onRerunCitation && (
@@ -296,9 +312,10 @@ function VerdictBadge({ citation }: { citation: CitationRecord }) {
         ? "text-red-600"
         : "text-zinc-700";
   const needsReview =
-    citation.intent === "evidentiary" &&
-    citation.confidence &&
-    ["medium", "low"].includes(citation.confidence);
+    citation.needs_human_review ||
+    (citation.intent === "evidentiary" &&
+      citation.confidence &&
+      ["medium", "low"].includes(citation.confidence));
   return (
     <div>
       <p className={`font-audit text-2xl font-semibold uppercase ${color}`}>

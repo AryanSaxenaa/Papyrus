@@ -35,14 +35,9 @@ def detect_hallucination(
 
     resolved = merged_override or crossref or scholar or openalex
     if not resolved:
-        if cited.doi:
-            record.hallucination_type = HallucinationType.DOI_404
-            record.evidence_tier = EvidenceTier.TIER_4
-            record.verdict_color = "failure"
-        else:
-            record.hallucination_type = HallucinationType.NONE
-            record.evidence_tier = EvidenceTier.TIER_4
-            record.verdict_color = "unresolvable"
+        record.hallucination_type = HallucinationType.NONE
+        record.evidence_tier = EvidenceTier.TIER_4
+        record.verdict_color = "unresolvable"
         return
 
     record.resolved_title = resolved.get("title")
@@ -129,11 +124,24 @@ async def run_claim_alignment_async(record: CitationRecord) -> None:
         )
 
 
+def _set_human_review_flag(record: CitationRecord) -> None:
+    if record.intent != CitationIntent.EVIDENTIARY:
+        record.needs_human_review = False
+        return
+    if record.confidence in {ConfidenceLevel.MEDIUM, ConfidenceLevel.LOW}:
+        record.needs_human_review = True
+    elif record.evidence_tier == EvidenceTier.TIER_2 and record.nli_verdict == NliVerdict.NEUTRAL:
+        record.needs_human_review = True
+    else:
+        record.needs_human_review = False
+
+
 def _apply_nli_verdict(record: CitationRecord, nli_result: NliVerdict) -> None:
     record.nli_verdict = nli_result
     verdict_label, confidence_token = nli_pipeline.confidence_for_verdict(nli_result, record.evidence_tier)
     record.claim_alignment_verdict = verdict_label
     record.confidence = ConfidenceLevel(confidence_token)
+    _set_human_review_flag(record)
     if nli_result == NliVerdict.CONTRADICTS:
         record.hallucination_type = HallucinationType.CLAIM_CONTRADICTION
         record.verdict_color = "failure"
@@ -152,16 +160,21 @@ def _apply_lexical_fallback(record: CitationRecord, claim: str, evidence: str) -
             ConfidenceLevel.HIGH if record.evidence_tier == EvidenceTier.TIER_1 else ConfidenceLevel.MEDIUM
         )
         record.verdict_color = "supported"
+        _set_human_review_flag(record)
+        return
     elif overlap <= 0.25:
         record.nli_verdict = NliVerdict.CONTRADICTS
         record.hallucination_type = HallucinationType.CLAIM_CONTRADICTION
         record.claim_alignment_verdict = "claim_contradiction"
         record.confidence = ConfidenceLevel.MEDIUM
         record.verdict_color = "failure"
+        _set_human_review_flag(record)
+        return
     else:
         record.nli_verdict = NliVerdict.NEUTRAL
         record.claim_alignment_verdict = "not_addressed"
         record.confidence = ConfidenceLevel.MEDIUM
         record.verdict_color = "amber"
+    _set_human_review_flag(record)
 
 

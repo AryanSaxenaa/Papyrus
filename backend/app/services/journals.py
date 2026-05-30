@@ -58,6 +58,28 @@ class JournalMetadataClient:
             "source": "apify",
         }
 
+    async def volume_has_issue_in_year(self, issn: str, volume: str, year: int) -> bool | None:
+        """True if CrossRef lists works in this journal volume during year; False if not; None if unknown."""
+        if not await rate_limit_service.allow("crossref"):
+            return None
+        settings = get_settings()
+        normalized = issn.replace("-", "")
+        filters = f"volume:{volume},from-issued-date:{year}-01-01,until-issued-date:{year}-12-31"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{self.BASE}/{normalized}/works",
+                params={"filter": filters, "rows": 1},
+                headers={
+                    "User-Agent": f"Papyrus/2.0 (mailto:{settings.crossref_mailto})",
+                    "Accept": "application/json",
+                },
+            )
+            await rate_limit_service.record("crossref")
+            if response.status_code != 200:
+                return None
+            total = response.json().get("message", {}).get("total-results", 0)
+            return int(total) > 0
+
 
 def _year_from_parts(parts: list | None) -> int | None:
     if not parts or not parts[0]:
@@ -73,15 +95,6 @@ def _first_issue_year(message: dict[str, Any]) -> int | None:
         if year:
             years.append(year)
     return min(years) if years else _year_from_parts(message.get("published-online", {}).get("date-parts"))
-
-
-def is_year_impossible(cited_year: int, journal_meta: dict[str, Any] | None) -> bool:
-    if not journal_meta:
-        return False
-    first_year = journal_meta.get("first_issue") or journal_meta.get("published_online")
-    if first_year and cited_year < int(first_year):
-        return True
-    return False
 
 
 journal_client = JournalMetadataClient()

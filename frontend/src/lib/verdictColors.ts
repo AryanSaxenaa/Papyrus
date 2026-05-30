@@ -5,7 +5,7 @@ const VERDICT_FILL: Record<string, string> = {
   failure: "#991b1b",
   retraction: "#991b1b",
   cannot_assess: "#1e3a8a",
-  neutral: "#3f3f46",
+  neutral: "#78716c",
   unresolvable: "#52525b",
   resolving: "#b45309",
   pending: "#a1a1aa",

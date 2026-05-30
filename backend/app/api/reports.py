@@ -90,8 +90,12 @@ def render_text_report(audit: AuditRun) -> str:
             for entry in [citation.version_mismatch.preprint, *citation.version_mismatch.revisions, citation.version_mismatch.published]:
                 if entry:
                     lines.append(f"       - {entry.label}: {entry.title or '—'} ({entry.date or '—'})")
+        if citation.abstract_only_caveat:
+            lines.append(f"     Abstract-only: {citation.abstract_only_caveat[:200]}")
         if citation.quantitative_caveat:
             lines.append(f"     Caveat: {citation.quantitative_caveat[:200]}")
+        if citation.needs_human_review:
+            lines.append("     Human review: recommended (medium/low confidence or abstract-only neutral)")
         if citation.exa_signal:
             lines.append(f"     Exa: {citation.exa_signal}")
         if citation.source_verify_url:

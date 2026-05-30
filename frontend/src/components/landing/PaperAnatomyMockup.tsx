@@ -63,7 +63,8 @@ const STEP_PANELS = [
 
 export function PaperAnatomyMockup({ activeStep }: Props) {
   const [view, setView] = useState<"text" | "pdf">("text");
-  const panel = STEP_PANELS[activeStep] ?? STEP_PANELS[0];
+  const step = Math.min(Math.max(activeStep, 0), STEP_PANELS.length - 1);
+  const panel = STEP_PANELS[step] ?? STEP_PANELS[0];
   const marks = CITATION_MARKS.slice(0, panel.visibleMarks);
 
   return (
@@ -139,10 +140,10 @@ export function PaperAnatomyMockup({ activeStep }: Props) {
           </AnimatePresence>
         </div>
 
-        <div className="bg-[#fafafa] p-5 min-h-[200px] lg:min-h-[220px]">
+        <div className="min-h-[200px] bg-[#fafafa] p-5 lg:min-h-[220px]">
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeStep}
+              key={step}
               initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
@@ -190,7 +191,11 @@ export function PaperAnatomyMockup({ activeStep }: Props) {
                     {panel.status}
                   </span>
 
-                  <div className="mt-4 flex gap-4 border-b border-zinc-200" role="tablist" aria-label="Citation panel">
+                  <div
+                    className="mt-4 flex gap-4 border-b border-zinc-200"
+                    role="tablist"
+                    aria-label="Citation panel"
+                  >
                     <button
                       type="button"
                       role="tab"
@@ -243,7 +248,7 @@ export function PaperAnatomyMockup({ activeStep }: Props) {
                     />
                   </div>
 
-                  {activeStep === 3 && (
+                  {step === 3 && (
                     <button
                       type="button"
                       disabled

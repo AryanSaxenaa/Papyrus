@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.rate_limits import rate_limit_service
 
 
 class FirecrawlClient:
@@ -16,6 +17,8 @@ class FirecrawlClient:
         settings = get_settings()
         if not settings.firecrawl_api_key:
             return None
+        if not await rate_limit_service.allow("firecrawl"):
+            return None
 
         async with httpx.AsyncClient(timeout=90.0) as client:
             response = await client.post(
@@ -26,6 +29,7 @@ class FirecrawlClient:
                 },
                 json={"url": url, "formats": ["markdown"], "onlyMainContent": True},
             )
+            await rate_limit_service.record("firecrawl")
             if response.status_code != 200:
                 return None
             data = response.json().get("data") or {}

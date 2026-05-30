@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from uuid import UUID
@@ -6,6 +7,12 @@ from uuid import UUID
 from app.domain.models import AuditStreamEvent
 
 AuditEventPayload = dict[str, object]
+
+logger = logging.getLogger(__name__)
+
+
+class EventHistoryLoadError(Exception):
+    """Audit event history could not be loaded from the relational store."""
 
 
 class EventBus:
@@ -35,9 +42,7 @@ class EventBus:
 
             persist_audit_event(key, event)
         except Exception as exc:
-            # Log database persistence errors but don't fail event emission
-            import logging
-            logging.getLogger(__name__).warning(f"Failed to persist audit event: {exc}")
+            logger.warning("Failed to persist audit event for %s: %s", key, exc)
         return event
 
     def history(self, audit_id: UUID | str) -> list[AuditEventPayload]:
@@ -52,16 +57,23 @@ class EventBus:
             if loaded:
                 self._history[key] = list(loaded)
                 return list(loaded)
+            return []
         except Exception as exc:
-            # Log database loading errors but don't fail event history retrieval
-            import logging
-            logging.getLogger(__name__).warning(f"Failed to load audit event history: {exc}")
-        return []
+            logger.warning("Failed to load audit event history for %s: %s", key, exc)
+            raise EventHistoryLoadError(str(exc)) from exc
+
+    def replay_for_subscribe(self, audit_id: UUID | str) -> list[AuditEventPayload]:
+        """Best-effort replay for SSE; does not fail the stream when DB history is unavailable."""
+        try:
+            return self.history(audit_id)
+        except EventHistoryLoadError:
+            key = str(audit_id)
+            return list(self._history.get(key, []))
 
     async def subscribe(self, audit_id: UUID | str) -> asyncio.Queue[AuditEventPayload]:
         queue: asyncio.Queue[AuditEventPayload] = asyncio.Queue()
         key = str(audit_id)
-        for past in self.history(audit_id):
+        for past in self.replay_for_subscribe(audit_id):
             await queue.put(past)
         self._queues[key].append(queue)
         return queue

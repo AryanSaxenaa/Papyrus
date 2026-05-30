@@ -141,9 +141,19 @@ def build_evidence_provenance(record: CitationRecord) -> str | None:
     return None
 
 
+TIER_2_ABSTRACT_CAVEAT = (
+    "Analysis based on abstract only — full text unavailable. Specific numerical claims, "
+    "methods details, and supplementary results cannot be verified from the abstract alone."
+)
+
+
 async def refresh_evidence_passage(record: CitationRecord) -> None:
     claim = record.claim_user_corrected or record.extracted_claim or ""
     text = full_evidence_text(record)
     record.evidence_passage = await retrieve_passage(claim, text) if claim else text
     record.evidence_provenance = build_evidence_provenance(record)
     record.evidence_retrieved_at = datetime.now(timezone.utc)
+    if record.evidence_tier == EvidenceTier.TIER_2:
+        record.abstract_only_caveat = TIER_2_ABSTRACT_CAVEAT
+    else:
+        record.abstract_only_caveat = None

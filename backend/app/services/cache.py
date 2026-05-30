@@ -1,9 +1,13 @@
 import hashlib
 import json
+import logging
 
 import redis.asyncio as redis
+from redis.exceptions import RedisError
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 from app.domain.json_types import JsonValue
 
 
@@ -25,7 +29,8 @@ class CacheService:
         try:
             await self._client.ping()
             return True
-        except Exception:
+        except (RedisError, OSError) as exc:
+            logger.debug("Redis ping failed: %s", exc)
             return False
 
     def _key(self, prefix: str, value: str) -> str:

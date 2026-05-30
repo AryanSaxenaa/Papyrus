@@ -45,6 +45,32 @@ def build_version_timeline(
     )
 
 
+def merge_semantic_scholar_version(
+    info: VersionMismatchInfo,
+    scholar: dict | None,
+    crossref: dict | None,
+) -> VersionMismatchInfo:
+    """Enrich timeline when S2 links a preprint to a distinct published DOI/title."""
+    if not scholar or not info.preprint:
+        return info
+    scholar_doi = scholar.get("doi")
+    published_doi = (crossref or {}).get("doi")
+    if scholar_doi and published_doi and normalize_doi_safe(scholar_doi) != normalize_doi_safe(published_doi):
+        info.material_difference = True
+    scholar_title = scholar.get("title")
+    if scholar_title and info.published and info.published.title:
+        ratio, _ = compare_titles(scholar_title, info.published.title)
+        if ratio < 0.75:
+            info.material_difference = True
+    if scholar.get("publication_date") and info.preprint and not info.preprint.date:
+        info.preprint.date = str(scholar["publication_date"])[:10]
+    return info
+
+
+def normalize_doi_safe(doi: str) -> str:
+    return doi.strip().lower().removeprefix("https://doi.org/")
+
+
 async def enrich_version_timeline(
     info: VersionMismatchInfo,
     arxiv_id: str | None,

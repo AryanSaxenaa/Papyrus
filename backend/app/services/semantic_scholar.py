@@ -19,11 +19,33 @@ class SemanticScholarClient:
             headers["x-api-key"] = settings.semantic_scholar_api_key
         self._headers = headers
 
+    async def lookup_arxiv(self, arxiv_id: str) -> dict[str, Any] | None:
+        if not await rate_limit_service.allow("semantic_scholar"):
+            return None
+        clean = arxiv_id.replace("arxiv:", "").strip()
+        fields = (
+            "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf,"
+            "publicationVenue,publicationTypes,publicationDate"
+        )
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{self.BASE}/paper/ARXIV:{clean}",
+                params={"fields": fields},
+                headers=self._headers,
+            )
+            await rate_limit_service.record("semantic_scholar")
+            if response.status_code != 200:
+                return None
+            return self._normalize_paper(response.json())
+
     async def lookup_doi(self, doi: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("semantic_scholar"):
             return None
         normalized = normalize_doi(doi)
-        fields = "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf,publicationVenue"
+        fields = (
+            "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf,"
+            "publicationVenue,publicationTypes,publicationDate"
+        )
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{self.BASE}/paper/DOI:{normalized}",
@@ -56,14 +78,19 @@ class SemanticScholarClient:
     def _normalize_paper(self, paper: dict[str, Any]) -> dict[str, Any]:
         external = paper.get("externalIds") or {}
         venue = paper.get("publicationVenue") or {}
+        pub_types = paper.get("publicationTypes") or []
         return {
             "title": paper.get("title"),
             "authors": [a.get("name", "") for a in paper.get("authors") or []],
             "year": paper.get("year"),
             "doi": external.get("DOI"),
+            "arxiv_id": external.get("ArXiv"),
             "abstract": paper.get("abstract"),
             "journal": venue.get("name"),
             "open_access_pdf": (paper.get("openAccessPdf") or {}).get("url"),
+            "publication_types": pub_types,
+            "publication_date": paper.get("publicationDate"),
+            "is_preprint": "Preprint" in pub_types or "preprint" in str(pub_types).lower(),
         }
 
 

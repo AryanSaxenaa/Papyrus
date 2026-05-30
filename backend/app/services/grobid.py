@@ -8,6 +8,7 @@ import httpx
 
 from app.config import get_settings
 from app.domain.models import BibliographyEntry, InlineCitation
+from app.text.context_window import three_sentence_window
 
 
 NS = {"tei": "http://www.tei-c.org/ns/1.0"}
@@ -56,6 +57,10 @@ class GrobidClient:
             year = _int(_text(bibl.find(".//tei:date", NS)))
             journal = _text(bibl.find(".//tei:title[@level='j']", NS))
             doi = _extract_doi(bibl)
+            volume = _bibl_scope(bibl, "volume")
+            issue = _bibl_scope(bibl, "issue")
+            pages = _bibl_scope(bibl, "page") or _bibl_scope(bibl, "pages")
+            url = _extract_url(bibl)
             raw = ET.tostring(bibl, encoding="unicode")
             bibliography.append(
                 BibliographyEntry(
@@ -65,23 +70,30 @@ class GrobidClient:
                     title=title,
                     year=year,
                     journal=journal,
+                    volume=volume,
+                    issue=issue,
+                    pages=pages,
                     doi=doi,
+                    url=url,
                 )
             )
 
         inline: list[InlineCitation] = []
-        for ref in root.findall(".//tei:ref[@type='bibr']", NS):
-            target = ref.attrib.get("target", "")
-            match = re.search(r"#b(\d+)", target)
-            if not match:
+        for paragraph in root.findall(".//tei:p", NS):
+            p_text = re.sub(r"\s+", " ", "".join(paragraph.itertext())).strip()
+            if not p_text:
                 continue
-            bib_index = int(match.group(1)) + 1  # Convert from 0-based to 1-based to match bibliography
-            marker = "".join(ref.itertext()).strip() or target
-            parent = ref
-            context = _context_window(parent)
-            inline.append(
-                InlineCitation(marker=marker, bibliography_index=bib_index, context_window=context)
-            )
+            for ref in paragraph.findall(".//tei:ref[@type='bibr']", NS):
+                target = ref.attrib.get("target", "")
+                match = re.search(r"#b(\d+)", target)
+                if not match:
+                    continue
+                bib_index = int(match.group(1)) + 1
+                marker = "".join(ref.itertext()).strip() or target
+                context = three_sentence_window(p_text, marker)
+                inline.append(
+                    InlineCitation(marker=marker, bibliography_index=bib_index, context_window=context)
+                )
 
         return bibliography, inline, paper_title, paper_authors
 
@@ -107,8 +119,25 @@ def _extract_doi(bibl: ET.Element) -> str | None:
     return None
 
 
-def _context_window(node: ET.Element) -> str:
-    return re.sub(r"\s+", " ", "".join(node.itertext())).strip()[:800]
+def _extract_url(bibl: ET.Element) -> str | None:
+    for idno in bibl.findall(".//tei:idno", NS):
+        id_type = (idno.attrib.get("type") or "").lower()
+        if id_type in {"url", "uri"} and idno.text:
+            return idno.text.strip()
+    return None
+
+
+def _bibl_scope(bibl: ET.Element, unit: str) -> str | None:
+    for scope in bibl.findall(f".//tei:biblScope[@unit='{unit}']", NS):
+        if scope.text:
+            return scope.text.strip()
+        start = scope.attrib.get("from")
+        end = scope.attrib.get("to")
+        if start and end:
+            return f"{start}-{end}"
+        if start:
+            return start
+    return None
 
 
 grobid_client = GrobidClient()

@@ -8,11 +8,12 @@ type Props = {
   audit: AuditRun | null;
   citations?: CitationRecord[];
   onSelect?: (citation: CitationRecord) => void;
+  auditId?: string;
 };
 
 const EVENT_TYPES = ["all", "crossref", "nli", "claim", "verdict", "version", "bulk", "error"] as const;
 
-export function LivePanel({ events, audit, citations, onSelect }: Props) {
+export function LivePanel({ events, audit, citations, onSelect, auditId }: Props) {
   const [search, setSearch] = useState("");
   const [eventType, setEventType] = useState<string>("all");
 
@@ -46,7 +47,16 @@ export function LivePanel({ events, audit, citations, onSelect }: Props) {
           <p className="text-xs text-zinc-500">
             {running ? "Pipeline events stream while the audit runs." : "Resolution events from this audit."}
           </p>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-center gap-1">
+            {auditId && (
+              <a
+                className="papyrus-link py-1 font-audit text-xs"
+                href={`/api/audits/${auditId}/events/log.txt`}
+                download
+              >
+                Download log
+              </a>
+            )}
             <select
               value={eventType}
               onChange={(e) => setEventType(e.target.value)}

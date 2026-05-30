@@ -144,8 +144,10 @@ class CitationRecord(BaseModel):
     nli_verdict: NliVerdict = NliVerdict.SKIPPED
     quantitative_claim: bool = False
     quantitative_caveat: str | None = None
+    abstract_only_caveat: str | None = None
     confidence: ConfidenceLevel | None = None
     claim_alignment_verdict: str | None = None
+    needs_human_review: bool = False
 
     status: str = "pending"  # pending | resolving | complete
     verdict_color: str = "pending"  # UI token

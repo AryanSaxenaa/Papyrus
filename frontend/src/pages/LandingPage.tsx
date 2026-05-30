@@ -49,7 +49,7 @@ export default function LandingPage() {
   const ctaIllustrationY = useTransform(scrollYProgress, [0.55, 0.85], [0, reduce ? 0 : -24]);
 
   return (
-    <div className="landing-page min-h-screen overflow-x-hidden bg-[#fafafa] text-zinc-900">
+    <div className="landing-page min-h-screen overflow-x-clip bg-[#fafafa] text-zinc-900">
       <LandingNav />
       <LandingHeroShell />
 
@@ -63,7 +63,7 @@ export default function LandingPage() {
           }}
           aria-hidden
         />
-      <div className="relative z-[1]">
+      <div className="relative z-[1] overflow-visible">
       <LandingHowItWorks />
 
       <div className="mx-auto max-w-6xl px-6 pt-8 pb-6">

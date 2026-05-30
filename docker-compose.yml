@@ -29,13 +29,15 @@ services:
     build:
       context: ./backend
     environment:
+      APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg2://papyrus:papyrus@postgres:5432/papyrus
       PERSISTENCE_BACKEND: both
       REDIS_URL: redis://redis:6379/0
       GROBID_URL: http://grobid:8070
-      CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@example.com}
-      OPENALEX_MAILTO: ${OPENALEX_MAILTO:-dev@example.com}
-      UNPAYWALL_EMAIL: ${UNPAYWALL_EMAIL:-dev@example.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@localhost.invalid}
+      OPENALEX_MAILTO: ${OPENALEX_MAILTO:-dev@localhost.invalid}
+      UNPAYWALL_EMAIL: ${UNPAYWALL_EMAIL:-dev@localhost.invalid}
       USE_CELERY_BULK: "true"
     ports:
       - "8000:8000"
@@ -52,13 +54,15 @@ services:
     build:
       context: ./backend
     environment:
+      APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg2://papyrus:papyrus@postgres:5432/papyrus
       PERSISTENCE_BACKEND: both
       REDIS_URL: redis://redis:6379/0
       GROBID_URL: http://grobid:8070
-      CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@example.com}
-      OPENALEX_MAILTO: ${OPENALEX_MAILTO:-dev@example.com}
-      UNPAYWALL_EMAIL: ${UNPAYWALL_EMAIL:-dev@example.com}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@localhost.invalid}
+      OPENALEX_MAILTO: ${OPENALEX_MAILTO:-dev@localhost.invalid}
+      UNPAYWALL_EMAIL: ${UNPAYWALL_EMAIL:-dev@localhost.invalid}
       USE_CELERY_BULK: "true"
     volumes:
       - ./backend:/app

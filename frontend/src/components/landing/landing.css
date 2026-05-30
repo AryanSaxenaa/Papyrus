@@ -92,21 +92,7 @@
 }
 
 .workflow-steps-list {
-  scroll-behavior: smooth;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.workflow-steps-list::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .workflow-steps-list {
-    scroll-behavior: auto;
-  }
+  overflow: visible;
 }
 
 @keyframes lp-shimmer {

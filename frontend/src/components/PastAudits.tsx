@@ -19,19 +19,31 @@ export function PastAudits({
   const [summaries, setSummaries] = useState<AuditSummary[]>([]);
   const [open, setOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const load = useCallback(() => {
-    void fetch("/api/audits/summaries")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data) => setSummaries((data as AuditSummary[]).slice(0, 20)))
-      .catch((err: unknown) => {
-        console.warn("Failed to load audit summaries", err);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const response = await fetch("/api/audits/summaries");
+      if (!response.ok) {
+        setLoadError(`Could not load past audits (HTTP ${response.status}).`);
         setSummaries([]);
-      });
+        return;
+      }
+      const data = (await response.json()) as AuditSummary[];
+      setSummaries(data.slice(0, 20));
+    } catch {
+      setLoadError("Could not load past audits. Check that the API is running.");
+      setSummaries([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load, refreshKey]);
 
   const onDelete = async (auditId: string, event: MouseEvent) => {
@@ -49,7 +61,7 @@ export function PastAudits({
     }
   };
 
-  if (!summaries.length) return null;
+  if (!summaries.length && !loadError) return null;
 
   return (
     <div className={embedded ? "w-full" : "papyrus-card"}>
@@ -62,10 +74,26 @@ export function PastAudits({
       >
         <span className="font-audit text-xs">{open ? "▾" : "▸"}</span>
         Past audits
-        <span className="font-audit text-xs text-zinc-400">({summaries.length})</span>
+        {summaries.length > 0 && (
+          <span className="font-audit text-xs text-zinc-400">({summaries.length})</span>
+        )}
       </button>
 
-      {open && (
+      {loadError && (
+        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+          <p>{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="mt-1.5 font-audit text-[10px] uppercase text-amber-800 underline hover:text-amber-950 disabled:opacity-50"
+          >
+            {loading ? "Retrying…" : "Retry"}
+          </button>
+        </div>
+      )}
+
+      {open && summaries.length > 0 && (
         <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto papyrus-scroll-hidden">
           {summaries.map((row) => (
             <li key={row.id}>

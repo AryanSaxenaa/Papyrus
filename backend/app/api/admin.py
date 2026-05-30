@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
+from app.services.bulk_dispatch import celery_worker_available
 from app.services.corrections import correction_store
 from app.services.rate_limits import rate_limit_service
 
@@ -54,10 +55,14 @@ async def export_corrections_csv(limit: int = 500) -> StreamingResponse:
 @router.get("/config")
 async def get_public_config() -> dict:
     settings = get_settings()
+    celery_ready = await celery_worker_available()
     return {
         "pipeline_version": settings.pipeline_version,
         "persistence_backend": settings.persistence_backend,
         "grobid_enabled": settings.grobid_enabled,
+        "use_celery_bulk": settings.use_celery_bulk,
+        "bulk_queue_mode": "celery" if celery_ready else "background_tasks",
+        "celery_worker_available": celery_ready,
         "integrations": {
             "deepseek": bool(settings.deepseek_api_key),
             "openai_embeddings": bool(settings.openai_api_key),
