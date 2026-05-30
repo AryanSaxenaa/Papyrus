@@ -116,7 +116,13 @@ async def create_bulk_audit(background: BackgroundTasks, file: UploadFile) -> Bu
         shutil.copyfileobj(file.file, handle)
 
     bulk_job_store.create(job)
-    background.add_task(_run_bulk_job, job.id, zip_path)
+    settings = get_settings()
+    if settings.use_celery_bulk:
+        from app.worker import run_bulk_audit
+
+        run_bulk_audit.delay(str(job.id), str(zip_path))
+    else:
+        background.add_task(_run_bulk_job, job.id, zip_path)
     return job
 
 

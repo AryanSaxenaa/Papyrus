@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.services.firecrawl import firecrawl_client
+from app.services.unpaywall import unpaywall_client
 
 ARXIV_ABS = re.compile(r"arxiv\.org/abs/([\d.]+v?\d*)", re.I)
 ARXIV_PDF = re.compile(r"arxiv\.org/pdf/([\d.]+v?\d*)", re.I)
@@ -31,6 +32,9 @@ class UrlFetchService:
         try:
             return self.resolve_pdf_url(url)
         except ValueError:
+            oa_pdf = await self._resolve_doi_open_access(url)
+            if oa_pdf:
+                return oa_pdf
             landing = await self._resolve_landing_pdf(url)
             if landing:
                 return landing
@@ -38,6 +42,18 @@ class UrlFetchService:
                 "Could not resolve a PDF from this URL. Supported: arXiv, DOI with open access, "
                 "PubMed/PMC (via Firecrawl), and direct .pdf links."
             )
+
+    async def _resolve_doi_open_access(self, url: str) -> str | None:
+        doi_match = DOI_URL.search(url)
+        if not doi_match and "doi.org" not in urlparse(url).netloc.lower():
+            return None
+        doi = doi_match.group(0) if doi_match else urlparse(url).path.strip("/")
+        if not doi:
+            return None
+        unpaywall = await unpaywall_client.lookup(doi)
+        if not unpaywall:
+            return None
+        return unpaywall.get("open_access_pdf") or unpaywall.get("oa_url")
 
     def resolve_pdf_url(self, url: str) -> str:
         parsed = urlparse(url.strip())

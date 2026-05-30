@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
     enable_deepseek: bool = True
+    use_celery_bulk: bool = False
 
 
 @lru_cache

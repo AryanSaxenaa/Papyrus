@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.apify_client import ApifyClient
 from app.services.rate_limits import rate_limit_service
 
 
@@ -37,6 +38,25 @@ class JournalMetadataClient:
                 "published_online": _year_from_parts(message.get("published-online", {}).get("date-parts")),
                 "first_issue": _first_issue_year(message),
             }
+
+    async def lookup_issn_apify(self, issn: str) -> dict[str, Any] | None:
+        settings = get_settings()
+        normalized = issn.replace("-", "")
+        items = await ApifyClient().run_actor(
+            settings.apify_actor_crossref_journals,
+            {"issn": normalized, "maxItems": 1},
+        )
+        if not items:
+            return None
+        row = items[0]
+        first_year = row.get("firstIssueYear") or row.get("first_issue_year") or row.get("startYear")
+        return {
+            "title": row.get("title") or row.get("journalTitle"),
+            "issn": normalized,
+            "published_online": int(first_year) if first_year else None,
+            "first_issue": int(first_year) if first_year else None,
+            "source": "apify",
+        }
 
 
 def _year_from_parts(parts: list | None) -> int | None:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import difflib
 import re
 
-from app.config import get_settings
 from app.domain.enums import (
     CitationIntent,
     ConfidenceLevel,
@@ -39,7 +38,6 @@ def detect_hallucination(
     openalex: dict | None,
     merged_override: dict | None = None,
 ) -> None:
-    settings = get_settings()
     cited = record.bibliography
 
     resolved = merged_override or crossref or scholar or openalex
@@ -71,13 +69,6 @@ def detect_hallucination(
         record.title_edit_distance = round((1 - ratio) * 100, 1)
         if ratio < 0.35:
             record.hallucination_type = HallucinationType.DOI_REDIRECT
-            record.verdict_color = "failure"
-            record.evidence_tier = _tier_from_text(crossref)
-            return
-        semantic_mismatch = ratio < settings.title_drift_token_threshold
-        edit_gate = ratio < settings.title_drift_ratio_threshold
-        if edit_gate and semantic_mismatch:
-            record.hallucination_type = HallucinationType.TITLE_DRIFT
             record.verdict_color = "failure"
             record.evidence_tier = _tier_from_text(crossref)
             return

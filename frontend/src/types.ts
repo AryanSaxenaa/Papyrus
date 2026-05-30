@@ -25,7 +25,9 @@ export type AuditRun = {
     tier_3: number;
     tier_4: number;
     coverage_percent: number;
+    coverage_confidence?: string;
   };
+  risk_confidence?: string;
   failures: {
     confirmed_failure_rate: number;
     supported: number;
@@ -78,6 +80,8 @@ export type CitationRecord = {
   evidence_passage?: string | null;
   quantitative_caveat?: string | null;
   claim_alignment_verdict?: string | null;
+  title_edit_distance?: number | null;
+  confidence?: string | null;
   version_mismatch?: VersionMismatchInfo | null;
   exa_signal?: string | null;
   source_verify_url?: string | null;

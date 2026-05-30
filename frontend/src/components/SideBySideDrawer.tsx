@@ -24,6 +24,7 @@ export function SideBySideDrawer({
 }: Props) {
   const context = citation.inline_markers?.[0]?.context_window ?? "No inline context captured.";
   const claim = citation.claim_user_corrected ?? citation.extracted_claim;
+  const highlightClaim = claim && context.includes(claim);
 
   return (
     <div className="fixed inset-0 z-40 flex items-stretch justify-end bg-black/60 backdrop-blur-sm">
@@ -42,7 +43,22 @@ export function SideBySideDrawer({
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[1fr_0.9fr_1fr]">
           <Panel title="Manuscript context">
-            <p className="text-sm leading-relaxed text-stone-200">{context}</p>
+            <p className="text-sm leading-relaxed text-stone-200">
+              {highlightClaim ? (
+                <>
+                  {context.split(claim).map((part, index, parts) => (
+                    <span key={index}>
+                      {part}
+                      {index < parts.length - 1 && (
+                        <mark className="rounded bg-amber-900/60 px-1 text-amber-50">{claim}</mark>
+                      )}
+                    </span>
+                  ))}
+                </>
+              ) : (
+                context
+              )}
+            </p>
             <p className="mt-4 text-xs text-[var(--papyrus-muted)]">Bibliography entry</p>
             <p className="mt-1 font-audit text-xs text-stone-400">{citation.bibliography.raw}</p>
           </Panel>
@@ -51,6 +67,16 @@ export function SideBySideDrawer({
             <VerdictBadge citation={citation} />
             <p className="mt-3 text-xs text-[var(--papyrus-muted)]">Hallucination type</p>
             <p className="font-audit text-sm">{citation.hallucination_type}</p>
+            {citation.title_edit_distance != null && (
+              <p className="mt-1 text-xs text-stone-400">
+                Title edit distance: {citation.title_edit_distance}%
+              </p>
+            )}
+            {citation.confidence && (
+              <p className="mt-1 text-xs text-stone-400">
+                Confidence: <span className="font-audit uppercase">{citation.confidence}</span>
+              </p>
+            )}
             {citation.quantitative_caveat && (
               <p className="mt-3 rounded border border-amber-700/40 bg-amber-950/30 p-2 text-xs text-amber-100">
                 {citation.quantitative_caveat}
@@ -89,6 +115,12 @@ export function SideBySideDrawer({
             >
               Rerun alignment
             </button>
+            {citation.extracted_claim && citation.claim_user_corrected && (
+              <p className="mt-3 text-xs text-stone-500">
+                Original extraction:{" "}
+                <span className="text-stone-300">{citation.extracted_claim}</span>
+              </p>
+            )}
             {claim && (
               <p className="mt-3 text-xs text-stone-400">
                 Alignment: <span className="text-stone-200">{citation.claim_alignment_verdict ?? "—"}</span>
@@ -169,6 +201,15 @@ function VerdictBadge({ citation }: { citation: CitationRecord }) {
   );
 }
 
+function AbstractBlock({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="rounded border border-white/10 bg-black/20 p-2">
+      <p className="font-audit text-[10px] uppercase text-amber-300">{label}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-stone-400">{text.slice(0, 400)}…</p>
+    </div>
+  );
+}
+
 function VersionTimeline({ info }: { info: VersionMismatchInfo }) {
   const entries = [info.preprint, ...info.revisions, info.published].filter(Boolean);
   return (
@@ -177,8 +218,14 @@ function VersionTimeline({ info }: { info: VersionMismatchInfo }) {
       {info.material_difference && (
         <p className="text-xs text-amber-100">Material difference detected between preprint and published versions.</p>
       )}
+      {info.material_difference && info.preprint?.abstract && info.published?.abstract && (
+        <div className="grid gap-2 md:grid-cols-2">
+          <AbstractBlock label="Preprint abstract" text={info.preprint.abstract} />
+          <AbstractBlock label="Published abstract" text={info.published.abstract} />
+        </div>
+      )}
       {entries.map((entry) => (
-        <div key={entry!.label} className="border-l-2 border-amber-700/60 pl-3">
+        <div key={`${entry!.label}-${entry!.date}`} className="border-l-2 border-amber-700/60 pl-3">
           <p className="font-audit text-xs text-amber-300">{entry!.label}</p>
           {entry!.date && <p className="text-[10px] text-stone-500">{entry!.date}</p>}
           {entry!.title && <p className="mt-1 text-xs font-semibold">{entry!.title}</p>}

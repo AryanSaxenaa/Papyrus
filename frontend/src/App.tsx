@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { CoverageBar } from "./components/CoverageBar";
 import { CoverageSummary } from "./components/CoverageSummary";
 import { HeatmapLegend } from "./components/HeatmapLegend";
 import { LivePanel } from "./components/LivePanel";
+import { PaperAnatomy } from "./components/PaperAnatomy";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
@@ -17,32 +19,6 @@ const verdictClass: Record<string, string> = {
   amber: "bg-[var(--papyrus-amber)]",
 };
 
-function highlightCitations(text: string, citations: CitationRecord[]) {
-  const colors: Record<string, string> = {
-    supported: "#1f6b4a",
-    failure: "#8b1e2f",
-    retraction: "#8b1e2f",
-    cannot_assess: "#3d5a73",
-    neutral: "#5c6460",
-    unresolvable: "#4a524e",
-    resolving: "#b8860b",
-    pending: "#2a312e",
-    amber: "#b8860b",
-  };
-  let html = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  for (const citation of citations) {
-    for (const marker of [citation.bibliography.doi, `[${citation.index}]`]) {
-      if (!marker) continue;
-      const color = colors[citation.verdict_color] ?? colors.pending;
-      html = html.replaceAll(
-        marker,
-        `<mark style="background:${color};color:#fff;border-radius:2px;padding:0 2px">${marker}</mark>`,
-      );
-    }
-  }
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
-}
-
 export default function App() {
   const [audit, setAudit] = useState<AuditRun | null>(null);
   const [events, setEvents] = useState<StreamEvent[]>([]);
@@ -56,6 +32,8 @@ export default function App() {
   const [filter, setFilter] = useState<HeatmapFilter>("all");
   const [claimDraft, setClaimDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [expandedBulkId, setExpandedBulkId] = useState<string | null>(null);
+  const [bulkAuditCache, setBulkAuditCache] = useState<Record<string, AuditRun>>({});
 
   const refreshAudit = useCallback(async (id: string) => {
     const response = await fetch(`/api/audits/${id}`);
@@ -245,29 +223,20 @@ export default function App() {
     );
   }, [audit?.citations, filter]);
 
-  const coverageBar = useMemo(() => {
-    if (!audit) return null;
-    const { coverage } = audit;
-    const total = coverage.total || 1;
-    const segments = [
-      { label: "Tier 1", value: coverage.tier_1, color: "bg-emerald-700" },
-      { label: "Tier 2", value: coverage.tier_2, color: "bg-emerald-900" },
-      { label: "Tier 3", value: coverage.tier_3, color: "bg-slate-600" },
-      { label: "Unresolvable", value: coverage.tier_4, color: "bg-stone-600" },
-    ];
-    return (
-      <div className="flex h-3 overflow-hidden rounded-full border border-white/10">
-        {segments.map((segment) => (
-          <div
-            key={segment.label}
-            className={segment.color}
-            style={{ width: `${(segment.value / total) * 100}%` }}
-            title={`${segment.label}: ${segment.value}`}
-          />
-        ))}
-      </div>
-    );
-  }, [audit]);
+  const openBulkPaper = async (auditId: string) => {
+    if (bulkAuditCache[auditId]) {
+      setAudit(bulkAuditCache[auditId]);
+      setExpandedBulkId(auditId);
+      return;
+    }
+    const response = await fetch(`/api/audits/${auditId}`);
+    if (!response.ok) return;
+    const data = (await response.json()) as AuditRun;
+    setBulkAuditCache((prev) => ({ ...prev, [auditId]: data }));
+    setAudit(data);
+    setExpandedBulkId(auditId);
+    setShowAnatomy(true);
+  };
 
   return (
     <div className="min-h-screen">
@@ -372,22 +341,51 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bulkDashboard.papers.map((paper) => (
-                      <tr
-                        key={paper.audit_id}
-                        className="cursor-pointer border-t border-white/5 hover:bg-white/5"
-                        onClick={() => {
-                          void fetch(`/api/audits/${paper.audit_id}`)
-                            .then((response) => response.json())
-                            .then((data) => setAudit(data as AuditRun));
-                        }}
-                      >
-                        <td className="py-2 pr-3">{paper.title ?? paper.audit_id.slice(0, 8)}</td>
-                        <td className="py-2 pr-3 font-audit">{paper.coverage_percent}%</td>
-                        <td className="py-2 pr-3 font-audit">{paper.confirmed_failure_rate}%</td>
-                        <td className="py-2 font-audit uppercase">{paper.risk_level}</td>
-                      </tr>
-                    ))}
+                    {bulkDashboard.papers.map((paper) => {
+                      const cached = bulkAuditCache[paper.audit_id];
+                      const isExpanded = expandedBulkId === paper.audit_id;
+                      return (
+                        <Fragment key={paper.audit_id}>
+                          <tr
+                            className="cursor-pointer border-t border-white/5 hover:bg-white/5"
+                            onClick={() => void openBulkPaper(paper.audit_id)}
+                          >
+                            <td className="py-2 pr-3">
+                              {paper.title ?? paper.audit_id.slice(0, 8)}
+                              {isExpanded && (
+                                <span className="ml-2 font-audit text-[10px] text-emerald-400">expanded</span>
+                              )}
+                            </td>
+                            <td className="py-2 pr-3 font-audit">{paper.coverage_percent}%</td>
+                            <td className="py-2 pr-3 font-audit">{paper.confirmed_failure_rate}%</td>
+                            <td className="py-2 font-audit uppercase">{paper.risk_level}</td>
+                          </tr>
+                          {isExpanded && cached && (
+                            <tr key={`${paper.audit_id}-heat`} className="border-t border-white/5 bg-black/20">
+                              <td colSpan={4} className="py-3">
+                                <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-1">
+                                  {cached.citations.map((citation) => (
+                                    <button
+                                      key={citation.id}
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelected(citation);
+                                      }}
+                                      className={`rounded p-1 text-left text-[10px] ${
+                                        verdictClass[citation.verdict_color] ?? verdictClass.pending
+                                      }`}
+                                    >
+                                      #{citation.index}
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -411,7 +409,9 @@ export default function App() {
                   <p className="mt-2 font-audit text-sm uppercase text-amber-300">{audit.risk_level} risk</p>
                 </div>
               </div>
-              <div className="mt-4">{coverageBar}</div>
+              <div className="mt-4">
+                <CoverageBar audit={audit} />
+              </div>
               <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
               {audit.status === "complete" && (
                 <div className="mt-3 flex gap-3 text-sm">
@@ -472,8 +472,12 @@ export default function App() {
                 Paper anatomy view {showAnatomy ? "▾" : "▸"}
               </button>
               {showAnatomy && (
-                <div className="mt-3 max-h-64 overflow-y-auto text-sm leading-relaxed text-stone-200">
-                  {highlightCitations(audit.paper_text, audit.citations)}
+                <div className="mt-3 max-h-64 overflow-y-auto">
+                  <PaperAnatomy
+                    text={audit.paper_text}
+                    citations={audit.citations}
+                    onSelectCitation={setSelected}
+                  />
                 </div>
               )}
             </div>

@@ -6,7 +6,8 @@ from uuid import UUID
 from app.domain.enums import EvidenceTier, HallucinationType, ResolutionSource
 from app.domain.models import CitationRecord, ResolutionAttempt
 from app.pipeline.verdicts import compare_titles, detect_hallucination
-from app.pipeline.version_tracking import build_version_timeline
+from app.pipeline.title_drift import apply_title_drift_gate
+from app.pipeline.version_tracking import build_version_timeline, enrich_version_timeline
 from app.services.arxiv import arxiv_client
 from app.services.europe_pmc import europe_pmc_client
 from app.services.cache import cache_service
@@ -198,8 +199,21 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
 
     detect_hallucination(record, crossref, scholar, openalex, merged_override=merged or None)
 
+    if record.hallucination_type == HallucinationType.NONE and cited.title and crossref:
+        await apply_title_drift_gate(record, cited.title, crossref)
+        if record.hallucination_type == HallucinationType.TITLE_DRIFT:
+            event_bus.emit(
+                audit_id,
+                "title_drift",
+                "Type 6 — title drift (edit distance + semantic gate)",
+                citation_index=record.index,
+                edit_distance=record.title_edit_distance,
+            )
+
     if crossref and cited.year and crossref.get("issn"):
         journal_meta = await journal_client.lookup_issn(crossref["issn"])
+        if not journal_meta:
+            journal_meta = await journal_client.lookup_issn_apify(crossref["issn"])
         if is_year_impossible(cited.year, journal_meta):
             record.hallucination_type = HallucinationType.DATE_IMPOSSIBLE
             record.verdict_color = "failure"
@@ -224,12 +238,19 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
             record.hallucination_type = HallucinationType.VERSION_MISMATCH
             record.verdict_color = "failure"
             record.version_mismatch = build_version_timeline(arxiv, crossref)
+            if record.version_mismatch:
+                arxiv_id = arxiv.get("arxiv_id") or arxiv_client.extract_id(cited.doi) or arxiv_client.extract_id(cited.raw)
+                record.version_mismatch = await enrich_version_timeline(
+                    record.version_mismatch,
+                    arxiv_id,
+                )
             event_bus.emit(
                 audit_id,
                 "version",
                 "Version mismatch timeline built",
                 citation_index=record.index,
                 material=record.version_mismatch.material_difference if record.version_mismatch else False,
+                revisions=len(record.version_mismatch.revisions) if record.version_mismatch else 0,
             )
 
     if record.evidence_tier == EvidenceTier.TIER_4 and cited.title:

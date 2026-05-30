@@ -22,6 +22,42 @@ class ArxivClient:
         match = ARXIV_ID.match(doi_or_text.strip())
         return match.group(1) if match else None
 
+    async def fetch_revision_entries(self, arxiv_id: str) -> list[dict[str, Any]]:
+        base_id = re.sub(r"v\d+$", "", arxiv_id, flags=re.I)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                self.EXPORT,
+                params={
+                    "search_query": f"id:{base_id}",
+                    "max_results": 15,
+                    "sortBy": "submittedDate",
+                    "sortOrder": "ascending",
+                },
+            )
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+            entries = root.findall("atom:entry", ATOM_NS)
+            revisions: list[dict[str, Any]] = []
+            for entry in entries:
+                entry_id = _text(entry.find("atom:id", ATOM_NS)) or ""
+                if base_id not in entry_id:
+                    continue
+                version_label = "v1"
+                match = re.search(r"v(\d+)$", entry_id)
+                if match:
+                    version_label = f"v{match.group(1)}"
+                published = _text(entry.find("atom:published", ATOM_NS))
+                updated = _text(entry.find("atom:updated", ATOM_NS))
+                revisions.append(
+                    {
+                        "label": f"arXiv {version_label}",
+                        "date": (updated or published or "")[:10] or None,
+                        "title": _text(entry.find("atom:title", ATOM_NS)),
+                        "abstract": (_text(entry.find("atom:summary", ATOM_NS)) or "")[:1500] or None,
+                    }
+                )
+            return revisions
+
     async def fetch(self, arxiv_id: str) -> dict[str, Any] | None:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(self.EXPORT, params={"id_list": arxiv_id})

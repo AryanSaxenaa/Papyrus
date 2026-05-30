@@ -1,4 +1,4 @@
-from app.domain.enums import EvidenceTier, HallucinationType, RiskLevel
+from app.domain.enums import ConfidenceLevel, EvidenceTier, HallucinationType, RiskLevel
 from app.domain.models import AuditRun, CoverageSummary, FailureSummary
 
 
@@ -23,6 +23,14 @@ def finalize_scores(audit: AuditRun) -> None:
 
     resolved = tier_1 + tier_2 + tier_3
     coverage_percent = round((resolved / total) * 100, 1) if total else 0.0
+    unresolvable_ratio = (tier_4 / total) if total else 0.0
+    if unresolvable_ratio > 0.5:
+        coverage_confidence = ConfidenceLevel.LOW
+    elif unresolvable_ratio > 0.25:
+        coverage_confidence = ConfidenceLevel.MEDIUM
+    else:
+        coverage_confidence = ConfidenceLevel.HIGH
+
     audit.coverage = CoverageSummary(
         total=total,
         tier_1=tier_1,
@@ -30,6 +38,7 @@ def finalize_scores(audit: AuditRun) -> None:
         tier_3=tier_3,
         tier_4=tier_4,
         coverage_percent=coverage_percent,
+        coverage_confidence=coverage_confidence,
     )
 
     failures = FailureSummary()
@@ -43,12 +52,12 @@ def finalize_scores(audit: AuditRun) -> None:
             failures.type_5 += 1
         elif citation.hallucination_type == HallucinationType.TITLE_DRIFT:
             failures.type_6 += 1
+        elif citation.hallucination_type == HallucinationType.VERSION_MISMATCH:
+            failures.version_mismatch += 1
         elif citation.hallucination_type == HallucinationType.CLAIM_CONTRADICTION:
             failures.type_7 += 1
         elif citation.hallucination_type == HallucinationType.RETRACTION:
             failures.retraction += 1
-        elif citation.hallucination_type == HallucinationType.VERSION_MISMATCH:
-            failures.version_mismatch += 1
         elif citation.claim_alignment_verdict == "supported":
             failures.supported += 1
         elif citation.claim_alignment_verdict in {"claim_contradiction", "not_addressed"}:

@@ -101,5 +101,18 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Apify actor fallback layer (arxiv, OpenAlex, Europe PMC scrapers)
 - [x] Rate-limit tracking + admin dashboard endpoint
 - [x] CrossRef journal ISSN check for Type 5 (date impossible)
+- [x] Type 6 embedding semantic gate (OpenAI) + edit-distance gate
+- [x] arXiv revision history + Apify version enrichment for timelines
+- [x] DOI URL → Unpaywall open-access PDF before Firecrawl fallback
+- [x] Apify CrossRef journals fallback for Type 5
+- [x] Spec-aligned TXT report (coverage confidence, claim breakdown, version timeline)
+- [x] Coverage bar with confidence note; clickable paper anatomy markers
+- [x] Bulk dashboard inline heatmap expand; optional Celery bulk (`USE_CELERY_BULK=true`)
 
 See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
+
+### Still out of scope / v2
+
+- Normalized PostgreSQL schema (current: JSON blob per audit)
+- Local/on-prem NLI model (current: Hugging Face API + lexical fallback)
+- Circular citation detection (spec § excluded from v1)
