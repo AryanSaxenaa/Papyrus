@@ -1,24 +1,6 @@
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 
-
-
-type Summary = {
-
-  id: string;
-
-  paper_title?: string | null;
-
-  status: string;
-
-  coverage_percent: number;
-
-  failure_rate: number;
-
-  risk_level: string;
-
-  citation_count: number;
-
-};
+import type { AuditSummary } from "../types";
 
 
 
@@ -38,7 +20,7 @@ type Props = {
 
 export function PastAudits({ onSelect, refreshKey = 0, activeAuditId, onDeleted }: Props) {
 
-  const [summaries, setSummaries] = useState<Summary[]>([]);
+  const [summaries, setSummaries] = useState<AuditSummary[]>([]);
 
   const [open, setOpen] = useState(false);
 
@@ -52,9 +34,12 @@ export function PastAudits({ onSelect, refreshKey = 0, activeAuditId, onDeleted 
 
       .then((response) => (response.ok ? response.json() : []))
 
-      .then((data) => setSummaries((data as Summary[]).slice(0, 20)))
+      .then((data) => setSummaries((data as AuditSummary[]).slice(0, 20)))
 
-      .catch(() => setSummaries([]));
+      .catch((err: unknown) => {
+        console.warn("Failed to load audit summaries", err);
+        setSummaries([]);
+      });
 
   }, []);
 

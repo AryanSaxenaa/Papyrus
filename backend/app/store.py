@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import AuditRecord, AuditSummaryRecord, CitationIndexRecord
-from app.services.citations_index import sync_citation_index
-from app.services.relational_audit import delete_relational_audit, sync_relational_audit
+from app.persistence.postgres_sync import sync_postgres_audit_indexes
+from app.services.relational_audit import delete_relational_audit
 from app.db.session import get_engine
-from app.domain.models import AuditRun
+from app.domain.models import AuditRun, AuditSummary
 
 
 class AuditStore:
@@ -61,20 +61,20 @@ class AuditStore:
         if self._use_postgres():
             self._save_postgres(audit, payload)
 
-    def list_summaries(self) -> list[dict]:
+    def list_summaries(self) -> list[AuditSummary]:
         engine = get_engine()
         if engine is None:
             return [
-                {
-                    "id": str(a.id),
-                    "paper_title": a.paper_title,
-                    "status": a.status,
-                    "coverage_percent": a.coverage.coverage_percent,
-                    "failure_rate": a.failures.confirmed_failure_rate,
-                    "risk_level": a.risk_level.value,
-                    "citation_count": len(a.citations),
-                    "created_at": a.created_at.isoformat(),
-                }
+                AuditSummary(
+                    id=str(a.id),
+                    paper_title=a.paper_title,
+                    status=a.status,
+                    coverage_percent=a.coverage.coverage_percent,
+                    failure_rate=a.failures.confirmed_failure_rate,
+                    risk_level=a.risk_level.value,
+                    citation_count=len(a.citations),
+                    created_at=a.created_at.isoformat(),
+                )
                 for a in self.list()
             ]
         with Session(engine) as session:
@@ -82,16 +82,16 @@ class AuditStore:
                 select(AuditSummaryRecord).order_by(AuditSummaryRecord.created_at.desc())
             ).all()
             return [
-                {
-                    "id": row.id,
-                    "paper_title": row.paper_title,
-                    "status": row.status,
-                    "coverage_percent": row.coverage_percent,
-                    "failure_rate": row.failure_rate,
-                    "risk_level": row.risk_level,
-                    "citation_count": row.citation_count,
-                    "created_at": row.created_at.isoformat() if row.created_at else None,
-                }
+                AuditSummary(
+                    id=row.id,
+                    paper_title=row.paper_title,
+                    status=row.status,
+                    coverage_percent=row.coverage_percent,
+                    failure_rate=row.failure_rate,
+                    risk_level=row.risk_level,
+                    citation_count=row.citation_count,
+                    created_at=row.created_at.isoformat() if row.created_at else None,
+                )
                 for row in rows
             ]
 
@@ -144,8 +144,7 @@ class AuditStore:
                 row.payload = payload
             session.commit()
         self._save_summary(audit)
-        sync_citation_index(audit)
-        sync_relational_audit(audit)
+        sync_postgres_audit_indexes(audit)
 
     def delete(self, audit_id: UUID) -> bool:
         removed = False

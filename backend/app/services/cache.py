@@ -1,10 +1,10 @@
 import hashlib
 import json
-from typing import Any
 
 import redis.asyncio as redis
 
 from app.config import get_settings
+from app.domain.json_types import JsonValue
 
 
 class CacheService:
@@ -29,13 +29,13 @@ class CacheService:
         digest = hashlib.sha256(value.encode()).hexdigest()[:24]
         return f"{prefix}:{digest}"
 
-    async def get_json(self, prefix: str, value: str) -> Any | None:
+    async def get_json(self, prefix: str, value: str) -> JsonValue | None:
         if not self._client:
             return None
         raw = await self._client.get(self._key(prefix, value))
         return json.loads(raw) if raw else None
 
-    async def set_json(self, prefix: str, value: str, payload: Any) -> None:
+    async def set_json(self, prefix: str, value: str, payload: JsonValue) -> None:
         if not self._client:
             return
         settings = get_settings()

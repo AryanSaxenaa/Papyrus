@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from app.domain.enums import EvidenceTier, HallucinationType, ResolutionSource
+from app.domain.metadata import ResolvedMetadata
 from app.domain.models import CitationRecord, ResolutionAttempt
 from app.pipeline.verdicts import detect_hallucination
 from app.text.similarity import compare_titles
@@ -25,14 +25,14 @@ from app.services.unpaywall import unpaywall_client
 
 
 def merge_resolved(
-    crossref: dict | None,
-    scholar: dict | None,
-    openalex: dict | None,
-    arxiv: dict | None,
-    unpaywall: dict | None,
-    europe_pmc: dict | None = None,
-    apify: dict | None = None,
-) -> dict[str, Any]:
+    crossref: ResolvedMetadata | None,
+    scholar: ResolvedMetadata | None,
+    openalex: ResolvedMetadata | None,
+    arxiv: ResolvedMetadata | None,
+    unpaywall: ResolvedMetadata | None,
+    europe_pmc: ResolvedMetadata | None = None,
+    apify: ResolvedMetadata | None = None,
+) -> ResolvedMetadata:
     base = crossref or scholar or openalex or arxiv or europe_pmc or apify or {}
     merged = dict(base)
     for extra in (scholar, openalex, arxiv, europe_pmc, apify):
@@ -49,7 +49,7 @@ def merge_resolved(
     return merged
 
 
-async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, Any] | None:
+async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMetadata | None:
     cited = record.bibliography
     crossref = None
     scholar = None
@@ -327,7 +327,7 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> dict[str, An
     return merged if merged else None
 
 
-def _attempt(source: ResolutionSource, query: str, success: bool, payload: Any) -> ResolutionAttempt:
+def _attempt(source: ResolutionSource, query: str, success: bool, payload: object | None) -> ResolutionAttempt:
     return ResolutionAttempt(
         source=source,
         query=query,

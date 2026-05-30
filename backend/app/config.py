@@ -8,7 +8,6 @@ class Settings(BaseSettings):
 
     app_name: str = "Papyrus"
     pipeline_version: str = "2.0"
-    debug: bool = False
 
     # SQLAlchemy sync URL (postgresql+psycopg2:// in Docker).
     database_url: str = "postgresql+psycopg2://papyrus:papyrus@localhost:5432/papyrus"
@@ -17,6 +16,8 @@ class Settings(BaseSettings):
 
     grobid_url: str = "http://localhost:8070"
     grobid_enabled: bool = True
+    # Min share of bibliography rows with title + (DOI or year) before keeping GROBID output.
+    grobid_min_bibliography_fill_ratio: float = 0.4
 
     crossref_mailto: str = "contact@example.com"
     semantic_scholar_api_key: str | None = None

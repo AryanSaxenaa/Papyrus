@@ -4,14 +4,14 @@ from typing import Any
 
 import httpx
 
+from app.text.identifiers import normalize_doi
+
 
 class EuropePMCClient:
-    """Europe PMC REST search for biomedical abstracts and open-access links."""
-
     BASE = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 
     async def lookup_doi(self, doi: str) -> dict[str, Any] | None:
-        normalized = doi.strip().removeprefix("https://doi.org/")
+        normalized = normalize_doi(doi)
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 self.BASE,

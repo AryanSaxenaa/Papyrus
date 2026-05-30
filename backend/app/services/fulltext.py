@@ -45,7 +45,7 @@ class FullTextService:
             snippet = text[:120_000]
             await cache_service.set_json("fulltext", cache_key, {"text": snippet})
             return snippet
-        except Exception:
+        except (httpx.HTTPError, OSError, RuntimeError, ValueError):
             return None
         finally:
             if file_path.exists():

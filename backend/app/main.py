@@ -8,6 +8,8 @@ from app.api.admin import router as admin_router
 from app.api.routes import router
 from app.config import get_settings
 from app.db.session import init_db
+from redis.exceptions import RedisError
+
 from app.services.cache import cache_service
 
 
@@ -19,7 +21,7 @@ async def lifespan(_: FastAPI):
     init_db()
     try:
         await cache_service.connect()
-    except Exception:
+    except (RedisError, OSError):
         # Redis optional for local dev without Docker
         pass
     yield

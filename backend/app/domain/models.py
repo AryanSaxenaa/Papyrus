@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import (
     CitationIntent,
@@ -22,7 +21,59 @@ class ResolutionAttempt(BaseModel):
     query: str
     success: bool
     summary: str
-    payload: dict[str, Any] | None = None
+    payload: dict[str, object] | None = None
+
+
+class AuditLimitations(BaseModel):
+    not_ai_detection: bool = True
+    exa_absence_not_verdict: bool = True
+    unresolvable_count: int = 0
+    field_coverage_note: str | None = None
+    misappropriation_not_detected: str = (
+        "Papyrus does not detect misappropriated citations where a real paper is cited "
+        "out of context to support a claim its authors never made."
+    )
+    nli_quantitative_caveat: str = (
+        "NLI may not detect numerical discrepancies or causal vs correlational differences. "
+        "Manual verification is recommended for quantitative claims."
+    )
+    out_of_scope: list[str] = Field(
+        default_factory=lambda: [
+            "AI authorship detection",
+            "Author Ghost (author publication history heuristics)",
+            "Journal Phantom via DOAJ",
+            "Circular citation analysis (v2)",
+            "Self-citation manipulation",
+            "Research quality beyond reference integrity",
+        ]
+    )
+
+
+class AuditStreamEvent(BaseModel):
+    """SSE / audit log event payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    ts: str
+    type: str
+    message: str
+    citation_index: int | None = None
+    path: str | None = None
+    bibliography_count: int | None = None
+    inline_count: int | None = None
+    coverage: float | None = None
+    risk: str | None = None
+    doi: str | None = None
+    counts: dict[str, int] | None = None
+    hallucination: str | None = None
+    tier: str | None = None
+    color: str | None = None
+    claim: str | None = None
+    intent: str | None = None
+    error: str | None = None
+    job_id: str | None = None
+    completed: int | None = None
+    failed: int | None = None
 
 
 class BibliographyEntry(BaseModel):
@@ -140,11 +191,24 @@ class AuditRun(BaseModel):
     risk_level: RiskLevel = RiskLevel.LOW
     risk_confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
 
-    events: list[dict[str, Any]] = Field(default_factory=list)
-    limitations: dict[str, Any] | None = None
+    events: list[dict[str, object]] = Field(default_factory=list)
+    limitations: AuditLimitations | None = None
     bulk_job_id: UUID | None = None
     source_url: str | None = None
     paper_text: str | None = None
+
+
+class AuditSummary(BaseModel):
+    """Lightweight row for audit list UIs (`GET /api/audits/summaries`)."""
+
+    id: str
+    paper_title: str | None = None
+    status: str
+    coverage_percent: float
+    failure_rate: float
+    risk_level: str
+    citation_count: int
+    created_at: str | None = None
 
 
 class BulkAuditJob(BaseModel):
@@ -160,3 +224,30 @@ class BulkAuditJob(BaseModel):
     avg_seconds_per_paper: float | None = None
     estimated_seconds_remaining: int | None = None
     error: str | None = None
+
+
+class BulkDashboardPaper(BaseModel):
+    """One ranked paper row in `GET /api/bulk/{id}/dashboard`."""
+
+    audit_id: str
+    title: str | None = None
+    first_author: str | None = None
+    status: str
+    coverage_percent: float
+    confirmed_failure_rate: float
+    risk_level: str
+    resolvable_citations: int
+    type_1: int = 0
+    type_2: int = 0
+    type_5: int = 0
+    type_6: int = 0
+    type_7: int = 0
+    retraction: int = 0
+    version_mismatch: int = 0
+
+
+class BulkDashboard(BaseModel):
+    job: BulkAuditJob
+    papers: list[BulkDashboardPaper]
+    pending_papers: int
+    note: str

@@ -1,7 +1,8 @@
 import type { CitationRecord } from "../types";
+import { isRetraction } from "./verdictColors";
 
 export function verdictBadgeLabel(citation: CitationRecord): string {
-  if (citation.hallucination_type === "retraction" || citation.verdict_color === "retraction") {
+  if (isRetraction(citation)) {
     return "RETRACTED";
   }
   if (citation.claim_alignment_verdict === "supported" || citation.verdict_color === "supported") {

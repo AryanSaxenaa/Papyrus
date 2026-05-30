@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -25,6 +25,7 @@ from app.domain.enums import (
     RiskLevel,
 )
 from app.domain.models import (
+    AuditLimitations,
     AuditRun,
     BibliographyEntry,
     CitationRecord,
@@ -64,7 +65,9 @@ def sync_relational_audit(audit: AuditRun) -> None:
         meta.risk_confidence = audit.risk_confidence.value
         meta.coverage_json = json.dumps(audit.coverage.model_dump(mode="json"))
         meta.failures_json = json.dumps(audit.failures.model_dump(mode="json"))
-        meta.limitations_json = json.dumps(audit.limitations) if audit.limitations else None
+        meta.limitations_json = (
+            json.dumps(audit.limitations.model_dump(mode="json")) if audit.limitations else None
+        )
         meta.source_url = audit.source_url
         meta.bulk_job_id = str(audit.bulk_job_id) if audit.bulk_job_id else None
         meta.error = audit.error
@@ -179,23 +182,6 @@ def list_citation_attempts(audit_id: str, citation_id: str) -> list[dict]:
     ]
 
 
-def relational_schema_stats() -> dict:
-    engine = get_engine()
-    if engine is None:
-        return {"postgres": False}
-    with Session(engine) as session:
-        def _count(model: type) -> int:
-            return int(session.scalar(select(func.count()).select_from(model)) or 0)
-
-        return {
-            "postgres": True,
-            "audit_metadata": _count(AuditMetadataRecord),
-            "citations": _count(CitationRow),
-            "resolution_attempts": _count(ResolutionAttemptRow),
-            "audit_events": _count(AuditEventRow),
-        }
-
-
 def load_audit_events(audit_id: str) -> list[dict]:
     engine = get_engine()
     if engine is None:
@@ -302,7 +288,11 @@ def hydrate_audit_from_relational(audit_id: str) -> AuditRun | None:
         risk_confidence=ConfidenceLevel(meta.risk_confidence),
         coverage=coverage,
         failures=failures,
-        limitations=json.loads(meta.limitations_json) if meta.limitations_json else None,
+        limitations=(
+            AuditLimitations.model_validate(json.loads(meta.limitations_json))
+            if meta.limitations_json
+            else None
+        ),
         source_url=meta.source_url,
         bulk_job_id=UUID(meta.bulk_job_id) if meta.bulk_job_id else None,
         error=meta.error,

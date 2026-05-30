@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import type { CitationRecord } from "../types";
 import { collectAnatomyMarkers, findMarkerInString } from "../lib/anatomyMarkers";
-import { citationFill, isRetraction } from "../lib/verdictColors";
+import { citationFill, citationMarkerRingClass } from "../lib/verdictColors";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -18,10 +18,10 @@ type Props = {
 
 function applyCitationStyles(button: HTMLButtonElement, citation: CitationRecord) {
   button.style.backgroundColor = citationFill(citation);
-  if (isRetraction(citation)) {
-    button.classList.add("ring-1", "ring-amber-400");
-  } else {
-    button.classList.remove("ring-1", "ring-amber-400");
+  const ringClass = citationMarkerRingClass(citation);
+  button.classList.remove("ring-1", "ring-amber-400");
+  if (ringClass) {
+    button.classList.add(...ringClass.split(/\s+/));
   }
 }
 

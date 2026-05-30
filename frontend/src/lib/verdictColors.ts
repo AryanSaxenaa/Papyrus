@@ -1,6 +1,6 @@
 import type { CitationRecord } from "../types";
 
-export const VERDICT_FILL: Record<string, string> = {
+const VERDICT_FILL: Record<string, string> = {
   supported: "#1a4d3e",
   failure: "#6b1f2a",
   retraction: "#6b1f2a",
@@ -29,6 +29,11 @@ export function citationFill(citation: CitationRecord): string {
     return VERDICT_FILL.retraction;
   }
   return VERDICT_FILL[citation.verdict_color] ?? VERDICT_FILL.pending;
+}
+
+/** Tailwind ring classes for inline citation markers (text + PDF overlay). */
+export function citationMarkerRingClass(citation: CitationRecord): string {
+  return isRetraction(citation) ? "ring-1 ring-amber-400" : "";
 }
 
 export function citationCardClass(citation: CitationRecord): string {

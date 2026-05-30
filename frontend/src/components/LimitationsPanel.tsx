@@ -24,7 +24,7 @@ export function LimitationsPanel({ audit }: Props) {
       )}
       {limitations.out_of_scope && (
         <ul className="mt-2 list-inside list-disc space-y-1 text-stone-400">
-          {(limitations.out_of_scope as string[]).map((item) => (
+          {limitations.out_of_scope.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>

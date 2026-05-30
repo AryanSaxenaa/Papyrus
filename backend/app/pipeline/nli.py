@@ -88,7 +88,6 @@ def confidence_for_verdict(
     nli: NliVerdict,
     tier: EvidenceTier,
 ) -> tuple[str, str]:
-    """Map NLI + tier to claim_alignment_verdict label and confidence token."""
     if nli == NliVerdict.ENTAILS:
         if tier == EvidenceTier.TIER_1:
             return "supported", "high"

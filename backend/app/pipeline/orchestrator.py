@@ -19,6 +19,7 @@ from app.services.fallback_parser import parse_pdf_fallback
 from app.services.grobid import grobid_client
 from app.services.pdf_text import extract_paper_text
 from app.store import audit_store
+from app.text.identifiers import normalize_doi
 
 
 class AuditOrchestrator:
@@ -36,7 +37,7 @@ class AuditOrchestrator:
         audit.paper_authors = paper_authors
         try:
             audit.paper_text = extract_paper_text(pdf_path)
-        except Exception:  # noqa: BLE001
+        except (OSError, RuntimeError, ValueError):
             audit.paper_text = None
         event_bus.emit(
             audit_id,
@@ -69,7 +70,7 @@ class AuditOrchestrator:
         if not audit:
             raise ValueError("Audit not found")
 
-        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        normalized = normalize_doi(doi)
         audit.status = "running"
         audit_store.save(audit)
         audit.paper_title = f"DOI verification: {normalized}"
@@ -165,7 +166,8 @@ class AuditOrchestrator:
             try:
                 bibliography, inline, title, paper_authors = await grobid_client.parse_pdf(pdf_path)
                 filled = sum(1 for b in bibliography if b.title and (b.doi or b.year))
-                if bibliography and filled / len(bibliography) >= 0.4:
+                min_fill = settings.grobid_min_bibliography_fill_ratio
+                if bibliography and filled / len(bibliography) >= min_fill:
                     return bibliography, inline, title, paper_authors
                 event_bus.emit(audit_id, "grobid", "Sparse GROBID output — routing to PyMuPDF fallback")
             except Exception as exc:  # noqa: BLE001

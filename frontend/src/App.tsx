@@ -56,9 +56,7 @@ export default function App() {
       try {
         const payload = JSON.parse(message.data) as StreamEvent;
         setBulkEvents((prev) => [...prev.slice(-80), payload]);
-      } catch {
-        // ignore malformed chunks
-      }
+      } catch {}
     };
     source.onerror = () => source.close();
     return () => source.close();
@@ -71,9 +69,7 @@ export default function App() {
       try {
         const payload = JSON.parse(message.data) as StreamEvent;
         setEvents((prev) => [...prev, payload]);
-      } catch {
-        // ignore malformed chunks
-      }
+      } catch {}
     };
     source.onerror = () => source.close();
     return () => source.close();

@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.text.identifiers import author_title_query
 
 EXA_ABSENCE_MESSAGE = (
     "Not found in any indexed source — signal only, not a verdict. Human review required."
@@ -21,9 +22,7 @@ class ExaClient:
         if not settings.exa_api_key:
             return {"found": False, "message": EXA_ABSENCE_MESSAGE, "skipped": True}
 
-        query = title
-        if authors:
-            query = f"{authors[0]} {title}"
+        query = author_title_query(title, authors)
 
         async with httpx.AsyncClient(timeout=45.0) as client:
             response = await client.post(

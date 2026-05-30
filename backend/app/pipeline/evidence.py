@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 import difflib
-import re
 from datetime import datetime, timezone
 
 from app.config import get_settings
 from app.services.embeddings import embedding_rank_best_chunk
 from app.domain.enums import EvidenceTier, ResolutionSource
 from app.domain.models import CitationRecord
-
-SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+from app.text.sentences import split_sentences
 
 
 def chunk_text(text: str, max_chars: int = 2048) -> list[str]:
-    sentences = [s.strip() for s in SENTENCE_SPLIT.split(text) if s.strip()]
+    sentences = split_sentences(text)
     if not sentences:
         return [text[:max_chars]] if text else []
 

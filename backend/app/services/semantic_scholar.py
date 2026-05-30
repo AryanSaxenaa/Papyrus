@@ -6,6 +6,7 @@ import httpx
 
 from app.config import get_settings
 from app.services.rate_limits import rate_limit_service
+from app.text.identifiers import normalize_doi
 
 
 class SemanticScholarClient:
@@ -21,7 +22,7 @@ class SemanticScholarClient:
     async def lookup_doi(self, doi: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("semantic_scholar"):
             return None
-        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        normalized = normalize_doi(doi)
         fields = "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf,publicationVenue"
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
@@ -33,29 +34,6 @@ class SemanticScholarClient:
             if response.status_code != 200:
                 return None
             return self._normalize_paper(response.json())
-
-    async def reference_dois(self, doi: str, limit: int = 50) -> list[str]:
-        """Outbound reference DOIs for a resolved paper (bounded list)."""
-        if not await rate_limit_service.allow("semantic_scholar"):
-            return []
-        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.get(
-                f"{self.BASE}/paper/DOI:{normalized}",
-                params={"fields": "references.externalIds", "limit": limit},
-                headers=self._headers,
-            )
-            await rate_limit_service.record("semantic_scholar")
-            if response.status_code != 200:
-                return []
-            refs = response.json().get("references") or []
-            dois: list[str] = []
-            for ref in refs:
-                external = ref.get("externalIds") or {}
-                ref_doi = external.get("DOI")
-                if ref_doi:
-                    dois.append(ref_doi.strip().removeprefix("https://doi.org/"))
-            return dois
 
     async def search_title(self, title: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("semantic_scholar"):

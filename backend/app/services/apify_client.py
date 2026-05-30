@@ -9,6 +9,7 @@ import httpx
 from app.config import get_settings
 from app.domain.enums import ResolutionSource
 from app.services.cache import cache_service
+from app.text.identifiers import author_title_query, normalize_doi
 from app.text.similarity import compare_titles
 from app.services.rate_limits import rate_limit_service
 
@@ -50,7 +51,7 @@ class ApifyClient:
 
     async def resolve_academic_mcp(self, title: str, authors: list[str] | None = None) -> dict[str, Any] | None:
         settings = get_settings()
-        query = f"{authors[0]} {title}" if authors and authors[0] else title
+        query = author_title_query(title, authors)
         items = await self.run_actor(
             settings.apify_actor_academic_mcp,
             {"query": query, "searchQuery": query, "searchTerms": query, "maxResults": 1, "maxItems": 1},
@@ -61,7 +62,7 @@ class ApifyClient:
 
     async def resolve_by_title(self, title: str, authors: list[str] | None = None) -> dict[str, Any] | None:
         settings = get_settings()
-        query = f"{authors[0]} {title}" if authors else title
+        query = author_title_query(title, authors)
 
         mcp = await self.resolve_academic_mcp(title, authors)
         if mcp:
@@ -166,7 +167,7 @@ def _normalize_academic_item(row: dict[str, Any]) -> dict[str, Any]:
         authors = [authors]
     doi = row.get("doi") or row.get("DOI")
     if isinstance(doi, str):
-        doi = doi.removeprefix("https://doi.org/")
+        doi = normalize_doi(doi)
     return {
         "title": title,
         "abstract": abstract,
@@ -185,7 +186,7 @@ def _normalize_openalex_item(row: dict[str, Any]) -> dict[str, Any]:
         "abstract": row.get("abstract"),
         "authors": row.get("authors") or [],
         "year": row.get("year") or row.get("publication_year"),
-        "doi": (row.get("doi") or "").removeprefix("https://doi.org/") or None,
+        "doi": normalize_doi(row.get("doi") or "") or None,
         "source": ResolutionSource.APIFY.value,
     }
 

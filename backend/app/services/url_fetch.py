@@ -112,11 +112,5 @@ class UrlFetchService:
                 return self._pdf_from_scrape(pmc_search)
         return None
 
-    def infer_title_hint(self, url: str) -> str | None:
-        arxiv_match = ARXIV_ABS.search(url) or ARXIV_PDF.search(url)
-        if arxiv_match:
-            return f"arXiv:{arxiv_match.group(1)}"
-        return url[:120]
-
 
 url_fetch_service = UrlFetchService()

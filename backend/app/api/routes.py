@@ -9,13 +9,22 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from redis.exceptions import RedisError
+from sqlalchemy.exc import SQLAlchemyError
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.reports import render_json_report, render_text_report
 from app.config import get_settings
 from app.domain.enums import CitationIntent, NliVerdict
 from app.bulk_store import bulk_job_store
-from app.domain.models import AuditRun, BulkAuditJob, CitationRecord
+from app.domain.models import (
+    AuditRun,
+    AuditSummary,
+    BulkAuditJob,
+    BulkDashboard,
+    BulkDashboardPaper,
+    CitationRecord,
+)
 from app.pipeline.bulk import process_bulk_zip
 from app.pipeline.orchestrator import audit_orchestrator
 from app.pipeline.scoring import finalize_scores
@@ -70,14 +79,14 @@ async def health_detailed() -> dict:
             checks["postgres"] = {"ok": True}
         else:
             checks["postgres"] = {"ok": False, "note": "not configured"}
-    except Exception as exc:  # noqa: BLE001
+    except SQLAlchemyError as exc:
         checks["postgres"] = {"ok": False, "error": str(exc)}
 
     try:
         from app.services.cache import cache_service
 
         checks["redis"] = {"ok": await cache_service.ping()}
-    except Exception as exc:  # noqa: BLE001
+    except (RedisError, OSError) as exc:
         checks["redis"] = {"ok": False, "error": str(exc)}
 
     if settings.grobid_enabled:
@@ -87,14 +96,14 @@ async def health_detailed() -> dict:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(f"{settings.grobid_url}/api/isalive")
                 checks["grobid"] = {"ok": response.status_code == 200}
-        except Exception as exc:  # noqa: BLE001
+        except httpx.HTTPError as exc:
             checks["grobid"] = {"ok": False, "error": str(exc)}
 
     return {"status": "ok" if all(c.get("ok") for c in checks.values()) else "degraded", "checks": checks}
 
 
 @router.get("/audits/summaries")
-async def list_audit_summaries() -> list[dict]:
+async def list_audit_summaries() -> list[AuditSummary]:
     return audit_store.list_summaries()
 
 
@@ -120,14 +129,7 @@ async def get_citation_attempts(audit_id: UUID, citation_id: str) -> dict:
     if not attempts:
         source = "inline"
         attempts = [
-            {
-                "source": a.source.value,
-                "query": a.query,
-                "success": a.success,
-                "summary": a.summary,
-                "payload": a.payload,
-            }
-            for a in record.resolution_attempts
+            a.model_dump(mode="json", exclude_none=True) for a in record.resolution_attempts
         ]
     return {"citation_id": citation_id, "attempts": attempts, "source": source}
 
@@ -261,12 +263,12 @@ async def stream_bulk_events(job_id: UUID) -> EventSourceResponse:
 
 
 @router.get("/bulk/{job_id}/dashboard")
-async def bulk_dashboard(job_id: UUID) -> dict:
+async def bulk_dashboard(job_id: UUID) -> BulkDashboard:
     job = bulk_job_store.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Bulk job not found")
 
-    papers = []
+    papers: list[BulkDashboardPaper] = []
     for audit_id in job.audit_ids:
         audit = audit_store.get(audit_id)
         if not audit:
@@ -274,33 +276,33 @@ async def bulk_dashboard(job_id: UUID) -> dict:
         resolvable = audit.coverage.tier_1 + audit.coverage.tier_2 + audit.coverage.tier_3
         first_author = audit.paper_authors[0] if audit.paper_authors else None
         papers.append(
-            {
-                "audit_id": str(audit.id),
-                "title": audit.paper_title,
-                "first_author": first_author,
-                "status": audit.status,
-                "coverage_percent": audit.coverage.coverage_percent,
-                "confirmed_failure_rate": audit.failures.confirmed_failure_rate,
-                "risk_level": audit.risk_level.value,
-                "resolvable_citations": resolvable,
-                "type_1": audit.failures.type_1,
-                "type_2": audit.failures.type_2,
-                "type_5": audit.failures.type_5,
-                "type_6": audit.failures.type_6,
-                "type_7": audit.failures.type_7,
-                "retraction": audit.failures.retraction,
-                "version_mismatch": audit.failures.version_mismatch,
-            }
+            BulkDashboardPaper(
+                audit_id=str(audit.id),
+                title=audit.paper_title,
+                first_author=first_author,
+                status=audit.status,
+                coverage_percent=audit.coverage.coverage_percent,
+                confirmed_failure_rate=audit.failures.confirmed_failure_rate,
+                risk_level=audit.risk_level.value,
+                resolvable_citations=resolvable,
+                type_1=audit.failures.type_1,
+                type_2=audit.failures.type_2,
+                type_5=audit.failures.type_5,
+                type_6=audit.failures.type_6,
+                type_7=audit.failures.type_7,
+                retraction=audit.failures.retraction,
+                version_mismatch=audit.failures.version_mismatch,
+            )
         )
 
-    papers.sort(key=lambda row: row["confirmed_failure_rate"], reverse=True)
-    pending = sum(1 for row in papers if row["status"] in {"queued", "running"})
-    return {
-        "job": job.model_dump(mode="json"),
-        "papers": papers,
-        "pending_papers": pending,
-        "note": "Ranked by confirmed failure rate among resolvable citations, not unresolvable count.",
-    }
+    papers.sort(key=lambda row: row.confirmed_failure_rate, reverse=True)
+    pending = sum(1 for row in papers if row.status in {"queued", "running"})
+    return BulkDashboard(
+        job=job,
+        papers=papers,
+        pending_papers=pending,
+        note="Ranked by confirmed failure rate among resolvable citations, not unresolvable count.",
+    )
 
 
 @router.get("/bulk/{job_id}/events/log.txt")
@@ -317,7 +319,7 @@ async def export_bulk_event_log(job_id: UUID) -> StreamingResponse:
 @router.get("/bulk/{job_id}/dashboard.json")
 async def export_bulk_dashboard_json(job_id: UUID) -> JSONResponse:
     payload = await bulk_dashboard(job_id)
-    return JSONResponse(content=payload)
+    return JSONResponse(content=payload.model_dump(mode="json"))
 
 
 @router.get("/audits/{audit_id}/events/log.txt")

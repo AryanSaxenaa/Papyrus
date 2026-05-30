@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { CitationRecord } from "../types";
 import { buildAnatomySegments, collectAnatomyMarkers } from "../lib/anatomyMarkers";
-import { citationFill, isRetraction } from "../lib/verdictColors";
+import { citationFill, citationMarkerRingClass } from "../lib/verdictColors";
 
 type Props = {
   text: string;
@@ -32,13 +32,12 @@ export function PaperAnatomy({ text, citations, onSelectCitation }: Props) {
         }
         const { citation } = segment;
         const color = citationFill(citation);
-        const ring = isRetraction(citation) ? "ring-1 ring-amber-400" : "";
         return (
           <button
             key={`${index}-cite-${citation.index}`}
             type="button"
             onClick={() => onSelectCitation(citation)}
-            className={`mx-0.5 inline rounded px-1 font-audit text-xs font-semibold text-white transition hover:opacity-90 ${ring}`}
+            className={`mx-0.5 inline rounded px-1 font-audit text-xs font-semibold text-white transition hover:opacity-90 ${citationMarkerRingClass(citation)}`}
             style={{ background: color }}
             title={`Citation #${citation.index}: ${citation.bibliography.title ?? "Reference"}`}
             data-citation-index={citation.index}

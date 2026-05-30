@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.text.identifiers import normalize_doi
 
 
 class UnpaywallClient:
@@ -12,7 +13,7 @@ class UnpaywallClient:
 
     async def lookup(self, doi: str) -> dict[str, Any] | None:
         settings = get_settings()
-        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        normalized = normalize_doi(doi)
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
                 f"{self.BASE}/{normalized}",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import httpx
 
 from app.config import get_settings
@@ -24,9 +26,7 @@ async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
                 return None
             data = response.json()
             if isinstance(data, list) and data and isinstance(data[0], list):
-                if isinstance(data[0][0], list):
-                    return data  # type: ignore[return-value]
-                return data  # type: ignore[return-value]
+                return cast(list[list[float]], data)
 
     if settings.openai_api_key:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -42,7 +42,6 @@ async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
 
 
 async def embedding_rank_best_chunk(claim: str, chunks: list[str]) -> str | None:
-    """Pick the chunk most similar to the claim using the configured embedding backend."""
     if not chunks or not claim.strip():
         return None
     if len(chunks) == 1:
@@ -62,7 +61,6 @@ async def embedding_rank_best_chunk(claim: str, chunks: list[str]) -> str | None
 
 
 async def embedding_similarity(text_a: str, text_b: str) -> float | None:
-    """Cosine similarity between two short texts via configured embedding backend."""
     if not text_a.strip() or not text_b.strip():
         return None
     vectors = await _embed_batch([text_a[:500], text_b[:500]])

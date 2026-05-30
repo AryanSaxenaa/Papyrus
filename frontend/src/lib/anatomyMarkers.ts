@@ -76,7 +76,6 @@ export function buildAnatomySegments(text: string, markers: AnatomyMarker[]): An
   return segments;
 }
 
-/** First matching marker within a PDF text run, if any. */
 export function findMarkerInString(
   value: string,
   markers: AnatomyMarker[],

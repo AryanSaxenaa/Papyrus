@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from app.config import get_settings
-from app.domain.enums import EvidenceTier, HallucinationType
+from app.domain.enums import HallucinationType
 from app.domain.models import CitationRecord
-from app.pipeline.verdicts import _tier_from_text
+from app.pipeline.evidence_tier import tier_from_resolved
 from app.text.similarity import compare_titles
 from app.services.embeddings import embedding_similarity
 
@@ -38,4 +38,4 @@ async def apply_title_drift_gate(
 
     record.hallucination_type = HallucinationType.TITLE_DRIFT
     record.verdict_color = "failure"
-    record.evidence_tier = _tier_from_text(crossref)
+    record.evidence_tier = tier_from_resolved(crossref)

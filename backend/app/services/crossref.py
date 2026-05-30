@@ -6,6 +6,7 @@ import httpx
 
 from app.config import get_settings
 from app.services.rate_limits import rate_limit_service
+from app.text.identifiers import normalize_doi
 
 
 class CrossRefClient:
@@ -21,7 +22,7 @@ class CrossRefClient:
     async def resolve_doi(self, doi: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("crossref"):
             return None
-        normalized = doi.strip().removeprefix("https://doi.org/").removeprefix("http://doi.org/")
+        normalized = normalize_doi(doi)
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(f"{self.BASE}/{normalized}", headers=self._headers)
             await rate_limit_service.record("crossref")

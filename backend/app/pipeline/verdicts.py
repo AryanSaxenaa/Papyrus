@@ -12,6 +12,8 @@ from app.domain.enums import (
 )
 from app.domain.models import CitationRecord
 from app.pipeline import nli as nli_pipeline
+from app.pipeline.evidence_tier import tier_from_resolved
+from app.text.sentences import split_sentences
 from app.text.similarity import author_sets_equal, compare_titles
 
 
@@ -52,7 +54,7 @@ def detect_hallucination(
     if record.retracted:
         record.hallucination_type = HallucinationType.RETRACTION
         record.verdict_color = "retraction"
-        record.evidence_tier = _tier_from_text(resolved)
+        record.evidence_tier = tier_from_resolved(resolved)
         return
 
     doi_metadata = crossref or (merged_override if cited.doi else None)
@@ -68,24 +70,12 @@ def detect_hallucination(
         if title_mismatch or author_mismatch:
             record.hallucination_type = HallucinationType.DOI_REDIRECT
             record.verdict_color = "failure"
-            record.evidence_tier = _tier_from_text(doi_metadata)
+            record.evidence_tier = tier_from_resolved(doi_metadata)
             return
 
     record.hallucination_type = HallucinationType.NONE
-    record.evidence_tier = _tier_from_text(resolved)
+    record.evidence_tier = tier_from_resolved(resolved)
     record.verdict_color = _color_for_success(record)
-
-
-def _tier_from_text(resolved: dict) -> EvidenceTier:
-    if resolved.get("full_text"):
-        return EvidenceTier.TIER_1
-    if resolved.get("open_access_pdf") or resolved.get("oa_url"):
-        return EvidenceTier.TIER_1
-    if resolved.get("abstract"):
-        return EvidenceTier.TIER_2
-    if resolved.get("title"):
-        return EvidenceTier.TIER_3
-    return EvidenceTier.TIER_4
 
 
 def _color_for_success(record: CitationRecord) -> str:
@@ -97,10 +87,10 @@ def _color_for_success(record: CitationRecord) -> str:
 
 
 def extract_claim(context: str) -> str:
-    sentences = re.split(r"(?<=[.!?])\s+", context.strip())
+    sentences = split_sentences(context)
     if not sentences:
         return context.strip()
-    return max(sentences, key=len).strip()
+    return max(sentences, key=len)
 
 
 def has_quantitative_language(claim: str) -> bool:
