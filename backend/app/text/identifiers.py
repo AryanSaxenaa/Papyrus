@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
+from app.text.similarity import coerce_author_list
+
 
 def normalize_doi(doi: str) -> str:
     """Strip whitespace and common DOI URL prefixes for API lookups."""
@@ -9,8 +13,9 @@ def normalize_doi(doi: str) -> str:
     return normalized
 
 
-def author_title_query(title: str, authors: list[str] | None) -> str:
+def author_title_query(title: str, authors: list[str] | Any | None) -> str:
     """First-author + title query used by retrieval fallbacks."""
-    if authors and authors[0]:
-        return f"{authors[0]} {title}"
+    names = coerce_author_list(authors)
+    if names:
+        return f"{names[0]} {title}"
     return title

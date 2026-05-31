@@ -14,7 +14,7 @@ from app.domain.models import CitationRecord
 from app.pipeline import nli as nli_pipeline
 from app.pipeline.evidence_tier import tier_from_resolved
 from app.text.sentences import split_sentences
-from app.text.similarity import author_sets_equal, compare_titles
+from app.text.similarity import author_sets_equal, coerce_author_list, compare_titles
 
 
 QUANT_PATTERN = re.compile(
@@ -43,7 +43,7 @@ def detect_hallucination(
     record.resolved_title = resolved.get("title")
     record.resolved_doi = resolved.get("doi") or cited.doi
     record.resolved_year = resolved.get("year")
-    record.resolved_authors = resolved.get("authors") or []
+    record.resolved_authors = coerce_author_list(resolved.get("authors") or [])
     record.retracted = bool(resolved.get("retracted"))
 
     if record.retracted:
@@ -59,7 +59,7 @@ def detect_hallucination(
             ratio, _partial = compare_titles(cited.title, doi_metadata.get("title"))
             record.title_edit_distance = round((1 - ratio) * 100, 1)
             title_mismatch = ratio < 0.35
-        resolved_authors = doi_metadata.get("authors") or []
+        resolved_authors = coerce_author_list(doi_metadata.get("authors") or [])
         author_equal = author_sets_equal(cited.authors, resolved_authors)
         author_mismatch = author_equal is False
         if title_mismatch or author_mismatch:

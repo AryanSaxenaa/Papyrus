@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.domain.enums import ResolutionSource
 from app.services.cache import cache_service
 from app.text.identifiers import author_title_query, normalize_doi
-from app.text.similarity import compare_titles
+from app.text.similarity import coerce_author_list, compare_titles
 from app.services.rate_limits import rate_limit_service
 
 APIFY_BASE = "https://api.apify.com/v2"
@@ -122,7 +122,7 @@ class ApifyClient:
         return {
             "title": row.get("title"),
             "abstract": row.get("abstract"),
-            "authors": row.get("authors") or [],
+            "authors": coerce_author_list(row.get("authors") or []),
             "year": _year_from_row(row),
             "doi": row.get("doi"),
             "open_access_pdf": row.get("pdfUrl") or row.get("pdf_url"),
@@ -162,16 +162,14 @@ async def apify_fallback_resolve(
 def _normalize_academic_item(row: dict[str, Any]) -> dict[str, Any]:
     title = row.get("title") or row.get("paperTitle") or row.get("name")
     abstract = row.get("abstract") or row.get("summary") or row.get("snippet")
-    authors = row.get("authors") or row.get("authorNames") or []
-    if isinstance(authors, str):
-        authors = [authors]
+    authors = coerce_author_list(row.get("authors") or row.get("authorNames") or [])
     doi = row.get("doi") or row.get("DOI")
     if isinstance(doi, str):
         doi = normalize_doi(doi)
     return {
         "title": title,
         "abstract": abstract,
-        "authors": authors if isinstance(authors, list) else [],
+        "authors": authors,
         "year": _year_from_row(row),
         "doi": doi,
         "open_access_pdf": row.get("pdfUrl") or row.get("pdf_url") or row.get("openAccessPdf"),
@@ -184,7 +182,7 @@ def _normalize_openalex_item(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "title": row.get("title") or row.get("display_name"),
         "abstract": row.get("abstract"),
-        "authors": row.get("authors") or [],
+        "authors": coerce_author_list(row.get("authors") or row.get("authorships") or []),
         "year": row.get("year") or row.get("publication_year"),
         "doi": normalize_doi(row.get("doi") or "") or None,
         "source": ResolutionSource.APIFY.value,

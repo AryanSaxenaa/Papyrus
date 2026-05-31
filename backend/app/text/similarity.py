@@ -3,11 +3,54 @@ from __future__ import annotations
 import difflib
 import math
 import re
+from typing import Any
 
 
-def normalize_author_set(authors: list[str]) -> set[str]:
+def coerce_author_name(author: Any) -> str | None:
+    """Normalize author entries from strings or API shapes (e.g. OpenAlex dicts)."""
+    if author is None:
+        return None
+    if isinstance(author, str):
+        text = author.strip()
+        return text or None
+    if isinstance(author, dict):
+        for key in ("display_name", "name", "literal", "author", "authorName"):
+            if key not in author:
+                continue
+            nested = author[key]
+            if isinstance(nested, dict):
+                return coerce_author_name(nested)
+            if isinstance(nested, str):
+                text = nested.strip()
+                return text or None
+        return None
+    text = str(author).strip()
+    return text or None
+
+
+def coerce_author_list(authors: Any) -> list[str]:
+    if not authors:
+        return []
+    if isinstance(authors, str):
+        name = coerce_author_name(authors)
+        return [name] if name else []
+    if not isinstance(authors, list):
+        name = coerce_author_name(authors)
+        return [name] if name else []
+    result: list[str] = []
+    for item in authors:
+        if isinstance(item, list):
+            result.extend(coerce_author_list(item))
+            continue
+        name = coerce_author_name(item)
+        if name:
+            result.append(name)
+    return result
+
+
+def normalize_author_set(authors: list[str] | Any) -> set[str]:
     result: set[str] = set()
-    for author in authors:
+    for author in coerce_author_list(authors):
         collapsed = re.sub(r"[^a-z0-9]", "", author.lower())
         if collapsed:
             result.add(collapsed)

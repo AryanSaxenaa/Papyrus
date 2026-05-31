@@ -34,7 +34,7 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 | **Health** | https://papyrus-api-694307068650.us-central1.run.app/api/health/detailed | Postgres, Redis, Celery worker, GCS mode |
 | **Worker** | `papyrus-worker` (private) | Celery; `min-instances=1`; not browser-facing |
 
-Cloud Run also serves the same revisions on `*.run.app` hostnames (e.g. `papyrus-api-6mhdzvaxua-uc.a.run.app`); either hostname works.
+Cloud Run serves each service on two hostnames (hash and project-number forms). **`CORS_ORIGINS` must list every web URL you use**, comma-separated, or the browser shows “Failed to fetch”.
 
 **Production settings:** `APP_ENV=production`, `PERSISTENCE_BACKEND=postgres`, `FILE_STORAGE_BACKEND=gcs`, `GCS_BUCKET=papyrus-data-papyrus-audit`, `GROBID_ENABLED=false`, `ENABLE_LLM_PDF_INGESTION=false`.
 

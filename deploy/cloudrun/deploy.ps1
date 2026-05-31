@@ -184,10 +184,21 @@ if (-not $ApiUrl) {
     $WebUrl = (gcloud run services describe papyrus-web --region $GCP_REGION --format="value(status.url)")
     Write-Host ""
     Write-Host "Web URL: $WebUrl"
-    if ($CORS_ORIGINS -and $CORS_ORIGINS -notlike "*$WebUrl*") {
-        Write-Host ""
-        Write-Host "CORS: add $WebUrl to CORS_ORIGINS in deploy/cloudrun/.env, then redeploy API:"
-        Write-Host "  `$env:SKIP_WEB='1'; .\deploy\cloudrun\deploy.ps1"
+    if ($WebUrl) {
+        $origins = @($WebUrl)
+        if ($CORS_ORIGINS) {
+            foreach ($existing in ($CORS_ORIGINS -split ",")) {
+                $trimmed = $existing.Trim()
+                if ($trimmed -and $origins -notcontains $trimmed) { $origins += $trimmed }
+            }
+        }
+        $merged = ($origins -join ",")
+        if ($merged -ne $CORS_ORIGINS) {
+            Write-Host ""
+            Write-Host "CORS: set CORS_ORIGINS to include all web hostnames, then redeploy API:"
+            Write-Host "  CORS_ORIGINS=$merged"
+            Write-Host "  `$env:SKIP_WEB='1'; .\deploy\cloudrun\deploy.ps1"
+        }
     }
 }
 
