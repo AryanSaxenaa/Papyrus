@@ -31,6 +31,7 @@ class AuditStore:
 
     def create(self, audit: AuditRun) -> AuditRun:
         self._audits[audit.id] = audit
+        self.save(audit)
         return audit
 
     def get(self, audit_id: UUID) -> AuditRun | None:

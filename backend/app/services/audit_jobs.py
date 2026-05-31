@@ -67,8 +67,12 @@ async def run_bulk_job(job_id: UUID, storage_key: str) -> None:
 
 def _fail_audit(audit_id: UUID, exc: Exception) -> None:
     audit = audit_store.get(audit_id)
-    if audit:
-        audit.status = "failed"
-        audit.error = str(exc)
-        audit_store.save(audit)
+    if audit is None:
+        from app.domain.models import AuditRun
+
+        audit = AuditRun(id=audit_id)
+        audit_store.create(audit)
+    audit.status = "failed"
+    audit.error = str(exc)
+    audit_store.save(audit)
     event_bus.emit(audit_id, "error", f"Audit failed: {exc}")
