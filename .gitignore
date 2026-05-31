@@ -1,20 +1,30 @@
 AGENTS.md
 CLAUDE.md
 
-# Environment variables and secrets
+# Environment variables and secrets (never commit real keys or DB passwords)
 .env
 .env.*
 !.env.example
 !.env.template
 !.env.sample
 !frontend/.env.example
+!deploy/cloudrun/env.template
 *.env.local
 *.env.development.local
 *.env.test.local
 *.env.production.local
 
-# Cursor
+# Credentials and key material
+*.pem
+*.key
+*.p12
+credentials.json
+service-account*.json
+**/secrets.json
+
+# Cursor / editor (may contain MCP URLs with project refs)
 .cursor/
+**/.cursor/mcp.json
 
 # Claude
 .claude/
