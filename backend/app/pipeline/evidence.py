@@ -4,7 +4,7 @@ import difflib
 from datetime import datetime, timezone
 
 from app.config import get_settings
-from app.services.embeddings import embedding_rank_best_chunk
+from app.services.embeddings import embedding_rank_best_chunk, embeddings_api_enabled
 from app.domain.enums import EvidenceTier, ResolutionSource
 from app.domain.models import CitationRecord
 from app.text.sentences import split_sentences
@@ -87,10 +87,7 @@ async def retrieve_passage(claim: str, text: str | None) -> str | None:
     chunks = chunk_text(text)
     if len(chunks) == 1:
         return chunks[0]
-    settings = get_settings()
-    if settings.openrouter_api_key or settings.openai_api_key or (
-        settings.embeddings_backend.lower() == "snowflake" and settings.huggingface_api_key
-    ):
+    if embeddings_api_enabled():
         ranked = await embedding_rank_best_chunk(claim, chunks)
         if ranked:
             return ranked

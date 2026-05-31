@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import BulkJobRecord
+from app.storage.files import file_store
 from app.db.session import get_engine
 from app.domain.models import BulkAuditJob
 
@@ -16,11 +16,8 @@ class BulkJobStore:
     def __init__(self) -> None:
         self._jobs: dict[UUID, BulkAuditJob] = {}
 
-    def _path(self, job_id: UUID) -> Path:
-        settings = get_settings()
-        directory = Path(settings.audit_data_dir) / "bulk"
-        directory.mkdir(parents=True, exist_ok=True)
-        return directory / f"{job_id}.json"
+    def _json_key(self, job_id: UUID) -> str:
+        return f"audits/bulk/{job_id}.json"
 
     def _use_postgres(self) -> bool:
         return get_settings().persistence_backend in {"postgres", "both"}
@@ -48,9 +45,11 @@ class BulkJobStore:
                         return job
 
         if self._use_json():
-            path = self._path(job_id)
-            if path.exists():
-                job = BulkAuditJob.model_validate_json(path.read_text(encoding="utf-8"))
+            key = self._json_key(job_id)
+            if file_store.exists(key):
+                job = BulkAuditJob.model_validate_json(
+                    file_store.read_bytes(key).decode("utf-8")
+                )
                 self._jobs[job_id] = job
                 return job
         return None
@@ -59,7 +58,7 @@ class BulkJobStore:
         self._jobs[job.id] = job
         payload = json.dumps(job.model_dump(mode="json"), indent=2)
         if self._use_json():
-            self._path(job.id).write_text(payload, encoding="utf-8")
+            file_store.write_bytes(self._json_key(job.id), payload.encode("utf-8"))
         if self._use_postgres():
             engine = get_engine()
             if engine is None:

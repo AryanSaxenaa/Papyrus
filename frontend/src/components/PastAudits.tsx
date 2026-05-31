@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { apiUrl } from "../lib/api";
 import type { AuditSummary } from "../types";
 
 type Props = {
@@ -26,7 +27,7 @@ export function PastAudits({
     setLoading(true);
     setLoadError(null);
     try {
-      const response = await fetch("/api/audits/summaries");
+      const response = await fetch(apiUrl("/api/audits/summaries"));
       if (!response.ok) {
         setLoadError(`Could not load past audits (HTTP ${response.status}).`);
         setSummaries([]);
@@ -51,7 +52,7 @@ export function PastAudits({
     if (!window.confirm("Delete this audit and its indexed records?")) return;
     setDeletingId(auditId);
     try {
-      const response = await fetch(`/api/audits/${auditId}`, { method: "DELETE" });
+      const response = await fetch(apiUrl(`/api/audits/${auditId}`), { method: "DELETE" });
       if (response.ok || response.status === 204) {
         setSummaries((rows) => rows.filter((row) => row.id !== auditId));
         onDeleted?.(auditId);

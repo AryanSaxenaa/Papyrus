@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { apiUrl } from "../lib/api";
 import type { AuditRun, CitationRecord, StreamEvent } from "../types";
 import { citationCardClass, citationFill } from "../lib/verdictColors";
 import { verdictBadgeLabel } from "../lib/verdictLabel";
@@ -51,7 +52,7 @@ export function LivePanel({ events, audit, citations, onSelect, auditId }: Props
             {auditId && (
               <a
                 className="papyrus-link py-1 font-audit text-xs"
-                href={`/api/audits/${auditId}/events/log.txt`}
+                href={apiUrl(`/api/audits/${auditId}/events/log.txt`)}
                 download
               >
                 Download log

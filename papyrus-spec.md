@@ -2,6 +2,8 @@
 
 ## Citation Integrity Audit System — Build Specification
 
+> **Implementation note:** Default runtime uses **PyMuPDF** PDF ingestion (`GROBID_ENABLED=false`), **no LLM full-PDF bibliography** (`ENABLE_LLM_PDF_INGESTION=false`), and **DeepSeek API** or **OpenRouter** for intent/claim extraction only. See [docs/configuration.md](docs/configuration.md). GROBID in this spec is the planned primary parser when enabled for public beta.
+
 ---
 
 ## Project Statement

@@ -1,0 +1,17 @@
+# Build from repo root: gcloud builds submit . --config=deploy/cloudrun/cloudbuild-web.yaml ...
+substitutions:
+  _IMAGE: gcr.io/PROJECT/papyrus-web
+  _API_URL: https://example.com
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - frontend/Dockerfile
+      - -t
+      - ${_IMAGE}
+      - --build-arg
+      - VITE_API_BASE_URL=${_API_URL}
+      - .
+images:
+  - ${_IMAGE}

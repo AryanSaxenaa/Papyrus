@@ -6,9 +6,76 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 
 ## Stack
 
-- **Backend:** FastAPI, Redis (cache + Celery broker), Celery (async bulk worker), GROBID + PyMuPDF ingestion
+- **Backend:** FastAPI, Redis (cache + Celery broker), Celery (async bulk worker), PyMuPDF PDF ingestion (optional GROBID for public beta)
 - **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Europe PMC, Exa, Apify fallbacks
 - **Frontend:** React + Vite + Tailwind + motion, D3 (heatmap/timeline), pdf.js (paper anatomy)
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| [docs/configuration.md](docs/configuration.md) | Env vars: PDF ingestion, LLM backends, NLI, embeddings, Celery |
+| [docs/cloudrun-deployment.md](docs/cloudrun-deployment.md) | Cloud Run + Supabase/Redis/GCS (recommended for GCP) |
+| [docs/gcp-deployment.md](docs/gcp-deployment.md) | Cloud SQL, VMs, cost options |
+| [papyrus-spec.md](./papyrus-spec.md) | Full product architecture (some ingestion details differ from current defaults) |
+
+## Production deployment (Google Cloud Run)
+
+**GCP project:** `papyrus-audit` (display name *Papyrus*). The project ID `papyrus` is not available globally; use `papyrus-audit` in `deploy/cloudrun/.env`.
+
+**External services (not on GCP):** Supabase Postgres (`DATABASE_URL`), Redis Cloud (`REDIS_URL`), optional third-party API keys (DeepSeek, Hugging Face, OpenRouter, Exa, Firecrawl, Apify).
+
+### Live URLs
+
+| Service | URL | Notes |
+|---------|-----|--------|
+| **Web UI** | https://papyrus-web-694307068650.us-central1.run.app | Static React; `VITE_API_BASE_URL` baked at build time |
+| **API** | https://papyrus-api-694307068650.us-central1.run.app | FastAPI on port 8080 |
+| **Health** | https://papyrus-api-694307068650.us-central1.run.app/api/health/detailed | Postgres, Redis, Celery worker, GCS mode |
+| **Worker** | `papyrus-worker` (private) | Celery; `min-instances=1`; not browser-facing |
+
+Cloud Run also serves the same revisions on `*.run.app` hostnames (e.g. `papyrus-api-6mhdzvaxua-uc.a.run.app`); either hostname works.
+
+**Production settings:** `APP_ENV=production`, `PERSISTENCE_BACKEND=postgres`, `FILE_STORAGE_BACKEND=gcs`, `GCS_BUCKET=papyrus-data-papyrus-audit`, `GROBID_ENABLED=false`, `ENABLE_LLM_PDF_INGESTION=false`.
+
+### Deploy from scratch
+
+1. Copy [deploy/cloudrun/env.template](deploy/cloudrun/env.template) to `deploy/cloudrun/.env` and set `GCP_PROJECT_ID=papyrus-audit`, `DATABASE_URL`, `REDIS_URL`, API keys, and real resolver mailtos.
+2. Initialize Postgres (once): `cd backend && python scripts/init_db.py` (with `DATABASE_URL` set), or `INIT_DB=1` before the deploy script on first run.
+3. From repo root:
+
+   ```powershell
+   .\deploy\cloudrun\deploy.ps1
+   ```
+
+   ```bash
+   chmod +x deploy/cloudrun/deploy.sh && ./deploy/cloudrun/deploy.sh
+   ```
+
+4. After the first deploy, set `CORS_ORIGINS` in `deploy/cloudrun/.env` to the **web** URL, then redeploy API + worker only:
+
+   ```powershell
+   $env:SKIP_WEB = "1"
+   .\deploy\cloudrun\deploy.ps1
+   ```
+
+Deploy creates **papyrus-api**, **papyrus-worker**, and **papyrus-web** in `us-central1`; PDFs in GCS; PyMuPDF ingestion only (no GROBID container). Details: [docs/cloudrun-deployment.md](docs/cloudrun-deployment.md), [deploy/cloudrun/README.md](deploy/cloudrun/README.md).
+
+## Configuration (summary)
+
+Default stack (see [docs/configuration.md](docs/configuration.md) for full list):
+
+| Area | Default | Notes |
+|------|---------|--------|
+| PDF parsing | PyMuPDF | `GROBID_ENABLED=false` |
+| LLM on full PDF | Off | `ENABLE_LLM_PDF_INGESTION=false` (hallucination risk) |
+| Intent + claims | DeepSeek API | `LLM_BACKEND=deepseek`, `DEEPSEEK_MODEL` (e.g. `deepseek-v4-flash` in `.env`; code default is `deepseek-chat`) |
+| Alt LLM host | OpenRouter only | `LLM_BACKEND=openrouter` — e.g. `openrouter/owl-alpha`, `OPENROUTER_FALLBACK_MODEL` (Nemotron); not used for DeepSeek-hosted models |
+| NLI | Hugging Face | `NLI_BACKEND=hf`, `HUGGINGFACE_API_KEY` |
+| Embeddings | Snowflake Arctic (HF) | `EMBEDDINGS_BACKEND=snowflake` |
+| Background jobs | Celery | `USE_CELERY_BACKGROUND=true`, needs Redis + worker |
+
+Copy [`.env.example`](.env.example) to `.env` and set resolver mailtos (`CROSSREF_MAILTO`, `OPENALEX_MAILTO`, `UNPAYWALL_EMAIL`).
 
 ## Quick start
 
@@ -16,22 +83,28 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 
 ```bash
 cp .env.example .env
-# Set CROSSREF_MAILTO and OPENALEX_MAILTO to your email
+# Required: contact emails for CrossRef / OpenAlex / Unpaywall
+# Optional: DEEPSEEK_API_KEY, HUGGINGFACE_API_KEY, OPENROUTER_API_KEY
 ```
 
 ### 2. Infrastructure (optional but recommended)
 
 ```bash
-docker compose up -d postgres redis grobid
+docker compose up -d postgres redis
 ```
 
-Full stack (API + UI + worker):
+Full stack (API + UI + Celery worker):
 
 ```bash
-docker compose up --build api web
+docker compose up --build api worker web
 ```
 
-GROBID needs several GB RAM. Without it, the API falls back to PyMuPDF parsing.
+`api` and `worker` load `.env` from the repo root. **GROBID is not started by default.** To enable later:
+
+```bash
+docker compose --profile grobid up -d grobid
+# Set GROBID_ENABLED=true in .env
+```
 
 ### Bulk ZIP jobs
 
@@ -63,7 +136,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and upload a PDF.
+Open http://localhost:5173 and upload a PDF. The dev server proxies `/api` to the backend (`vite.config.ts`); production web calls the Cloud Run API URL via `frontend/src/lib/api.ts` (`VITE_API_BASE_URL`).
 
 ## API
 
@@ -89,7 +162,7 @@ Open http://localhost:5173 and upload a PDF.
 | `GET` | `/api/admin/config` | Integration feature flags |
 | `GET` | `/api/admin/corrections` | Recent user intent/claim corrections (ground truth) |
 | `GET` | `/api/health` | Basic health check |
-| `GET` | `/api/health/detailed` | Postgres, Redis, GROBID connectivity |
+| `GET` | `/api/health/detailed` | Postgres, Redis, GROBID (or skipped), Celery worker probe, `file_storage_backend` |
 | `GET` | `/api/audits` | List all audits |
 | `GET` | `/api/audits/summaries` | Indexed audit list (Postgres summaries table) |
 | `PATCH` | `/api/audits/{id}/citations/{cid}/intent` | Reclassify citation intent • reruns NLI |
@@ -106,13 +179,13 @@ Open http://localhost:5173 and upload a PDF.
 
 ## Implementation status (v1 slice)
 
-- [x] PDF ingestion (GROBID + PyMuPDF fallback)
-- [x] Intent heuristics + optional DeepSeek classification
+- [x] PDF ingestion — **PyMuPDF default**; optional GROBID (`GROBID_ENABLED`); LLM PDF ingest gated (`ENABLE_LLM_PDF_INGESTION`)
+- [x] Intent heuristics + LLM classification (`LLM_BACKEND=deepseek` or `openrouter`)
 - [x] Multi-source resolution (CrossRef → S2 → OpenAlex)
 - [x] Unpaywall OA lookup, arXiv metadata, Exa weak-signal (never a verdict)
 - [x] Types 1, 2, 5, 6, 7 (NLI claim alignment), retraction, version mismatch (preprint vs published)
-- [x] Evidence passage retrieval (lexical + optional OpenAI embeddings)
-- [x] Coverage + risk scoring, JSON/TXT reports, disk persistence
+- [x] Evidence passage retrieval (lexical + Snowflake/OpenAI/OpenRouter embeddings)
+- [x] Coverage + risk scoring, JSON/TXT reports; persistence via Postgres + JSON artifacts (`FILE_STORAGE_BACKEND` local or GCS)
 - [x] SSE live panel + D3 heatmap (verdict color transitions, filters, claim rerun)
 - [x] Side-by-side claim viewer (context / verdict / evidence drawer)
 - [x] Coverage summary chips + heatmap legend + contradiction filter
@@ -176,7 +249,9 @@ Open http://localhost:5173 and upload a PDF.
 - [x] Type 5 volume/year checks (CrossRef DOI metadata + journal volume filter)
 - [x] Semantic Scholar arXiv version linking for version mismatch
 - [x] OpenAlex ISSN journal catalog verification
-- [x] GROBID volume/issue/pages/URL extraction; three-sentence claim context
+- [x] GROBID volume/issue/pages/URL extraction when enabled; three-sentence claim context
+- [x] Cloud Run deploy on `papyrus-audit` (`deploy/cloudrun/deploy.ps1` / `deploy.sh`; GCS; no GROBID)
+- [x] Celery for single audits and bulk ZIP (`USE_CELERY_BACKGROUND`); Cloud Run worker `min-instances=1`
 - [x] Firecrawl + Europe PMC rate limits; `ryanclinton/europe-pmc-search` Apify fallback
 - [x] SSE named-event consumer; event history API; bulk expand with resolution log
 - [x] Limitations panel always visible; abstract-only + human-review fields in reports

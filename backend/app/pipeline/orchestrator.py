@@ -13,7 +13,6 @@ from app.pipeline.intent import apply_negation_override, classify_intent
 from app.pipeline.llm import (
     classify_intent as llm_classify_intent,
     extract_claim as llm_extract_claim,
-    parse_pdf_citations as llm_parse_pdf_citations,
 )
 from app.pipeline.resolution import resolve_record
 from app.pipeline.scoring import finalize_scores
@@ -45,7 +44,7 @@ class AuditOrchestrator:
             audit.paper_text = None
         event_bus.emit(
             audit_id,
-            "grobid",
+            "ingestion",
             "Citation extraction complete",
             bibliography_count=len(bibliography),
             inline_count=len(inline),
@@ -181,7 +180,9 @@ class AuditOrchestrator:
             except Exception as exc:  # noqa: BLE001
                 event_bus.emit(audit_id, "grobid", f"GROBID unavailable: {exc}")
         bibliography, inline, paper_title, paper_authors = parse_pdf_fallback(pdf_path)
-        if settings.enable_deepseek:
+        if settings.enable_llm_pdf_ingestion:
+            from app.pipeline.llm import parse_pdf_citations as llm_parse_pdf_citations
+
             try:
                 import fitz
 
@@ -193,14 +194,14 @@ class AuditOrchestrator:
                     return parsed
                 event_bus.emit(
                     audit_id,
-                    "deepseek",
-                    "LLM returned no usable bibliography — using fallback parser output",
+                    "ingestion",
+                    "LLM PDF parse returned no usable bibliography — using PyMuPDF output",
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 event_bus.emit(
                     audit_id,
-                    "deepseek",
-                    f"LLM citation parse failed: {exc}",
+                    "ingestion",
+                    f"LLM PDF parse failed: {exc}",
                 )
         return bibliography, inline, paper_title, paper_authors
 

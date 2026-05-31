@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
-import shutil
-from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, UploadFile
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
@@ -25,7 +23,6 @@ from app.domain.models import (
     BulkDashboardPaper,
     CitationRecord,
 )
-from app.pipeline.bulk import process_bulk_zip
 from app.pipeline.orchestrator import audit_orchestrator
 from app.pipeline.scoring import finalize_scores
 from app.pipeline.evidence import refresh_evidence_passage
@@ -35,8 +32,14 @@ from app.services.deepseek import deepseek_client
 from app.services.events import EventHistoryLoadError, event_bus
 from app.services.corrections import correction_store
 from app.services.relational_audit import list_citation_attempts
-from app.services.bulk_dispatch import enqueue_bulk_zip
-from app.services.url_fetch import url_fetch_service
+from app.services.background_dispatch import (
+    celery_worker_available,
+    enqueue_bulk_zip,
+    enqueue_doi_audit,
+    enqueue_pdf_audit,
+    enqueue_url_audit,
+)
+from app.storage.files import bulk_zip_key, file_store, upload_key
 from app.store import audit_store
 
 router = APIRouter()
@@ -99,15 +102,16 @@ async def health_detailed() -> dict:
                 checks["grobid"] = {"ok": response.status_code == 200}
         except httpx.HTTPError as exc:
             checks["grobid"] = {"ok": False, "error": str(exc)}
-
-    from app.services.bulk_dispatch import celery_worker_available
+    else:
+        checks["grobid"] = {"ok": True, "skipped": True, "note": "GROBID_ENABLED=false"}
 
     celery_ready = await celery_worker_available()
-    checks["bulk_queue"] = {
+    checks["background_queue"] = {
         "ok": True,
-        "use_celery_bulk": settings.use_celery_bulk,
+        "use_celery_background": settings.celery_background_enabled(),
         "celery_worker_available": celery_ready,
         "effective_mode": "celery" if celery_ready else "background_tasks",
+        "file_storage_backend": settings.file_storage_backend,
     }
 
     return {"status": "ok" if all(c.get("ok") for c in checks.values()) else "degraded", "checks": checks}
@@ -123,10 +127,11 @@ async def list_audits() -> list[AuditRun]:
     return audit_store.list()
 
 
-@router.delete("/audits/{audit_id}", status_code=204)
-async def delete_audit(audit_id: UUID) -> None:
+@router.delete("/audits/{audit_id}", status_code=204, response_class=Response)
+async def delete_audit(audit_id: UUID) -> Response:
     if not audit_store.delete(audit_id):
         raise HTTPException(status_code=404, detail="Audit not found")
+    return Response(status_code=204)
 
 
 @router.get("/audits/{audit_id}/citations/{citation_id}/attempts")
@@ -158,17 +163,18 @@ async def get_audit(audit_id: UUID) -> AuditRun:
 
 
 @router.get("/audits/{audit_id}/paper.pdf")
-async def get_audit_paper_pdf(audit_id: UUID) -> FileResponse:
+async def get_audit_paper_pdf(audit_id: UUID) -> StreamingResponse:
     if not audit_store.get(audit_id):
         raise HTTPException(status_code=404, detail="Audit not found")
-    settings = get_settings()
-    pdf_path = Path(settings.upload_dir) / f"{audit_id}.pdf"
-    if not pdf_path.is_file():
+    key = upload_key(str(audit_id))
+    if not file_store.exists(key):
         raise HTTPException(status_code=404, detail="Source PDF not available for this audit")
-    return FileResponse(
-        pdf_path,
+    return StreamingResponse(
+        iter([file_store.read_bytes(key)]),
         media_type="application/pdf",
-        filename=f"papyrus-audit-{audit_id}.pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="papyrus-audit-{audit_id}.pdf"',
+        },
     )
 
 
@@ -178,16 +184,16 @@ async def create_audit(background: BackgroundTasks, file: UploadFile) -> AuditRu
         raise HTTPException(status_code=400, detail="Only PDF uploads are supported")
 
     settings = get_settings()
-    upload_dir = Path(settings.upload_dir)
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    content = await file.read()
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"PDF exceeds {settings.max_upload_mb} MB limit")
 
     audit = AuditRun()
-    destination = upload_dir / f"{audit.id}.pdf"
-    with destination.open("wb") as handle:
-        shutil.copyfileobj(file.file, handle)
-
+    storage_key = upload_key(str(audit.id))
+    file_store.write_bytes(storage_key, content)
     audit_store.create(audit)
-    background.add_task(_run_pdf_audit, audit.id, destination)
+    await enqueue_pdf_audit(audit.id, storage_key, background)
     return audit
 
 
@@ -195,20 +201,16 @@ async def create_audit(background: BackgroundTasks, file: UploadFile) -> AuditRu
 async def create_doi_audit(background: BackgroundTasks, body: DoiAuditRequest) -> AuditRun:
     audit = AuditRun()
     audit_store.create(audit)
-    background.add_task(_run_doi_audit, audit.id, body.doi)
+    await enqueue_doi_audit(audit.id, body.doi, background)
     return audit
 
 
 @router.post("/audits/url", status_code=202)
 async def create_url_audit(background: BackgroundTasks, body: UrlAuditRequest) -> AuditRun:
-    settings = get_settings()
-    upload_dir = Path(settings.upload_dir)
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
     audit = AuditRun(source_url=body.url)
-    destination = upload_dir / f"{audit.id}.pdf"
     audit_store.create(audit)
-    background.add_task(_run_url_audit, audit.id, body.url, destination)
+    storage_key = upload_key(str(audit.id))
+    await enqueue_url_audit(audit.id, body.url, storage_key, background)
     return audit
 
 
@@ -218,16 +220,16 @@ async def create_bulk_audit(background: BackgroundTasks, file: UploadFile) -> Bu
         raise HTTPException(status_code=400, detail="Bulk upload requires a ZIP of PDF files")
 
     settings = get_settings()
-    upload_dir = Path(settings.upload_dir) / "bulk"
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    max_bytes = settings.max_upload_mb * 1024 * 1024 * 4
+    content = await file.read()
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail="ZIP exceeds upload size limit")
 
     job = BulkAuditJob()
-    zip_path = upload_dir / f"{job.id}.zip"
-    with zip_path.open("wb") as handle:
-        shutil.copyfileobj(file.file, handle)
-
+    storage_key = bulk_zip_key(str(job.id))
+    file_store.write_bytes(storage_key, content)
     bulk_job_store.create(job)
-    queue_mode = await enqueue_bulk_zip(job.id, zip_path, background, _run_bulk_job)
+    queue_mode = await enqueue_bulk_zip(job.id, storage_key, background)
     event_bus.emit(
         job.id,
         "bulk",
@@ -581,44 +583,3 @@ def _get_citation(audit: AuditRun, citation_id: str) -> CitationRecord:
     raise HTTPException(status_code=404, detail="Citation not found")
 
 
-async def _run_pdf_audit(audit_id: UUID, pdf_path: Path) -> None:
-    try:
-        await audit_orchestrator.run(audit_id, pdf_path)
-    except Exception as exc:  # noqa: BLE001
-        _fail_audit(audit_id, exc)
-
-
-async def _run_doi_audit(audit_id: UUID, doi: str) -> None:
-    try:
-        await audit_orchestrator.run_doi(audit_id, doi)
-    except Exception as exc:  # noqa: BLE001
-        _fail_audit(audit_id, exc)
-
-
-async def _run_url_audit(audit_id: UUID, url: str, destination: Path) -> None:
-    try:
-        await url_fetch_service.download_pdf(url, destination)
-        await audit_orchestrator.run_from_url(audit_id, url, destination)
-    except Exception as exc:  # noqa: BLE001
-        _fail_audit(audit_id, exc)
-
-
-async def _run_bulk_job(job_id: UUID, zip_path: Path) -> None:
-    try:
-        await process_bulk_zip(job_id, zip_path)
-    except Exception as exc:  # noqa: BLE001
-        job = bulk_job_store.get(job_id)
-        if job and job.status not in {"complete", "failed"}:
-            job.status = "failed"
-            job.error = str(exc)
-            bulk_job_store.save(job)
-        event_bus.emit(job_id, "error", f"Bulk job failed: {exc}")
-
-
-def _fail_audit(audit_id: UUID, exc: Exception) -> None:
-    audit = audit_store.get(audit_id)
-    if audit:
-        audit.status = "failed"
-        audit.error = str(exc)
-        audit_store.save(audit)
-    event_bus.emit(audit_id, "error", f"Audit failed: {exc}")

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiUrl } from "../lib/api";
 import { ChevronDown } from "./landing/LandingIcons";
 import { SettingsIcon } from "./app/AppIcons";
 
@@ -42,9 +43,9 @@ export function AdminPanel({ variant = "default" }: Props) {
   useEffect(() => {
     if (!open) return;
     void Promise.all([
-      fetch("/api/admin/rate-limits").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/admin/config").then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/admin/corrections?limit=15").then((r) => (r.ok ? r.json() : null)),
+      fetch(apiUrl("/api/admin/rate-limits")).then((r) => (r.ok ? r.json() : null)),
+      fetch(apiUrl("/api/admin/config")).then((r) => (r.ok ? r.json() : null)),
+      fetch(apiUrl("/api/admin/corrections?limit=15")).then((r) => (r.ok ? r.json() : null)),
     ]).then(([limitsData, configData, correctionsData]) => {
       setLimits(limitsData?.sources ?? null);
       setConfig(configData);
@@ -177,7 +178,7 @@ export function AdminPanel({ variant = "default" }: Props) {
             </div>
           )}
           <a
-            href="/api/admin/corrections/export.csv"
+            href={apiUrl("/api/admin/corrections/export.csv")}
             className="inline-block rounded-lg border border-zinc-300 px-3 py-1.5 text-zinc-600 hover:bg-zinc-50 transition-colors"
           >
             Export corrections CSV

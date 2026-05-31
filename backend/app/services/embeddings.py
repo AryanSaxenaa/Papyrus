@@ -8,9 +8,24 @@ from app.config import get_settings
 from app.text.similarity import cosine_similarity
 
 
+def embeddings_api_enabled() -> bool:
+    """True only when the chosen embeddings backend has credentials (no paid calls otherwise)."""
+    settings = get_settings()
+    backend = settings.embeddings_backend.lower()
+    if backend == "lexical":
+        return False
+    if backend == "openrouter":
+        return bool(settings.openrouter_api_key)
+    if backend == "openai":
+        return bool(settings.openai_api_key)
+    if backend == "snowflake":
+        return bool(settings.huggingface_api_key)
+    return False
+
+
 async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
     settings = get_settings()
-    if not texts:
+    if not texts or not embeddings_api_enabled():
         return None
 
     backend = settings.embeddings_backend.lower()
@@ -49,11 +64,6 @@ async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
             if response.status_code != 200:
                 return None
             return [row["embedding"] for row in response.json()["data"]]
-
-    if backend == "openrouter" and not settings.openrouter_api_key:
-        pass
-    if backend == "openai" and not settings.openai_api_key:
-        pass
 
     return None
 

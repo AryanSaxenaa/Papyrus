@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import AuditRecord, AuditSummaryRecord, CitationIndexRecord
+from app.storage.files import audit_json_key, file_store, upload_key
 from app.persistence.postgres_sync import sync_postgres_audit_indexes
 from app.services.relational_audit import delete_relational_audit
 from app.db.session import get_engine
@@ -19,11 +20,8 @@ class AuditStore:
     def __init__(self) -> None:
         self._audits: dict[UUID, AuditRun] = {}
 
-    def _path(self, audit_id: UUID) -> Path:
-        settings = get_settings()
-        directory = Path(settings.audit_data_dir)
-        directory.mkdir(parents=True, exist_ok=True)
-        return directory / f"{audit_id}.json"
+    def _json_key(self, audit_id: UUID) -> str:
+        return audit_json_key(str(audit_id))
 
     def _use_postgres(self) -> bool:
         return get_settings().persistence_backend in {"postgres", "both"}
@@ -46,9 +44,11 @@ class AuditStore:
                 return audit
 
         if self._use_json():
-            path = self._path(audit_id)
-            if path.exists():
-                audit = AuditRun.model_validate_json(path.read_text(encoding="utf-8"))
+            key = self._json_key(audit_id)
+            if file_store.exists(key):
+                audit = AuditRun.model_validate_json(
+                    file_store.read_bytes(key).decode("utf-8")
+                )
                 self._audits[audit_id] = audit
                 return audit
         return None
@@ -57,7 +57,7 @@ class AuditStore:
         self._audits[audit.id] = audit
         payload = json.dumps(audit.model_dump(mode="json"), indent=2)
         if self._use_json():
-            self._path(audit.id).write_text(payload, encoding="utf-8")
+            file_store.write_bytes(self._json_key(audit.id), payload.encode("utf-8"))
         if self._use_postgres():
             self._save_postgres(audit, payload)
 
@@ -106,8 +106,8 @@ class AuditStore:
                         if audit_id not in self._audits:
                             self._audits[audit_id] = AuditRun.model_validate_json(row.payload)
 
-        if self._use_json():
-            directory = Path(get_settings().audit_data_dir)
+        if self._use_json() and get_settings().file_storage_backend == "local":
+            directory = Path(get_settings().file_storage_root) / "audits"
             if directory.exists():
                 for path in directory.glob("*.json"):
                     audit_id = UUID(path.stem)
@@ -151,9 +151,13 @@ class AuditStore:
         if audit_id in self._audits:
             del self._audits[audit_id]
             removed = True
-        path = self._path(audit_id)
-        if path.exists():
-            path.unlink()
+        json_key = self._json_key(audit_id)
+        if file_store.exists(json_key):
+            file_store.delete(json_key)
+            removed = True
+        pdf_key = upload_key(str(audit_id))
+        if file_store.exists(pdf_key):
+            file_store.delete(pdf_key)
             removed = True
         engine = get_engine()
         if engine is not None:

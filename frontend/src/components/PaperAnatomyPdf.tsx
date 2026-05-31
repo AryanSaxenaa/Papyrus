@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import type { CitationRecord } from "../types";
 import { collectAnatomyMarkers, findMarkerInString } from "../lib/anatomyMarkers";
+import { apiUrl } from "../lib/api";
 import { citationFill, citationMarkerRingClass } from "../lib/verdictColors";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -58,7 +59,7 @@ export function PaperAnatomyPdf({ auditId, citations, onSelectCitation, onUnavai
       overlayButtonsRef.current = [];
 
       try {
-        const pdf = await pdfjsLib.getDocument(`/api/audits/${auditId}/paper.pdf`).promise;
+        const pdf = await pdfjsLib.getDocument(apiUrl(`/api/audits/${auditId}/paper.pdf`)).promise;
         const scale = 1.15;
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {

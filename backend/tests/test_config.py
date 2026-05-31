@@ -39,3 +39,36 @@ def test_get_settings_uses_lru_cache() -> None:
     second = get_settings()
     assert first is second
     get_settings.cache_clear()
+
+
+def _production_kwargs(**overrides: object) -> dict:
+    base = {
+        "app_env": "production",
+        "persistence_backend": "postgres",
+        "file_storage_backend": "gcs",
+        "gcs_bucket": "papyrus-prod",
+        "llm_backend": "deepseek",
+        "deepseek_api_key": "sk-test",
+        "nli_backend": "hf",
+        "huggingface_api_key": "hf_test",
+        "crossref_mailto": "ops@yourdomain.com",
+        "openalex_mailto": "ops@yourdomain.com",
+        "unpaywall_email": "ops@yourdomain.com",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_production_requires_gcs_bucket() -> None:
+    with pytest.raises(ValueError, match="GCS_BUCKET"):
+        Settings(**_production_kwargs(gcs_bucket=None))
+
+
+def test_production_rejects_json_only_persistence() -> None:
+    with pytest.raises(ValueError, match="PERSISTENCE_BACKEND"):
+        Settings(**_production_kwargs(persistence_backend="json"))
+
+
+def test_production_deepseek_requires_api_key() -> None:
+    with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
+        Settings(**_production_kwargs(deepseek_api_key=None))

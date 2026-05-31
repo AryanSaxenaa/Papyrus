@@ -15,24 +15,29 @@ services:
     ports:
       - "6379:6379"
 
+  # Optional (public beta): grobid/grobid:0.8.0 — set GROBID_ENABLED=true in .env
   grobid:
     image: grobid/grobid:0.8.0
     ports:
       - "8070:8070"
+    profiles:
+      - grobid
     deploy:
       resources:
         limits:
           memory: 4G
 
-  # Optional: add env_file: [.env] when API keys (DeepSeek, Exa, Apify, etc.) are configured.
   api:
     build:
       context: ./backend
+    env_file:
+      - .env
     environment:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg2://papyrus:papyrus@postgres:5432/papyrus
       PERSISTENCE_BACKEND: both
       REDIS_URL: redis://redis:6379/0
+      GROBID_ENABLED: ${GROBID_ENABLED:-false}
       GROBID_URL: http://grobid:8070
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@localhost.invalid}
@@ -47,17 +52,19 @@ services:
     depends_on:
       - postgres
       - redis
-      - grobid
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
     build:
       context: ./backend
+    env_file:
+      - .env
     environment:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg2://papyrus:papyrus@postgres:5432/papyrus
       PERSISTENCE_BACKEND: both
       REDIS_URL: redis://redis:6379/0
+      GROBID_ENABLED: ${GROBID_ENABLED:-false}
       GROBID_URL: http://grobid:8070
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
       CROSSREF_MAILTO: ${CROSSREF_MAILTO:-dev@localhost.invalid}
@@ -70,7 +77,6 @@ services:
     depends_on:
       - postgres
       - redis
-      - grobid
     command: celery -A app.worker.celery_app worker -l info -Q audits --concurrency=1
 
   web:

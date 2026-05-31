@@ -16,6 +16,7 @@ import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
 import { MathGridBg } from "./components/app/MathGridBg";
+import { apiUrl } from "./lib/api";
 import { connectAuditEventSource } from "./lib/sse";
 import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
 
@@ -38,7 +39,7 @@ export default function App() {
   const [auditsListKey, setAuditsListKey] = useState(0);
 
   const refreshAudit = useCallback(async (id: string) => {
-    const response = await fetch(`/api/audits/${id}`);
+    const response = await fetch(apiUrl(`/api/audits/${id}`));
     if (!response.ok) return;
     const next = (await response.json()) as AuditRun;
     setAudit(next);
@@ -62,7 +63,7 @@ export default function App() {
 
   useEffect(() => {
     if (!bulkJobId) return;
-    const source = connectAuditEventSource(`/api/bulk/${bulkJobId}/events`, (payload) => {
+    const source = connectAuditEventSource(apiUrl(`/api/bulk/${bulkJobId}/events`), (payload) => {
       setBulkEvents((prev) => [...prev.slice(-80), payload]);
     });
     source.onerror = () => source.close();
@@ -71,7 +72,7 @@ export default function App() {
 
   useEffect(() => {
     if (!audit?.id) return;
-    const source = connectAuditEventSource(`/api/audits/${audit.id}/events`, (payload) => {
+    const source = connectAuditEventSource(apiUrl(`/api/audits/${audit.id}/events`), (payload) => {
       setEvents((prev) => [...prev, payload]);
     });
     source.onerror = () => source.close();
@@ -102,7 +103,7 @@ export default function App() {
     try {
       const body = new FormData();
       body.append("file", file);
-      await startAudit(await fetch("/api/audits", { method: "POST", body }));
+      await startAudit(await fetch(apiUrl("/api/audits"), { method: "POST", body }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -116,7 +117,7 @@ export default function App() {
     setEvents([]);
     setSelected(null);
     try {
-      const endpoint = kind === "url" ? "/api/audits/url" : "/api/audits/doi";
+      const endpoint = kind === "url" ? apiUrl("/api/audits/url") : apiUrl("/api/audits/doi");
       const body = kind === "url" ? { url: value } : { doi: value };
       await startAudit(
         await fetch(endpoint, {
@@ -139,7 +140,7 @@ export default function App() {
     try {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch("/api/audits/bulk", { method: "POST", body });
+      const response = await fetch(apiUrl("/api/audits/bulk"), { method: "POST", body });
       if (!response.ok) throw new Error(await response.text());
       const job = (await response.json()) as { id: string; total: number };
       setBulkJobId(job.id);
@@ -147,7 +148,7 @@ export default function App() {
       setBulkDashboard(null);
       setBulkStatus(`Bulk job ${job.id} queued (${job.total} papers)`);
       const poll = window.setInterval(async () => {
-        const statusRes = await fetch(`/api/bulk/${job.id}`);
+        const statusRes = await fetch(apiUrl(`/api/bulk/${job.id}`));
         if (!statusRes.ok) return;
         const status = (await statusRes.json()) as {
           status: string;
@@ -167,7 +168,7 @@ export default function App() {
           window.clearInterval(poll);
           setUploading(false);
           await hydrateBulkEvents(job.id);
-          const dashRes = await fetch(`/api/bulk/${job.id}/dashboard`);
+          const dashRes = await fetch(apiUrl(`/api/bulk/${job.id}/dashboard`));
           if (dashRes.ok) setBulkDashboard((await dashRes.json()) as BulkDashboard);
         }
       }, 3000);
@@ -179,7 +180,7 @@ export default function App() {
 
   const saveIntent = async (intent: string) => {
     if (!audit || !selected) return;
-    const response = await fetch(`/api/audits/${audit.id}/citations/${selected.id}/intent`, {
+    const response = await fetch(apiUrl(`/api/audits/${audit.id}/citations/${selected.id}/intent`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ intent }),
@@ -189,7 +190,7 @@ export default function App() {
 
   const saveClaim = async () => {
     if (!audit || !selected || !claimDraft.trim()) return;
-    const response = await fetch(`/api/audits/${audit.id}/citations/${selected.id}/claim`, {
+    const response = await fetch(apiUrl(`/api/audits/${audit.id}/citations/${selected.id}/claim`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ claim: claimDraft.trim() }),
@@ -200,7 +201,7 @@ export default function App() {
   const approveClaim = async () => {
     if (!audit || !selected) return;
     const response = await fetch(
-      `/api/audits/${audit.id}/citations/${selected.id}/approve-claim`,
+      apiUrl(`/api/audits/${audit.id}/citations/${selected.id}/approve-claim`),
       { method: "POST" },
     );
     if (response.ok) await refreshAudit(audit.id);
@@ -209,7 +210,7 @@ export default function App() {
   const rerunNli = async () => {
     if (!audit || !selected) return;
     const response = await fetch(
-      `/api/audits/${audit.id}/citations/${selected.id}/rerun-nli`,
+      apiUrl(`/api/audits/${audit.id}/citations/${selected.id}/rerun-nli`),
       { method: "POST" },
     );
     if (response.ok) await refreshAudit(audit.id);
@@ -217,7 +218,7 @@ export default function App() {
 
   const rerunCitation = async () => {
     if (!audit || !selected) return;
-    const response = await fetch(`/api/audits/${audit.id}/citations/${selected.id}/rerun`, {
+    const response = await fetch(apiUrl(`/api/audits/${audit.id}/citations/${selected.id}/rerun`), {
       method: "POST",
     });
     if (response.ok) await refreshAudit(audit.id);
@@ -263,13 +264,13 @@ export default function App() {
   }, [audit?.citations, filter]);
 
   const loadAuditById = async (auditId: string) => {
-    const response = await fetch(`/api/audits/${auditId}`);
+    const response = await fetch(apiUrl(`/api/audits/${auditId}`));
     if (!response.ok) return;
     setAudit((await response.json()) as AuditRun);
     setSelected(null);
     setAuditsListKey((key) => key + 1);
     try {
-      const historyRes = await fetch(`/api/audits/${auditId}/events/history`);
+      const historyRes = await fetch(apiUrl(`/api/audits/${auditId}/events/history`));
       if (historyRes.ok) {
         setEvents((await historyRes.json()) as StreamEvent[]);
       } else {
@@ -297,7 +298,7 @@ export default function App() {
 
   const hydrateBulkEvents = async (jobId: string) => {
     try {
-      const res = await fetch(`/api/bulk/${jobId}/events/history`);
+      const res = await fetch(apiUrl(`/api/bulk/${jobId}/events/history`));
       if (res.ok) {
         setBulkEvents((await res.json()) as StreamEvent[]);
       }
@@ -314,7 +315,7 @@ export default function App() {
       setAudit(bulkAuditCache[auditId]);
       setExpandedBulkId(auditId);
       try {
-        const historyRes = await fetch(`/api/audits/${auditId}/events/history`);
+        const historyRes = await fetch(apiUrl(`/api/audits/${auditId}/events/history`));
         if (historyRes.ok) {
           setEvents((await historyRes.json()) as StreamEvent[]);
         }
@@ -323,7 +324,7 @@ export default function App() {
       }
       return;
     }
-    const response = await fetch(`/api/audits/${auditId}`);
+    const response = await fetch(apiUrl(`/api/audits/${auditId}`));
     if (!response.ok) return;
     const data = (await response.json()) as AuditRun;
     setBulkAuditCache((prev) => ({ ...prev, [auditId]: data }));
@@ -331,7 +332,7 @@ export default function App() {
     setExpandedBulkId(auditId);
     setShowAnatomy(true);
     try {
-      const historyRes = await fetch(`/api/audits/${auditId}/events/history`);
+      const historyRes = await fetch(apiUrl(`/api/audits/${auditId}/events/history`));
       if (historyRes.ok) {
         setEvents((await historyRes.json()) as StreamEvent[]);
       }
@@ -416,13 +417,13 @@ export default function App() {
               <div className="mt-2 flex flex-wrap gap-3 text-xs">
                 <a
                   className="papyrus-link"
-                  href={`/api/bulk/${bulkDashboard.job.id}/dashboard.json`}
+                  href={apiUrl(`/api/bulk/${bulkDashboard.job.id}/dashboard.json`)}
                 >
                   Export dashboard JSON
                 </a>
                 <a
                   className="papyrus-link"
-                  href={`/api/bulk/${bulkDashboard.job.id}/events/log.txt`}
+                  href={apiUrl(`/api/bulk/${bulkDashboard.job.id}/events/log.txt`)}
                 >
                   Bulk event log
                 </a>
@@ -616,16 +617,16 @@ export default function App() {
                     Export reports
                   </summary>
                   <div className="mt-2 flex flex-wrap gap-3">
-                    <a className="papyrus-link" href={`/api/audits/${audit.id}/report.pdf`}>
+                    <a className="papyrus-link" href={apiUrl(`/api/audits/${audit.id}/report.pdf`)}>
                       PDF
                     </a>
-                    <a className="papyrus-link" href={`/api/audits/${audit.id}/report.txt`}>
+                    <a className="papyrus-link" href={apiUrl(`/api/audits/${audit.id}/report.txt`)}>
                       Text
                     </a>
-                    <a className="papyrus-link" href={`/api/audits/${audit.id}/report.json`}>
+                    <a className="papyrus-link" href={apiUrl(`/api/audits/${audit.id}/report.json`)}>
                       JSON
                     </a>
-                    <a className="papyrus-link" href={`/api/audits/${audit.id}/events/log.txt`}>
+                    <a className="papyrus-link" href={apiUrl(`/api/audits/${audit.id}/events/log.txt`)}>
                       Event log
                     </a>
                   </div>

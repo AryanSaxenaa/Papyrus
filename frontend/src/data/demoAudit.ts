@@ -1,4 +1,4 @@
-import type { AuditRun, CitationRecord, StreamEvent } from "../types";
+import type { AuditRun, CitationRecord } from "../types";
 
 const PAPER_TITLE =
   "Long-lived quantum coherence in photosynthetic complexes at physiological temperature";
@@ -134,52 +134,3 @@ export const DEMO_AUDIT: AuditRun = {
     cite(20, { evidence_tier: "tier_2", verdict_color: "supported" }),
   ],
 };
-
-/** Representative pipeline events — same shape as SSE / history API payloads. */
-export const DEMO_STREAM_EVENTS: StreamEvent[] = [
-  {
-    ts: "2025-11-14T09:12:04Z",
-    type: "ingestion",
-    message: "PDF upload received",
-  },
-  {
-    ts: "2025-11-14T09:12:18Z",
-    type: "grobid",
-    message: "Citation extraction complete",
-  },
-  {
-    ts: "2025-11-14T09:13:02Z",
-    type: "crossref",
-    message: "CrossRef DOI lookup — resolved",
-    citation_index: 1,
-  },
-  {
-    ts: "2025-11-14T09:14:11Z",
-    type: "semantic_scholar",
-    message: "Semantic Scholar DOI lookup — resolved",
-    citation_index: 3,
-  },
-  {
-    ts: "2025-11-14T09:16:40Z",
-    type: "nli",
-    message: "Claim alignment: supported",
-    citation_index: 3,
-  },
-  {
-    ts: "2025-11-14T09:18:05Z",
-    type: "verdict",
-    message: "Retraction detected",
-    citation_index: 6,
-  },
-  {
-    ts: "2025-11-14T09:21:33Z",
-    type: "verdict",
-    message: "Type 7 — claim contradicts source abstract",
-    citation_index: 18,
-  },
-  {
-    ts: "2025-11-14T09:28:00Z",
-    type: "complete",
-    message: "Audit finished",
-  },
-];

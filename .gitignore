@@ -7,6 +7,7 @@ CLAUDE.md
 !.env.example
 !.env.template
 !.env.sample
+!frontend/.env.example
 *.env.local
 *.env.development.local
 *.env.test.local
@@ -44,6 +45,17 @@ venv/
 data/uploads/
 data/audits/
 data/**/fulltext/
+backend/data/uploads/
+backend/data/audits/
+backend/data/**/fulltext/
+
+# Repo-local agent skill installs (use global Cursor/Claude skills instead)
+.agents/
+skills-lock.json
+.commandcode/
+
+# Cloud Run deploy secrets
+deploy/cloudrun/.env
 
 # Node
 node_modules/

@@ -16,9 +16,17 @@ NLI_MODEL = "cross-encoder/nli-deberta-v3-base"
 
 
 async def classify_entailment(claim: str, evidence: str) -> NliVerdict | None:
-    """NLI via configured backend chain, or None to use lexical fallback."""
+    """NLI via configured backend, or None to use lexical verdict fallback."""
     settings = get_settings()
     backend = settings.nli_backend.lower()
+
+    if backend == "hf":
+        if not settings.huggingface_api_key:
+            return None
+        return await _classify_huggingface(claim, evidence)
+
+    if backend == "lexical":
+        return None
 
     if backend in {"auto", "ollama"}:
         result = await classify_ollama(claim, evidence)
@@ -31,12 +39,7 @@ async def classify_entailment(claim: str, evidence: str) -> NliVerdict | None:
             return result
 
     if backend in {"auto", "hf"} and settings.huggingface_api_key:
-        result = await _classify_huggingface(claim, evidence)
-        if result is not None:
-            return result
-
-    if backend == "lexical":
-        return None
+        return await _classify_huggingface(claim, evidence)
 
     return None
 

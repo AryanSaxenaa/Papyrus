@@ -60,8 +60,10 @@ async def get_public_config() -> dict:
         "pipeline_version": settings.pipeline_version,
         "persistence_backend": settings.persistence_backend,
         "grobid_enabled": settings.grobid_enabled,
-        "use_celery_bulk": settings.use_celery_bulk,
-        "bulk_queue_mode": "celery" if celery_ready else "background_tasks",
+        "enable_llm_pdf_ingestion": settings.enable_llm_pdf_ingestion,
+        "use_celery_background": settings.celery_background_enabled(),
+        "file_storage_backend": settings.file_storage_backend,
+        "background_queue_mode": "celery" if celery_ready else "background_tasks",
         "celery_worker_available": celery_ready,
         "integrations": {
             "deepseek": bool(settings.deepseek_api_key),

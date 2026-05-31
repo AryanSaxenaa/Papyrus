@@ -1,0 +1,16 @@
+.git
+.github
+.cursor
+.claude
+**/.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+backend/data
+backend/tests
+*.md
+.env
+.env.*
+!deploy/cloudrun/env.template

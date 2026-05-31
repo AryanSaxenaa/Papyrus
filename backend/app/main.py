@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings = get_settings()
-    Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
-    Path(settings.audit_data_dir).mkdir(parents=True, exist_ok=True)
+    if settings.file_storage_backend == "local":
+        Path(settings.file_storage_root).mkdir(parents=True, exist_ok=True)
     init_db()
     try:
         await cache_service.connect()
