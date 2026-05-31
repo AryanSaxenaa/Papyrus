@@ -70,6 +70,20 @@ cd backend
 python -c "from app.storage.db import init_db; init_db()"
 ```
 
+## Resolution APIs (direct REST; optional Apify)
+
+| Variable | Purpose |
+|----------|---------|
+| `CROSSREF_MAILTO` | Polite pool for CrossRef API |
+| `OPENALEX_MAILTO` | Polite pool for OpenAlex API |
+| `OPENALEX_API_KEY` | Free daily budget on [openalex.org/settings/api](https://openalex.org/settings/api) — use direct `api.openalex.org`, not Apify |
+| `UNPAYWALL_EMAIL` | Unpaywall API |
+| `EXA_API_KEY` | Optional semantic web search (signal-only; not a sole verdict basis) |
+| `FIRECRAWL_API_KEY` | Optional publisher landing-page scrape when DOI metadata lacks abstract |
+| `APIFY_API_TOKEN` | Optional; **arXiv metadata and journal ISSN fallbacks only** (no OpenAlex/Europe PMC/MCP actors) |
+
+Europe PMC uses the public REST API at `ebi.ac.uk/europepmc/webservices/rest` (no Apify, no key). arXiv uses `export.arxiv.org`.
+
 ## Production (`APP_ENV=production`)
 
 Cloud Run sets `APP_ENV=production`. The app then requires:

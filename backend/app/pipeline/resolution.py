@@ -23,7 +23,6 @@ from app.services.openalex import openalex_client
 from app.services.semantic_scholar import semantic_scholar_client
 from app.services.firecrawl import firecrawl_client
 from app.services.fulltext import fulltext_service
-from app.services.apify_client import apify_fallback_resolve
 from app.pipeline.journal_checks import is_resolved_metadata_mismatch, is_year_impossible
 from app.services.journals import journal_client
 from app.services.unpaywall import unpaywall_client
@@ -198,27 +197,22 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
                 success=openalex is not None,
             )
 
-    if not crossref and not scholar and not openalex:
+    if not crossref and not scholar and not openalex and not arxiv:
         arxiv_id = arxiv_client.extract_id(cited.doi) or arxiv_client.extract_id(cited.raw)
-        apify = await apify_fallback_resolve(cited.title, cited.authors, arxiv_id)
-        record.resolution_attempts.append(
-            _attempt(
-                ResolutionSource.APIFY,
-                cited.title or cited.doi or cited.raw[:80],
-                apify is not None,
-                apify,
+        if arxiv_id:
+            arxiv = await arxiv_client.fetch(arxiv_id)
+            record.resolution_attempts.append(
+                _attempt(ResolutionSource.ARXIV, arxiv_id, arxiv is not None, arxiv)
             )
-        )
-        event_bus.emit(
-            audit_id,
-            "apify",
-            "Apify actor retrieval"
-            + (" (academic MCP)" if apify and apify.get("via") == "academic_mcp" else ""),
-            citation_index=record.index,
-            success=apify is not None,
-        )
+            event_bus.emit(
+                audit_id,
+                "arxiv",
+                "arXiv metadata lookup (fallback)",
+                citation_index=record.index,
+                success=arxiv is not None,
+            )
 
-    merged = merge_resolved(crossref, scholar, openalex, arxiv, unpaywall, europe_pmc, apify)
+    merged = merge_resolved(crossref, scholar, openalex, arxiv, unpaywall, europe_pmc, None)
 
     pdf_url = (merged or {}).get("open_access_pdf") or record.oa_pdf_url
     if pdf_url and not (merged or {}).get("full_text"):
@@ -289,9 +283,12 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
         and cited.year
         and crossref.get("issn")
     ):
-        journal_meta = await journal_client.lookup_issn(crossref["issn"])
-        if not journal_meta:
-            journal_meta = await journal_client.lookup_issn_apify(crossref["issn"])
+        try:
+            journal_meta = await journal_client.lookup_issn(crossref["issn"])
+            if not journal_meta:
+                journal_meta = await journal_client.lookup_issn_apify(crossref["issn"])
+        except OSError:
+            journal_meta = None
         if is_year_impossible(cited.year, journal_meta):
             record.hallucination_type = HallucinationType.DATE_IMPOSSIBLE
             record.verdict_color = "failure"
@@ -304,9 +301,12 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
                 cited_year=cited.year,
             )
         elif cited.volume and record.hallucination_type == HallucinationType.NONE:
-            volume_ok = await journal_client.volume_has_issue_in_year(
-                crossref["issn"], str(cited.volume), int(cited.year)
-            )
+            try:
+                volume_ok = await journal_client.volume_has_issue_in_year(
+                    crossref["issn"], str(cited.volume), int(cited.year)
+                )
+            except OSError:
+                volume_ok = None
             if volume_ok is False:
                 record.hallucination_type = HallucinationType.DATE_IMPOSSIBLE
                 record.verdict_color = "failure"

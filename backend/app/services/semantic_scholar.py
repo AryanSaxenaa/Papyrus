@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.http_retry import get_with_throttle
 from app.services.rate_limits import rate_limit_service
 from app.text.identifiers import normalize_doi
 
@@ -28,10 +29,13 @@ class SemanticScholarClient:
             "publicationVenue,publicationTypes,publicationDate"
         )
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{self.BASE}/paper/ARXIV:{clean}",
-                params={"fields": fields},
-                headers=self._headers,
+            response = await get_with_throttle(
+                "semantic_scholar",
+                lambda: client.get(
+                    f"{self.BASE}/paper/ARXIV:{clean}",
+                    params={"fields": fields},
+                    headers=self._headers,
+                ),
             )
             await rate_limit_service.record("semantic_scholar")
             if response.status_code != 200:
@@ -47,10 +51,13 @@ class SemanticScholarClient:
             "publicationVenue,publicationTypes,publicationDate"
         )
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{self.BASE}/paper/DOI:{normalized}",
-                params={"fields": fields},
-                headers=self._headers,
+            response = await get_with_throttle(
+                "semantic_scholar",
+                lambda: client.get(
+                    f"{self.BASE}/paper/DOI:{normalized}",
+                    params={"fields": fields},
+                    headers=self._headers,
+                ),
             )
             await rate_limit_service.record("semantic_scholar")
             if response.status_code != 200:
@@ -66,7 +73,14 @@ class SemanticScholarClient:
             "fields": "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf",
         }
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{self.BASE}/paper/search", params=params, headers=self._headers)
+            response = await get_with_throttle(
+                "semantic_scholar",
+                lambda: client.get(
+                    f"{self.BASE}/paper/search",
+                    params=params,
+                    headers=self._headers,
+                ),
+            )
             await rate_limit_service.record("semantic_scholar")
             if response.status_code != 200:
                 return None

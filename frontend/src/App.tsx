@@ -43,17 +43,41 @@ export default function App() {
     if (!response.ok) return;
     const next = (await response.json()) as AuditRun;
     setAudit(next);
-    if (selected) {
-      const updated = next.citations.find((c) => c.id === selected.id);
-      if (updated) setSelected(updated);
-    }
-  }, [selected]);
+    setSelected((current) => {
+      if (!current) return null;
+      return next.citations.find((c) => c.id === current.id) ?? current;
+    });
+  }, []);
 
   useEffect(() => {
-    if (!audit?.id || audit.status === "complete" || audit.status === "failed") return;
+    if (!audit?.id) return;
+    if (audit.status === "complete" || audit.status === "failed") {
+      void refreshAudit(audit.id);
+      return;
+    }
     const timer = window.setInterval(() => refreshAudit(audit.id), 2500);
     return () => window.clearInterval(timer);
   }, [audit?.id, audit?.status, refreshAudit]);
+
+  useEffect(() => {
+    if (!audit?.id) return;
+    const pollEvents = async () => {
+      try {
+        const res = await fetch(apiUrl(`/api/audits/${audit.id}/events/history`));
+        if (res.ok) {
+          setEvents((await res.json()) as StreamEvent[]);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    void pollEvents();
+    if (audit.status === "complete" || audit.status === "failed") {
+      return;
+    }
+    const timer = window.setInterval(pollEvents, 2000);
+    return () => window.clearInterval(timer);
+  }, [audit?.id, audit?.status]);
 
   useEffect(() => {
     if (audit && audit.status !== "complete" && audit.status !== "failed") {
@@ -82,11 +106,15 @@ export default function App() {
   useEffect(() => {
     if (!selected) return;
     setClaimDraft(selected.claim_user_corrected ?? selected.extracted_claim ?? "");
+  }, [selected]);
+
+  useEffect(() => {
+    if (!selected?.id) return;
     document.getElementById(`heatmap-citation-${selected.id}`)?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
     });
-  }, [selected]);
+  }, [selected?.id]);
 
   const startAudit = async (response: Response) => {
     if (!response.ok) throw new Error(await response.text());

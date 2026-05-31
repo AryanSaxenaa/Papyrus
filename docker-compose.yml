@@ -36,6 +36,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg2://papyrus:papyrus@postgres:5432/papyrus
       PERSISTENCE_BACKEND: both
+      SYNC_RELATIONAL_AUDITS: "true"
       REDIS_URL: redis://redis:6379/0
       GROBID_ENABLED: ${GROBID_ENABLED:-false}
       GROBID_URL: http://grobid:8070
@@ -63,6 +64,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg2://papyrus:papyrus@postgres:5432/papyrus
       PERSISTENCE_BACKEND: both
+      SYNC_RELATIONAL_AUDITS: "true"
       REDIS_URL: redis://redis:6379/0
       GROBID_ENABLED: ${GROBID_ENABLED:-false}
       GROBID_URL: http://grobid:8070

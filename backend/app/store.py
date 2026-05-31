@@ -35,9 +35,7 @@ class AuditStore:
         return audit
 
     def get(self, audit_id: UUID) -> AuditRun | None:
-        if audit_id in self._audits:
-            return self._audits[audit_id]
-
+        """Always prefer persisted state so Celery worker updates are visible to the API."""
         if self._use_postgres():
             audit = self._get_postgres(audit_id)
             if audit:
@@ -52,7 +50,8 @@ class AuditStore:
                 )
                 self._audits[audit_id] = audit
                 return audit
-        return None
+
+        return self._audits.get(audit_id)
 
     def save(self, audit: AuditRun) -> None:
         self._audits[audit.id] = audit

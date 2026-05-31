@@ -9,7 +9,6 @@ import httpx
 from app.config import get_settings
 from app.domain.enums import ResolutionSource
 from app.services.cache import cache_service
-from app.text.identifiers import author_title_query, normalize_doi
 from app.text.similarity import coerce_author_list, compare_titles
 from app.services.rate_limits import rate_limit_service
 
@@ -18,7 +17,7 @@ _ARXIV_MERGE_FIELDS = ("abstract", "authors", "doi", "open_access_pdf")
 
 
 class ApifyClient:
-    """Structured retrieval fallback when direct APIs miss or rate-limit."""
+    """Apify fallbacks limited to arXiv metadata (and optional CrossRef journal ISSN lookup)."""
 
     async def run_actor(self, actor_id: str, run_input: dict[str, Any]) -> list[dict[str, Any]] | None:
         settings = get_settings()
@@ -34,54 +33,23 @@ class ApifyClient:
 
         actor_path = actor_id.replace("/", "~")
         url = f"{APIFY_BASE}/acts/{actor_path}/run-sync-get-dataset-items"
-        async with httpx.AsyncClient(timeout=180.0) as client:
-            response = await client.post(
-                url,
-                params={"token": settings.apify_api_token, "timeout": 120},
-                json=run_input,
-            )
-            await rate_limit_service.record("apify")
-            if response.status_code not in {200, 201}:
-                return None
-            items = response.json()
-            if not isinstance(items, list):
-                return None
-            await cache_service.set_json("actor", cache_key, {"items": items})
-            return items
-
-    async def resolve_academic_mcp(self, title: str, authors: list[str] | None = None) -> dict[str, Any] | None:
-        settings = get_settings()
-        query = author_title_query(title, authors)
-        items = await self.run_actor(
-            settings.apify_actor_academic_mcp,
-            {"query": query, "searchQuery": query, "searchTerms": query, "maxResults": 1, "maxItems": 1},
-        )
-        if not items:
+        try:
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                response = await client.post(
+                    url,
+                    params={"token": settings.apify_api_token, "timeout": 120},
+                    json=run_input,
+                )
+                await rate_limit_service.record("apify")
+                if response.status_code not in {200, 201}:
+                    return None
+                items = response.json()
+                if not isinstance(items, list):
+                    return None
+                await cache_service.set_json("actor", cache_key, {"items": items})
+                return items
+        except (httpx.HTTPError, OSError):
             return None
-        return _normalize_academic_item(items[0])
-
-    async def resolve_by_title(self, title: str, authors: list[str] | None = None) -> dict[str, Any] | None:
-        settings = get_settings()
-        query = author_title_query(title, authors)
-
-        mcp = await self.resolve_academic_mcp(title, authors)
-        if mcp:
-            return mcp
-
-        openalex_items = await self.run_actor(
-            settings.apify_actor_openalex,
-            {"searchTerms": query, "maxItems": 1},
-        )
-        if openalex_items:
-            return _normalize_openalex_item(openalex_items[0])
-
-        epmc_items = await self.run_actor(
-            settings.apify_actor_europe_pmc,
-            {"searchQuery": title, "maxResults": 1},
-        )
-        if epmc_items:
-            return _normalize_epmc_item(epmc_items[0])
-        return None
 
     async def resolve_arxiv(self, arxiv_id: str) -> dict[str, Any] | None:
         settings = get_settings()
@@ -130,74 +98,17 @@ class ApifyClient:
             "apify_actor": actor_id,
         }
 
-    async def resolve_openalex_secondary(self, title: str) -> dict[str, Any] | None:
-        settings = get_settings()
-        items = await self.run_actor(
-            settings.apify_actor_openalex_secondary,
-            {"searchTerms": title, "search": title, "query": title, "maxItems": 1},
-        )
-        if not items:
-            return None
-        normalized = _normalize_openalex_item(items[0])
-        normalized["via"] = "openalex_apify_secondary"
-        normalized["apify_actor"] = settings.apify_actor_openalex_secondary
-        return normalized
-
 
 async def apify_fallback_resolve(
     title: str | None,
     authors: list[str] | None,
     arxiv_id: str | None,
 ) -> dict[str, Any] | None:
-    client = ApifyClient()
-    if arxiv_id:
-        result = await client.resolve_arxiv(arxiv_id)
-        if result:
-            return result
-    if title:
-        return await client.resolve_by_title(title, authors)
-    return None
-
-
-def _normalize_academic_item(row: dict[str, Any]) -> dict[str, Any]:
-    title = row.get("title") or row.get("paperTitle") or row.get("name")
-    abstract = row.get("abstract") or row.get("summary") or row.get("snippet")
-    authors = coerce_author_list(row.get("authors") or row.get("authorNames") or [])
-    doi = row.get("doi") or row.get("DOI")
-    if isinstance(doi, str):
-        doi = normalize_doi(doi)
-    return {
-        "title": title,
-        "abstract": abstract,
-        "authors": authors,
-        "year": _year_from_row(row),
-        "doi": doi,
-        "open_access_pdf": row.get("pdfUrl") or row.get("pdf_url") or row.get("openAccessPdf"),
-        "source": ResolutionSource.APIFY.value,
-        "via": "academic_mcp",
-    }
-
-
-def _normalize_openalex_item(row: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "title": row.get("title") or row.get("display_name"),
-        "abstract": row.get("abstract"),
-        "authors": coerce_author_list(row.get("authors") or row.get("authorships") or []),
-        "year": row.get("year") or row.get("publication_year"),
-        "doi": normalize_doi(row.get("doi") or "") or None,
-        "source": ResolutionSource.APIFY.value,
-    }
-
-
-def _normalize_epmc_item(row: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "title": row.get("title"),
-        "abstract": row.get("abstractText") or row.get("abstract"),
-        "authors": [row.get("authorString")] if row.get("authorString") else [],
-        "year": int(row["pubYear"]) if row.get("pubYear") else None,
-        "doi": row.get("doi"),
-        "source": ResolutionSource.APIFY.value,
-    }
+    """Last-resort Apify path: arXiv ID only (OpenAlex and Europe PMC use direct APIs)."""
+    _ = title, authors
+    if not arxiv_id:
+        return None
+    return await ApifyClient().resolve_arxiv(arxiv_id)
 
 
 def _year_from_row(row: dict[str, Any]) -> int | None:

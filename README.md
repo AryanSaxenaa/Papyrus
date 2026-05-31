@@ -7,7 +7,7 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 ## Stack
 
 - **Backend:** FastAPI, Redis (cache + Celery broker), Celery (async bulk worker), PyMuPDF PDF ingestion (optional GROBID for public beta)
-- **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Europe PMC, Exa, Apify fallbacks
+- **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC (REST), arXiv API, Exa, Firecrawl; optional Apify only for arXiv/journal fallbacks
 - **Frontend:** React + Vite + Tailwind + motion, D3 (heatmap/timeline), pdf.js (paper anatomy)
 
 ## Documentation
@@ -23,7 +23,7 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 
 **GCP project:** `papyrus-audit` (display name *Papyrus*). The project ID `papyrus` is not available globally; use `papyrus-audit` in `deploy/cloudrun/.env`.
 
-**External services (not on GCP):** Supabase Postgres (`DATABASE_URL`), Redis Cloud (`REDIS_URL`), optional third-party API keys (DeepSeek, Hugging Face, OpenRouter, Exa, Firecrawl, Apify).
+**External services (not on GCP):** Supabase Postgres (`DATABASE_URL`), Redis Cloud (`REDIS_URL`), optional third-party API keys (DeepSeek, Hugging Face, OpenRouter, Exa, Firecrawl, OpenAlex, Unpaywall; Apify optional for narrow fallbacks).
 
 ### Live URLs
 
@@ -177,86 +177,20 @@ Open http://localhost:5173 and upload a PDF. The dev server proxies `/api` to th
 | `GET` | `/api/audits/{id}/citations/{cid}/attempts` | Resolution attempts from relational DB |
 | `GET` | `/api/audits/{id}/paper.pdf` | Source PDF for paper anatomy overlay view |
 
-## Implementation status (v1 slice)
+## Implementation status (v1)
 
-- [x] PDF ingestion — **PyMuPDF default**; optional GROBID (`GROBID_ENABLED`); LLM PDF ingest gated (`ENABLE_LLM_PDF_INGESTION`)
-- [x] Intent heuristics + LLM classification (`LLM_BACKEND=deepseek` or `openrouter`)
-- [x] Multi-source resolution (CrossRef → S2 → OpenAlex)
-- [x] Unpaywall OA lookup, arXiv metadata, Exa weak-signal (never a verdict)
-- [x] Types 1, 2, 5, 6, 7 (NLI claim alignment), retraction, version mismatch (preprint vs published)
-- [x] Evidence passage retrieval (lexical + Snowflake/OpenAI/OpenRouter embeddings)
-- [x] Coverage + risk scoring, JSON/TXT reports; persistence via Postgres + JSON artifacts (`FILE_STORAGE_BACKEND` local or GCS)
-- [x] SSE live panel + D3 heatmap (verdict color transitions, filters, claim rerun)
-- [x] Side-by-side claim viewer (context / verdict / evidence drawer)
-- [x] Coverage summary chips + heatmap legend + contradiction filter
-- [x] Dual-column live panel (event log + resolving stack, citation search)
-- [x] D3 version mismatch timeline (arXiv preprint vs published)
-- [x] PubMed/PMC URL → PDF via Firecrawl landing scrape
-- [x] Europe PMC biomedical lookup
-- [x] NLI via Hugging Face Inference API (fallback: lexical heuristic)
-- [x] Bulk ZIP queue, URL ingestion (arXiv + direct PDF)
-- [x] PDF export report
-- [x] PostgreSQL persistence (`PERSISTENCE_BACKEND=json|postgres|both`)
-- [x] Firecrawl landing-page abstract fallback
-- [x] Open-access full-text PDF fetch for Tier 1 evidence
-- [x] CrossRef DOI content negotiation
-- [x] Bulk dashboard + paper anatomy view
-- [x] Apify actor fallback layer (arxiv, OpenAlex, Europe PMC scrapers)
-- [x] Rate-limit tracking + admin dashboard endpoint
-- [x] CrossRef journal ISSN check for Type 5 (date impossible)
-- [x] Type 6 embedding semantic gate (OpenAI) + edit-distance gate
-- [x] arXiv revision history + Apify version enrichment for timelines
-- [x] DOI URL → Unpaywall open-access PDF before Firecrawl fallback
-- [x] Apify CrossRef journals fallback for Type 5
-- [x] Spec-aligned TXT report (coverage confidence, claim breakdown, version timeline)
-- [x] Coverage bar with confidence note; clickable paper anatomy markers
-- [x] Bulk dashboard inline heatmap expand + resolution log; Celery bulk with BackgroundTasks fallback
-- [x] Semantic Scholar DOI lookup + abstract enrichment
-- [x] SSRN URL ingestion via Firecrawl
-- [x] Bulk job ETA (`estimated_seconds_remaining`)
-- [x] D3 force-layout citation heatmap (collision + grid targets)
-- [x] Celery bulk default on with auto-fallback to BackgroundTasks when no worker/Redis
-- [x] User correction ground-truth log (Postgres table or `corrections.jsonl`)
-- [x] Audit limitations panel (coverage bias, NLI caveats, out-of-scope list)
-- [x] Medium-confidence review flag in claim viewer
-- [x] OpenAlex DOI lookup + abstract enrichment
-- [x] Local NLI via Ollama or sentence-transformers (`NLI_BACKEND`, optional deps)
-- [x] Audit summaries index table (Postgres) for fast listing
-- [x] Claim approval gate before NLI (`NLI_REQUIRES_CLAIM_APPROVAL`, default true)
-- [x] Per-citation resolution rerun API
-- [x] Risk confidence scoring + detailed health check
-- [x] Citation-level Postgres index (`citation_index` table) for analytics
-- [x] Past audits panel, heatmap verdict badges, Tier 2 / unresolvable evidence drawers
-- [x] Live panel event-type filter; evidence sentence highlight
-- [x] Basic pytest suite (`backend/tests/`, `requirements-dev.txt`)
-- [x] Delete audit API + past-audits panel with removal
-- [x] Bulk dashboard pending-paper progress + ETA display
-- [x] Evidence provenance chain in claim viewer (tier, source, retrieved time)
-- [x] Admin panel (rate limits, integration flags, corrections export)
-- [x] Intent reclassification reruns claim alignment when set to evidentiary
-- [x] TXT/PDF reports include evidence provenance and per-source resolution trail
-- [x] Apify academic-research MCP actor in title-search fallback chain
-- [x] Admin corrections log in UI; Docker Compose `web` service for frontend
-- [x] D3 coverage bar (tiers + confirmed failures + unresolvable)
-- [x] Resolution trail in claim viewer centre column; bulk job SSE + failure-type columns
-- [x] Bulk log/JSON export; admin corrections CSV export
-- [x] Claim approval before NLI (default on, per spec live panel)
-- [x] Snowflake Arctic embedding backend option (`EMBEDDINGS_BACKEND=snowflake`)
-- [x] PDF paper anatomy with pdf.js citation badge overlays (`PaperAnatomyView`)
-- [x] Type 2 DOI redirect via title drift and exact author-list comparison
-- [x] Apify secondary actors: `openclawmara/arxiv-paper-scraper`, `shahidirfan/openalex-scraper`
-- [x] Celery bulk queue (`USE_CELERY_BULK=true` in Docker Compose)
-- [x] Type 5 volume/year checks (CrossRef DOI metadata + journal volume filter)
-- [x] Semantic Scholar arXiv version linking for version mismatch
-- [x] OpenAlex ISSN journal catalog verification
-- [x] GROBID volume/issue/pages/URL extraction when enabled; three-sentence claim context
-- [x] Cloud Run deploy on `papyrus-audit` (`deploy/cloudrun/deploy.ps1` / `deploy.sh`; GCS; no GROBID)
-- [x] Celery for single audits and bulk ZIP (`USE_CELERY_BACKGROUND`); Cloud Run worker `min-instances=1`
-- [x] Firecrawl + Europe PMC rate limits; `ryanclinton/europe-pmc-search` Apify fallback
-- [x] SSE named-event consumer; event history API; bulk expand with resolution log
-- [x] Limitations panel always visible; abstract-only + human-review fields in reports
+The v1 slice is implemented end-to-end: upload → multi-source resolution → classified heatmap → side-by-side claim viewer → exports. Defaults match [docs/configuration.md](docs/configuration.md) (PyMuPDF ingestion, direct REST resolvers, Celery background jobs).
 
-See [papyrus-spec.md](./papyrus-spec.md) for the full architecture.
+| Area | Shipped |
+|------|---------|
+| Ingestion | PyMuPDF; optional GROBID; LLM PDF bibliography gated off |
+| Resolution | CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC REST, arXiv API, Exa (signal-only), Firecrawl (landing abstracts) |
+| Optional | Apify only for arXiv metadata + journal ISSN fallbacks when `APIFY_API_TOKEN` is set |
+| Verdicts | Types 1–7, retraction, version mismatch, coverage/risk, NLI with claim approval |
+| UI | Live SSE log, D3 heatmap, paper anatomy (pdf.js), bulk ZIP dashboard, admin integrations panel |
+| Ops | Postgres + GCS artifacts, Cloud Run deploy (`papyrus-audit`), rate-limit admin API |
+
+Full architecture and taxonomy: [papyrus-spec.md](./papyrus-spec.md).
 
 ### Excluded per spec (not implemented)
 

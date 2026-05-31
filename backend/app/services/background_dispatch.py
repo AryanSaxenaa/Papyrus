@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID
 
@@ -35,6 +34,17 @@ async def redis_reachable() -> bool:
         return False
 
 
+def worker_consumes_audits_queue(active_queues: dict | None) -> bool:
+    """True when at least one live worker is bound to the audits queue."""
+    if not active_queues:
+        return False
+    for queues in active_queues.values():
+        for queue in queues or []:
+            if isinstance(queue, dict) and queue.get("name") == "audits":
+                return True
+    return False
+
+
 async def celery_worker_available() -> bool:
     global _cached_available, _cached_at
 
@@ -57,11 +67,16 @@ async def celery_worker_available() -> bool:
     try:
         from app.worker import celery_app
 
-        inspect = celery_app.control.inspect(timeout=1.0)
+        inspect = celery_app.control.inspect(timeout=2.0)
         stats = inspect.stats() if inspect else None
-        available = bool(stats)
+        active_queues = inspect.active_queues() if inspect else None
+        available = bool(stats) and worker_consumes_audits_queue(active_queues)
         if not available:
-            logger.info("Background queue: no Celery workers — using BackgroundTasks")
+            logger.info(
+                "Background queue: no worker on audits queue (stats=%s, active_queues=%s) — using BackgroundTasks",
+                bool(stats),
+                active_queues,
+            )
         _cached_available = available
         _cached_at = now
         return available
@@ -78,7 +93,7 @@ async def _enqueue_celery(task_name: str, *args: Any) -> bool:
     try:
         from app.worker import celery_app
 
-        celery_app.send_task(task_name, args=args)
+        celery_app.send_task(task_name, args=args, queue="audits")
         return True
     except Exception as exc:
         logger.warning("Celery enqueue failed (%s)", exc)
@@ -90,10 +105,14 @@ async def enqueue_pdf_audit(
     storage_key: str,
     background: BackgroundTasks,
 ) -> str:
+    from app.services.events import event_bus
+
     if await _enqueue_celery("app.worker.run_pdf_audit", str(audit_id), storage_key):
+        event_bus.emit(audit_id, "system", "Audit dispatched to Celery (audits queue)")
         return "celery"
     from app.services.audit_jobs import run_pdf_audit
 
+    event_bus.emit(audit_id, "system", "Audit dispatched in-process (BackgroundTasks)")
     background.add_task(run_pdf_audit, audit_id, storage_key)
     return "background"
 

@@ -13,12 +13,12 @@ export const WORKFLOW_STEPS = [
   {
     n: 1,
     title: "Extract",
-    body: "GROBID parses your PDF and extracts every bibliography entry with surrounding context.",
+    body: "PyMuPDF extracts every bibliography entry and inline citation context from your PDF (optional GROBID for public beta).",
   },
   {
     n: 2,
     title: "Verify",
-    body: "CrossRef, Semantic Scholar, and OpenAlex cross-reference every DOI and metadata field.",
+    body: "CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC, and arXiv APIs cross-reference every DOI and metadata field.",
   },
   {
     n: 3,

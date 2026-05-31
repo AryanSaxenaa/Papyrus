@@ -71,3 +71,10 @@ deploy/cloudrun/.env
 node_modules/
 frontend/dist/
 *.tsbuildinfo
+
+# Video / Remotion pitch deck (local only — not published)
+video/
+
+# Local agent instruction files (keep in editor rules, not in the public repo)
+AGENTS.md
+CLAUDE.md

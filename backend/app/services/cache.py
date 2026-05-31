@@ -81,5 +81,52 @@ class CacheService:
         except (RedisError, OSError) as exc:
             logger.debug("Cache set failed: %s", exc)
 
+    def _sync_client(self):
+        settings = get_settings()
+        if not settings.redis_url:
+            return None
+        import redis as sync_redis
+
+        return sync_redis.from_url(settings.redis_url, decode_responses=True)
+
+    def publish_sync(self, channel: str, message: str) -> None:
+        """Publish to Redis (sync) so Celery workers can fan out SSE events to the API."""
+        client = self._sync_client()
+        if client is None:
+            return
+        try:
+            client.publish(channel, message)
+        except (RedisError, OSError) as exc:
+            logger.debug("Redis publish failed: %s", exc)
+        finally:
+            client.close()
+
+    def append_audit_event_sync(self, audit_id: str, message: str) -> None:
+        """Durable per-audit event log for worker→API history polling."""
+        client = self._sync_client()
+        if client is None:
+            return
+        key = f"papyrus:audit-events:{audit_id}:history"
+        try:
+            client.rpush(key, message)
+            client.expire(key, 86_400)
+        except (RedisError, OSError) as exc:
+            logger.debug("Redis audit event append failed: %s", exc)
+        finally:
+            client.close()
+
+    def load_audit_events_sync(self, audit_id: str) -> list[str]:
+        client = self._sync_client()
+        if client is None:
+            return []
+        key = f"papyrus:audit-events:{audit_id}:history"
+        try:
+            return list(client.lrange(key, 0, -1) or [])
+        except (RedisError, OSError) as exc:
+            logger.debug("Redis audit event load failed: %s", exc)
+            return []
+        finally:
+            client.close()
+
 
 cache_service = CacheService()

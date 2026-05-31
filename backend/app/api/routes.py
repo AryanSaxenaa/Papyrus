@@ -281,11 +281,17 @@ async def stream_bulk_events(job_id: UUID) -> EventSourceResponse:
 
     async def generator():
         queue = await event_bus.subscribe(job_id)
+        redis_task = asyncio.create_task(event_bus.listen_redis(job_id, queue))
         try:
             while True:
                 event = await queue.get()
                 yield {"event": event["type"], "data": json.dumps(event, default=str)}
         except asyncio.CancelledError:
+            redis_task.cancel()
+            try:
+                await redis_task
+            except asyncio.CancelledError:
+                pass
             event_bus.unsubscribe(job_id, queue)
             raise
 
@@ -396,11 +402,17 @@ async def stream_events(audit_id: UUID) -> EventSourceResponse:
 
     async def generator():
         queue = await event_bus.subscribe(audit_id)
+        redis_task = asyncio.create_task(event_bus.listen_redis(audit_id, queue))
         try:
             while True:
                 event = await queue.get()
                 yield {"event": event["type"], "data": json.dumps(event, default=str)}
         except asyncio.CancelledError:
+            redis_task.cancel()
+            try:
+                await redis_task
+            except asyncio.CancelledError:
+                pass
             event_bus.unsubscribe(audit_id, queue)
             raise
 

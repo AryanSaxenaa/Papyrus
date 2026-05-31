@@ -49,7 +49,10 @@ export function SideBySideDrawer({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onClose();
+            }}
             className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
           >
             Close

@@ -15,6 +15,7 @@ settings = get_settings()
 celery_app = Celery("papyrus", broker=settings.redis_url, backend=settings.redis_url)
 
 _celery_conf: dict = {
+    "task_default_queue": "audits",
     "task_routes": {
         "app.worker.run_pdf_audit": {"queue": "audits"},
         "app.worker.run_doi_audit": {"queue": "audits"},
@@ -24,6 +25,7 @@ _celery_conf: dict = {
     "task_track_started": True,
     "worker_prefetch_multiplier": 1,
     "task_acks_late": True,
+    "broker_connection_retry_on_startup": True,
 }
 
 if settings.redis_url.startswith("rediss://"):

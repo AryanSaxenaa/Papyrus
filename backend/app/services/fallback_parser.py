@@ -9,6 +9,7 @@ import fitz
 
 from app.domain.models import BibliographyEntry, InlineCitation
 from app.text.context_window import three_sentence_window
+from app.text.identifiers import normalize_doi
 
 
 REFERENCES_HEADERS = re.compile(r"^(references|bibliography|works cited)\s*$", re.I)
@@ -46,7 +47,7 @@ def parse_pdf_fallback(
                     raw=raw,
                     title=_guess_title(entry_lines),
                     year=int(year_match.group(0)) if year_match else None,
-                    doi=doi_match.group(0) if doi_match else None,
+                    doi=normalize_doi(doi_match.group(0)) if doi_match else None,
                 )
             )
 

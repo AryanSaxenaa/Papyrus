@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import difflib
 
+import httpx
+
 from app.domain.models import VersionEntry, VersionMismatchInfo
 from app.text.similarity import compare_titles
-from app.services.apify_client import ApifyClient
 from app.services.arxiv import arxiv_client
 
 
@@ -79,7 +80,10 @@ async def enrich_version_timeline(
         return info
 
     revisions: list[VersionEntry] = []
-    raw_revisions = await arxiv_client.fetch_revision_entries(arxiv_id)
+    try:
+        raw_revisions = await arxiv_client.fetch_revision_entries(arxiv_id)
+    except (OSError, httpx.HTTPError):
+        raw_revisions = []
     for row in raw_revisions:
         revisions.append(
             VersionEntry(
@@ -90,11 +94,6 @@ async def enrich_version_timeline(
                 source="arxiv",
             )
         )
-
-    if not revisions:
-        apify_row = await ApifyClient().resolve_arxiv(arxiv_id)
-        if apify_row:
-            revisions = _revisions_from_apify(apify_row)
 
     if revisions:
         info.revisions = revisions
@@ -113,29 +112,3 @@ def _material_difference(preprint: VersionEntry | None, published: VersionEntry 
         material = material or abs_ratio < 0.65
     return material
 
-
-def _revisions_from_apify(row: dict) -> list[VersionEntry]:
-    revisions: list[VersionEntry] = []
-    raw_versions = row.get("versions") or row.get("versionHistory") or row.get("revisions") or []
-    if isinstance(raw_versions, list):
-        for item in raw_versions:
-            if not isinstance(item, dict):
-                continue
-            revisions.append(
-                VersionEntry(
-                    label=item.get("version") or item.get("label") or "Revision",
-                    date=_coerce_date(item),
-                    title=item.get("title"),
-                    abstract=(item.get("abstract") or item.get("summary") or "")[:1500] or None,
-                    source="apify",
-                )
-            )
-    return revisions
-
-
-def _coerce_date(item: dict) -> str | None:
-    for key in ("date", "submittedDate", "published", "updated"):
-        value = item.get(key)
-        if value:
-            return str(value)[:10]
-    return None

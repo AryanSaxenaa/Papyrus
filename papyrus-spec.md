@@ -70,8 +70,8 @@ The journal may have launched in 2021 and the citation claims 2018. Or the volum
 not correspond to the year cited.
 
 Detection method: CrossRef journal volume/issue metadata cross-referenced against the cited
-year and volume number. Supplemented by the parseforge/crossref-journals-scraper Apify actor
-for journals with incomplete API metadata.
+year and volume number. OpenAlex ISSN catalog and CrossRef `/journals/{issn}` API are primary;
+optional `parseforge/crossref-journals-scraper` Apify actor only when journal API metadata is incomplete.
 Confidence: High.
 
 ### Type 6 — Title Drift
@@ -126,9 +126,8 @@ Elevated severity display — visually distinct from standard hallucination flag
 The paper is cited using a preprint DOI (typically arXiv), but the published version has
 materially different conclusions, authorship, or title.
 
-Detection method: arXiv API submission history + Semantic Scholar version linking. Comparison
-of preprint metadata versus published record metadata. The datapilot/arxiv-research-paper-scraper
-Apify actor provides structured version data when direct API calls return incomplete history.
+Detection method: arXiv export API submission history (`export.arxiv.org`) + Semantic Scholar
+version linking. Comparison of preprint metadata versus published record metadata.
 Confidence: Medium.
 
 ### Cannot Determine
@@ -193,34 +192,25 @@ per-paper as they complete, with a live progress tracker showing which papers ha
 their preliminary coverage scores. This is the primary workflow for journal editors and grant
 review panels.
 
-**Apify Integration for Paper Retrieval**
-When cited papers need metadata or full text retrieved and standard API calls fail or hit rate
-limits, the following Apify actors serve as structured retrieval tools:
+**Direct API resolution (default)**
+OpenAlex, Europe PMC, CrossRef, Semantic Scholar, Unpaywall, and arXiv are called via their
+public REST APIs (`api.openalex.org`, `ebi.ac.uk/europepmc/webservices/rest`, etc.). Results are
+cached at the DOI level with a 30-day TTL in Redis.
 
-- datapilot/arxiv-research-paper-scraper: Retrieves arXiv paper metadata — titles, abstracts,
-authors with affiliations, DOI, categories, submission dates, and PDF links in structured
-JSON. Primary use: preprint version tracking and Version Mismatch detection.
-- openclawmara/arxiv-paper-scraper: Secondary arXiv retrieval for cross-validation,
-particularly for citation metadata fields the primary actor does not surface.
-- shahidirfan/openalex-scraper and parseforge/openalex-scraper: Bulk OpenAlex retrieval when
-the direct REST API hits rate limits. Returns scholarly metadata including institutional
-affiliations, concept tags, open access status, and ISSN data for journal verification.
-- parseforge/crossref-journals-scraper: Journal-level metadata for Type 5 (Date Impossible)
-verification — journal names, identifiers, publication dates, volume history, and status flags.
-- ryanclinton/europe-pmc-search and parseforge/europepmc-scraper: Biomedical and life sciences
-full text. Europe PMC aggregates PubMed, PubMed Central, bioRxiv, and medRxiv. Used for
-Tier 1 evidence retrieval in biomedical citation alignment.
-- nexgendata/academic-research-mcp-server: MCP-based cross-database research server for paper
-search and citation lookup across arXiv, PubMed, and Google Scholar. Used as a structured
-search layer when direct DOI resolution fails and semantic search is needed. MCP-native
-invocation means calls appear in the live resolution panel as named tool calls with parameters.
+**Optional Apify fallbacks (narrow scope)**
+When `APIFY_API_TOKEN` is set, Apify is used only where direct APIs are insufficient:
 
-All Apify actor outputs are cached at the DOI level with a 30-day TTL in Redis. The same paper
-queried by multiple users triggers one actor run.
+- `datapilot/arxiv-research-paper-scraper` and `openclawmara/arxiv-paper-scraper`: optional arXiv
+metadata enrichment (primary path is `export.arxiv.org`).
+- `parseforge/crossref-journals-scraper`: optional journal ISSN metadata when CrossRef `/journals`
+returns incomplete history for Type 5 checks.
+
+OpenAlex, Europe PMC, and academic MCP actors are **not** used in the current pipeline.
 
 **Caching Architecture**
-Every DOI resolution result, every abstract retrieval, and every actor output is cached in
-Redis with structured keys: doi:{hash}, abstract:{hash}, actor:{actor_id}:{input_hash}.
+Every DOI resolution result and abstract retrieval is cached in Redis with structured keys
+(for example `doi:{hash}`, `abstract:{hash}`, `openalex_doi:{hash}`). Optional Apify runs
+use the same TTL when enabled.
 Caching is architecture, not optimization. Without it, the resolution pipeline becomes
 rate-limited at any realistic scale. Rate limit budgets for each API are tracked and exposed
 in the admin dashboard.
@@ -299,9 +289,8 @@ For every resolved DOI, Unpaywall is queried for open-access full-text availabil
 text exists, it is retrieved and stored for Layer 4 evidence retrieval.
 
 **PMC / Europe PMC** (Biomedical Full Text)
-For biomedical and life sciences papers. PMC and Europe PMC have extensive open full-text
-coverage in this domain. Retrieved via the parseforge/europepmc-scraper and
-ryanclinton/europe-pmc-search Apify actors when direct API calls hit rate limits.
+For biomedical and life sciences papers. Europe PMC is queried via the public REST search API
+at `ebi.ac.uk/europepmc/webservices/rest` (no Apify, no API key).
 
 **arXiv API** (Preprint Version Tracking)
 For any citation using an arXiv identifier, the API is queried for the submission history.
@@ -709,8 +698,8 @@ Progress tracking per paper with estimated completion based on citation count.
 
 ### Document Processing
 
-- GROBID — self-hosted Docker, primary academic PDF parser (F1 ~0.87-0.90)
-- PyMuPDF — fallback raw text extraction for non-standard PDF layouts
+- PyMuPDF — default PDF ingestion and bibliography extraction (`GROBID_ENABLED=false`)
+- GROBID — optional self-hosted Docker parser for public beta (`GROBID_ENABLED=true`)
 - Firecrawl — targeted JavaScript-rendered landing pages only, after all other retrieval
 methods exhausted
 
@@ -720,18 +709,18 @@ methods exhausted
 - Semantic Scholar — title/author search, paper embeddings, version linking
 - OpenAlex — broadest bibliographic coverage, ISSN journal verification (250M+ records)
 - Unpaywall — open access full text retrieval
-- PMC / Europe PMC — biomedical full text (direct API + Apify actors)
-- arXiv API — preprint submission history and version tracking
+- PMC / Europe PMC — biomedical full text via Europe PMC REST API
+- arXiv API — preprint submission history and version tracking (`export.arxiv.org`)
+- Firecrawl — publisher landing-page abstract when DOI metadata lacks abstract
 - Exa AI — last-resort semantic web search, architecturally constrained to signal-only
 
-### Apify Actors (Structured Retrieval Layer)
+### Optional Apify fallbacks
 
-- datapilot/arxiv-research-paper-scraper — arXiv structured metadata and version data
+Requires `APIFY_API_TOKEN`. Not used for OpenAlex or Europe PMC.
+
+- datapilot/arxiv-research-paper-scraper — optional arXiv metadata
 - openclawmara/arxiv-paper-scraper — secondary arXiv cross-validation
-- shahidirfan/openalex-scraper + parseforge/openalex-scraper — bulk OpenAlex retrieval
-- parseforge/crossref-journals-scraper — journal-level metadata for Type 5 verification
-- ryanclinton/europe-pmc-search + parseforge/europepmc-scraper — biomedical full text
-- nexgendata/academic-research-mcp-server — MCP cross-database paper search
+- parseforge/crossref-journals-scraper — journal ISSN metadata when CrossRef journal API is incomplete
 
 ### AI and Reasoning Models
 

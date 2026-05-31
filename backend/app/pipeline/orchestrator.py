@@ -51,7 +51,9 @@ class AuditOrchestrator:
         )
 
         audit.citations = self._build_records(bibliography, inline)
+        audit_store.save(audit)
         await self._classify_intents(audit_id, audit)
+        audit_store.save(audit)
         await self._resolve_all(audit_id, audit)
         await self._align_claims(audit_id, audit)
 
@@ -123,7 +125,33 @@ class AuditOrchestrator:
                 color=record.verdict_color,
             )
 
-        await asyncio.gather(*(_one(record) for record in audit.citations))
+        sem = asyncio.Semaphore(4)
+
+        async def _limited(record: CitationRecord) -> None:
+            async with sem:
+                await _one(record)
+
+        results = await asyncio.gather(
+            *(_limited(record) for record in audit.citations),
+            return_exceptions=True,
+        )
+        fatal: BaseException | None = None
+        for record, result in zip(audit.citations, results, strict=True):
+            if not isinstance(result, BaseException):
+                continue
+            if fatal is None:
+                fatal = result
+            record.status = "failed"
+            record.verdict_color = "unresolvable"
+            event_bus.emit(
+                audit_id,
+                "error",
+                f"Citation #{record.index} resolution failed: {result}",
+                citation_index=record.index,
+            )
+        if fatal is not None and all(isinstance(r, BaseException) for r in results):
+            raise fatal
+        audit_store.save(audit)
 
     async def _align_claims(self, audit_id: UUID, audit: AuditRun) -> None:
         settings = get_settings()
@@ -157,7 +185,18 @@ class AuditOrchestrator:
             record.claim_pending_review = False
             await run_claim_alignment_async(record)
         
-        await asyncio.gather(*(_process_claim(record) for record in audit.citations))
+        claim_results = await asyncio.gather(
+            *(_process_claim(record) for record in audit.citations),
+            return_exceptions=True,
+        )
+        for record, result in zip(audit.citations, claim_results, strict=True):
+            if isinstance(result, BaseException):
+                event_bus.emit(
+                    audit_id,
+                    "error",
+                    f"Citation #{record.index} claim alignment failed: {result}",
+                    citation_index=record.index,
+                )
 
     async def run_from_url(self, audit_id: UUID, source_url: str, pdf_path: Path) -> AuditRun:
         audit = audit_store.get(audit_id)

@@ -12,10 +12,25 @@ from app.storage.files import file_store
 from app.store import audit_store
 
 
+def _claim_audit(audit_id: UUID) -> bool:
+    """Mark audit running; return False if another worker already claimed it."""
+    audit = audit_store.get(audit_id)
+    if audit is None:
+        raise ValueError(f"Audit {audit_id} not found")
+    if audit.status in {"running", "complete"}:
+        return False
+    audit.status = "running"
+    audit_store.save(audit)
+    event_bus.emit(audit_id, "ingestion", "Audit processing started")
+    return True
+
+
 async def run_pdf_audit(audit_id: UUID, storage_key: str) -> None:
     from app.pipeline.orchestrator import audit_orchestrator
 
     try:
+        if not _claim_audit(audit_id):
+            return
         with file_store.local_path(storage_key) as pdf_path:
             await audit_orchestrator.run(audit_id, pdf_path)
     except Exception as exc:  # noqa: BLE001
@@ -26,6 +41,8 @@ async def run_doi_audit(audit_id: UUID, doi: str) -> None:
     from app.pipeline.orchestrator import audit_orchestrator
 
     try:
+        if not _claim_audit(audit_id):
+            return
         await audit_orchestrator.run_doi(audit_id, doi)
     except Exception as exc:  # noqa: BLE001
         _fail_audit(audit_id, exc)
@@ -37,6 +54,8 @@ async def run_url_audit(audit_id: UUID, url: str, storage_key: str) -> None:
 
     temp_path: Path | None = None
     try:
+        if not _claim_audit(audit_id):
+            return
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as handle:
             temp_path = Path(handle.name)
         await url_fetch_service.download_pdf(url, temp_path)

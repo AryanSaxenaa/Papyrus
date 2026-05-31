@@ -19,25 +19,30 @@ class JournalMetadataClient:
             return None
         settings = get_settings()
         normalized = issn.replace("-", "")
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{self.BASE}/{normalized}",
-                headers={
-                    "User-Agent": f"Papyrus/2.0 (mailto:{settings.crossref_mailto})",
-                    "Accept": "application/json",
-                },
-            )
-            await rate_limit_service.record("crossref")
-            if response.status_code == 404:
-                return None
-            response.raise_for_status()
-            message = response.json().get("message", {})
-            return {
-                "title": (message.get("title") or ""),
-                "issn": normalized,
-                "published_online": _year_from_parts(message.get("published-online", {}).get("date-parts")),
-                "first_issue": _first_issue_year(message),
-            }
+        params = {"mailto": settings.crossref_mailto} if settings.crossref_mailto else None
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.BASE}/{normalized}",
+                    headers={
+                        "User-Agent": f"Papyrus/2.0 (mailto:{settings.crossref_mailto})",
+                        "Accept": "application/json",
+                    },
+                    params=params,
+                )
+                await rate_limit_service.record("crossref")
+                if response.status_code == 404:
+                    return None
+                response.raise_for_status()
+                message = response.json().get("message", {})
+                return {
+                    "title": (message.get("title") or ""),
+                    "issn": normalized,
+                    "published_online": _year_from_parts(message.get("published-online", {}).get("date-parts")),
+                    "first_issue": _first_issue_year(message),
+                }
+        except (httpx.HTTPError, OSError):
+            return None
 
     async def lookup_issn_apify(self, issn: str) -> dict[str, Any] | None:
         settings = get_settings()
@@ -65,20 +70,26 @@ class JournalMetadataClient:
         settings = get_settings()
         normalized = issn.replace("-", "")
         filters = f"volume:{volume},from-issued-date:{year}-01-01,until-issued-date:{year}-12-31"
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{self.BASE}/{normalized}/works",
-                params={"filter": filters, "rows": 1},
-                headers={
-                    "User-Agent": f"Papyrus/2.0 (mailto:{settings.crossref_mailto})",
-                    "Accept": "application/json",
-                },
-            )
-            await rate_limit_service.record("crossref")
-            if response.status_code != 200:
-                return None
-            total = response.json().get("message", {}).get("total-results", 0)
-            return int(total) > 0
+        params: dict[str, str | int] = {"filter": filters, "rows": 1}
+        if settings.crossref_mailto:
+            params["mailto"] = settings.crossref_mailto
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.BASE}/{normalized}/works",
+                    params=params,
+                    headers={
+                        "User-Agent": f"Papyrus/2.0 (mailto:{settings.crossref_mailto})",
+                        "Accept": "application/json",
+                    },
+                )
+                await rate_limit_service.record("crossref")
+                if response.status_code != 200:
+                    return None
+                total = response.json().get("message", {}).get("total-results", 0)
+                return int(total) > 0
+        except (httpx.HTTPError, OSError):
+            return None
 
 
 def _year_from_parts(parts: list | None) -> int | None:
