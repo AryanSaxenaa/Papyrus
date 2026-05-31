@@ -147,7 +147,7 @@ export default function LandingPage() {
                     </Link>
                   </MagneticLinkButton>
                   <a
-                    href="mailto:contact@example.com"
+                    href="mailto:aryansaxenaalig@gmail.com"
                     className="inline-block rounded-xl border border-[#0a3d2e]/20 bg-white px-6 py-3 text-sm font-semibold text-[#0a3d2e] hover:bg-white/80 transition-colors"
                   >
                     Contact →
