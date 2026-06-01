@@ -3,4 +3,4 @@
 PORT="${PORT:-8080}"
 python -m http.server "$PORT" &
 QUEUE="${CELERY_AUDIT_QUEUE:-audits-${APP_ENV:-production}}"
-exec celery -A app.worker.celery_app worker -l info -Q "$QUEUE" --concurrency=1
+exec celery -A app.worker.celery_app worker -l info -Q "$QUEUE" --concurrency=1 -n "papyrus@%h"

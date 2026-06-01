@@ -50,6 +50,40 @@ def worker_consumes_audits_queue(active_queues: dict | None) -> bool:
     return worker_consumes_audit_queue(active_queues, get_settings().audit_queue_name())
 
 
+async def celery_worker_diagnostics() -> dict[str, object]:
+    """Probe worker presence for health checks (not cached)."""
+    settings = get_settings()
+    queue_name = settings.audit_queue_name()
+    from app.services.celery_heartbeat import heartbeat_present
+
+    heartbeat = await heartbeat_present(queue_name)
+    ping_count = 0
+    inspect_queues: dict | None = None
+    inspect_error: str | None = None
+    on_queue = False
+    try:
+        from app.worker import celery_app
+
+        inspect = celery_app.control.inspect(timeout=5.0)
+        ping = inspect.ping() if inspect else None
+        ping_count = len(ping) if ping else 0
+        inspect_queues = inspect.active_queues() if inspect else None
+        on_queue = worker_consumes_audit_queue(inspect_queues, queue_name)
+    except Exception as exc:  # noqa: BLE001
+        inspect_error = str(exc)
+
+    available = heartbeat or (ping_count > 0 and on_queue)
+    return {
+        "queue": queue_name,
+        "heartbeat": heartbeat,
+        "inspect_ping_workers": ping_count,
+        "inspect_on_queue": on_queue,
+        "inspect_active_queues": inspect_queues,
+        "inspect_error": inspect_error,
+        "celery_worker_available": available,
+    }
+
+
 async def celery_worker_available() -> bool:
     global _cached_available, _cached_at
 
@@ -69,29 +103,20 @@ async def celery_worker_available() -> bool:
         _cached_at = now
         return False
 
-    try:
-        from app.worker import celery_app
-
-        inspect = celery_app.control.inspect(timeout=5.0)
-        stats = inspect.stats() if inspect else None
-        active_queues = inspect.active_queues() if inspect else None
-        queue_name = settings.audit_queue_name()
-        available = bool(stats) and worker_consumes_audit_queue(active_queues, queue_name)
-        if not available:
-            logger.info(
-                "Background queue: no worker on %s (stats=%s, active_queues=%s) — using BackgroundTasks",
-                queue_name,
-                bool(stats),
-                active_queues,
-            )
-        _cached_available = available
-        _cached_at = now
-        return available
-    except Exception as exc:
-        logger.info("Background queue: Celery inspect failed (%s) — using BackgroundTasks", exc)
-        _cached_available = False
-        _cached_at = now
-        return False
+    diagnostics = await celery_worker_diagnostics()
+    queue_name = diagnostics["queue"]
+    available = bool(diagnostics["celery_worker_available"])
+    if not available:
+        logger.info(
+            "Background queue: no worker on %s (heartbeat=%s, ping=%s, on_queue=%s) — using BackgroundTasks",
+            queue_name,
+            diagnostics["heartbeat"],
+            diagnostics["inspect_ping_workers"],
+            diagnostics["inspect_on_queue"],
+        )
+    _cached_available = available
+    _cached_at = now
+    return available
 
 
 async def _enqueue_celery(task_name: str, *args: Any) -> bool:

@@ -105,14 +105,20 @@ async def health_detailed() -> dict:
     else:
         checks["grobid"] = {"ok": True, "skipped": True, "note": "GROBID_ENABLED=false"}
 
-    celery_ready = await celery_worker_available()
+    from app.services.background_dispatch import celery_worker_diagnostics
+
+    celery_diag = await celery_worker_diagnostics()
+    celery_ready = bool(celery_diag["celery_worker_available"])
     checks["background_queue"] = {
-        "ok": True,
+        "ok": celery_ready,
         "use_celery_background": settings.celery_background_enabled(),
         "celery_worker_available": celery_ready,
         "effective_mode": "celery" if celery_ready else "background_tasks",
         "file_storage_backend": settings.file_storage_backend,
-        "celery_audit_queue": settings.audit_queue_name(),
+        "celery_audit_queue": celery_diag["queue"],
+        "celery_heartbeat": celery_diag["heartbeat"],
+        "celery_inspect_ping_workers": celery_diag["inspect_ping_workers"],
+        "celery_inspect_on_queue": celery_diag["inspect_on_queue"],
     }
 
     return {"status": "ok" if all(c.get("ok") for c in checks.values()) else "degraded", "checks": checks}

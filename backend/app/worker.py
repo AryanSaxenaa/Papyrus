@@ -37,6 +37,24 @@ if settings.redis_url.startswith("rediss://"):
 celery_app.conf.update(**_celery_conf)
 
 
+def _register_worker_signals() -> None:
+    from celery.signals import worker_ready, worker_shutdown
+
+    from app.services.celery_heartbeat import start_heartbeat_thread, stop_previous_heartbeat
+
+    @worker_ready.connect
+    def _on_worker_ready(sender=None, **kwargs) -> None:  # noqa: ARG001
+        queue = get_settings().audit_queue_name()
+        start_heartbeat_thread(queue)
+
+    @worker_shutdown.connect
+    def _on_worker_shutdown(sender=None, **kwargs) -> None:  # noqa: ARG001
+        stop_previous_heartbeat()
+
+
+_register_worker_signals()
+
+
 @celery_app.task(name="app.worker.run_pdf_audit")
 def run_pdf_audit(audit_id: str, storage_key: str) -> str:
     from app.services.audit_jobs import run_pdf_audit as _run
