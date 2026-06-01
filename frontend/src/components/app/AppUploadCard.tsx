@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { SAMPLE_PDFS, samplePdfUrl } from "../../data/samplePdfs";
 import { ChevronDown } from "../landing/LandingIcons";
 import { LockSmallIcon } from "./AppIcons";
 import { parseAuditReference } from "../../lib/auditInput";
@@ -62,6 +63,22 @@ export function AppUploadCard({
     onStartReference(parsed.kind, parsed.value);
   };
 
+  const onLoadSamplePdf = async (filename: string, label: string) => {
+    if (uploading) return;
+    setHint(null);
+    try {
+      const response = await fetch(samplePdfUrl(filename));
+      if (!response.ok) {
+        throw new Error(`Could not load sample PDF (${response.status}).`);
+      }
+      const blob = await response.blob();
+      const file = new File([blob], filename, { type: "application/pdf" });
+      onUploadPdf(file);
+    } catch (err) {
+      setHint(err instanceof Error ? err.message : `Failed to load ${label}.`);
+    }
+  };
+
   return (
     <div className="min-w-0 rounded-xl border border-zinc-100 bg-white p-4 sm:p-5">
       <p className="text-[13px] leading-relaxed text-zinc-600">
@@ -118,14 +135,36 @@ export function AppUploadCard({
             <p className="text-center text-[13px] text-zinc-600">
               Drag & drop your file here <span className="text-zinc-400">or</span>
             </p>
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-3 rounded-lg bg-[#1a3d32] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#153028] disabled:opacity-50"
-            >
-              {uploading ? "Working…" : "Choose PDF file"}
-            </button>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-lg bg-[#1a3d32] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#153028] disabled:opacity-50"
+              >
+                {uploading ? "Working…" : "Choose PDF file"}
+              </button>
+              {SAMPLE_PDFS.map((sample) => (
+                <span key={sample.id} className="inline-flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => void onLoadSamplePdf(sample.filename, sample.label)}
+                    className="rounded-lg border border-[#40916c]/50 bg-[#ecfdf3] px-4 py-2 text-[13px] font-semibold text-[#1a3d32] transition-colors hover:bg-[#d8f3dc] disabled:opacity-50"
+                    title={sample.description}
+                  >
+                    {uploading ? "Working…" : "Try sample PDF"}
+                  </button>
+                  <a
+                    href={samplePdfUrl(sample.filename)}
+                    download={sample.filename}
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[13px] font-semibold text-zinc-600 transition-colors hover:bg-zinc-50"
+                  >
+                    Download sample
+                  </a>
+                </span>
+              ))}
+            </div>
             <input
               ref={fileInputRef}
               type="file"
