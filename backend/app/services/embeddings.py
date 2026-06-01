@@ -29,41 +29,44 @@ async def _embed_batch(texts: list[str]) -> list[list[float]] | None:
         return None
 
     backend = settings.embeddings_backend.lower()
-    if backend == "snowflake" and settings.huggingface_api_key:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                "https://api-inference.huggingface.co/pipeline/feature-extraction/"
-                + settings.snowflake_embedding_model,
-                headers={"Authorization": f"Bearer {settings.huggingface_api_key}"},
-                json={"inputs": texts, "options": {"wait_for_model": True}},
-            )
-            if response.status_code != 200:
-                return None
-            data = response.json()
-            if isinstance(data, list) and data and isinstance(data[0], list):
-                return cast(list[list[float]], data)
+    try:
+        if backend == "snowflake" and settings.huggingface_api_key:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    "https://api-inference.huggingface.co/pipeline/feature-extraction/"
+                    + settings.snowflake_embedding_model,
+                    headers={"Authorization": f"Bearer {settings.huggingface_api_key}"},
+                    json={"inputs": texts, "options": {"wait_for_model": True}},
+                )
+                if response.status_code != 200:
+                    return None
+                data = response.json()
+                if isinstance(data, list) and data and isinstance(data[0], list):
+                    return cast(list[list[float]], data)
 
-    if backend == "openrouter" and settings.openrouter_api_key:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{settings.openrouter_base_url}/embeddings",
-                headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
-                json={"model": "text-embedding-3-small", "input": texts},
-            )
-            if response.status_code != 200:
-                return None
-            return [row["embedding"] for row in response.json()["data"]]
+        if backend == "openrouter" and settings.openrouter_api_key:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{settings.openrouter_base_url}/embeddings",
+                    headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
+                    json={"model": "text-embedding-3-small", "input": texts},
+                )
+                if response.status_code != 200:
+                    return None
+                return [row["embedding"] for row in response.json()["data"]]
 
-    if backend == "openai" and settings.openai_api_key:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/embeddings",
-                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-                json={"model": "text-embedding-3-small", "input": texts},
-            )
-            if response.status_code != 200:
-                return None
-            return [row["embedding"] for row in response.json()["data"]]
+        if backend == "openai" and settings.openai_api_key:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    "https://api.openai.com/v1/embeddings",
+                    headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                    json={"model": "text-embedding-3-small", "input": texts},
+                )
+                if response.status_code != 200:
+                    return None
+                return [row["embedding"] for row in response.json()["data"]]
+    except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+        return None
 
     return None
 

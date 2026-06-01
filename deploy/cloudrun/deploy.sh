@@ -94,6 +94,7 @@ gcloud run deploy papyrus-api \
   --memory 2Gi \
   --cpu 2 \
   --timeout 3600 \
+  --no-cpu-throttling \
   --min-instances 0 \
   --max-instances 4 \
   --port 8080 \
@@ -109,6 +110,7 @@ gcloud run deploy papyrus-worker \
   --memory 2Gi \
   --cpu 2 \
   --timeout 3600 \
+  --no-cpu-throttling \
   --min-instances 1 \
   --max-instances 2 \
   --port 8080 \

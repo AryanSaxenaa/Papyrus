@@ -72,7 +72,7 @@ async def celery_worker_available() -> bool:
     try:
         from app.worker import celery_app
 
-        inspect = celery_app.control.inspect(timeout=2.0)
+        inspect = celery_app.control.inspect(timeout=5.0)
         stats = inspect.stats() if inspect else None
         active_queues = inspect.active_queues() if inspect else None
         queue_name = settings.audit_queue_name()
@@ -124,7 +124,14 @@ async def enqueue_pdf_audit(
         return "celery"
     from app.services.audit_jobs import run_pdf_audit
 
-    event_bus.emit(audit_id, "system", "Audit dispatched in-process (BackgroundTasks)")
+    settings = get_settings()
+    note = (
+        " in-process (BackgroundTasks; slower — start a Celery worker on "
+        f"{settings.audit_queue_name()} for production throughput)"
+        if settings.app_env == "production"
+        else " in-process (BackgroundTasks)"
+    )
+    event_bus.emit(audit_id, "system", f"Audit dispatched{note}")
     background.add_task(run_pdf_audit, audit_id, storage_key)
     return "background"
 

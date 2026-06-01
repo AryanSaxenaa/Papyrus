@@ -113,7 +113,20 @@ class AuditOrchestrator:
         async def _one(record: CitationRecord) -> None:
             record.status = "resolving"
             record.verdict_color = "resolving"
-            await resolve_record(audit_id, record)
+            try:
+                await resolve_record(audit_id, record)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                record.status = "failed"
+                record.verdict_color = "unresolvable"
+                event_bus.emit(
+                    audit_id,
+                    "error",
+                    f"Citation #{record.index} resolution failed: {_format_pipeline_error(exc)}",
+                    citation_index=record.index,
+                )
+                return
             record.status = "complete"
             event_bus.emit(
                 audit_id,
@@ -125,32 +138,13 @@ class AuditOrchestrator:
                 color=record.verdict_color,
             )
 
-        sem = asyncio.Semaphore(4)
+        sem = asyncio.Semaphore(2)
 
         async def _limited(record: CitationRecord) -> None:
             async with sem:
                 await _one(record)
 
-        results = await asyncio.gather(
-            *(_limited(record) for record in audit.citations),
-            return_exceptions=True,
-        )
-        fatal: BaseException | None = None
-        for record, result in zip(audit.citations, results, strict=True):
-            if not isinstance(result, BaseException):
-                continue
-            if fatal is None:
-                fatal = result
-            record.status = "failed"
-            record.verdict_color = "unresolvable"
-            event_bus.emit(
-                audit_id,
-                "error",
-                f"Citation #{record.index} resolution failed: {result}",
-                citation_index=record.index,
-            )
-        if fatal is not None and all(isinstance(r, BaseException) for r in results):
-            raise fatal
+        await asyncio.gather(*(_limited(record) for record in audit.citations))
         audit_store.save(audit)
 
     async def _align_claims(self, audit_id: UUID, audit: AuditRun) -> None:
@@ -257,5 +251,12 @@ class AuditOrchestrator:
             )
             for entry in bibliography
         ]
+
+def _format_pipeline_error(exc: BaseException) -> str:
+    message = str(exc).strip()
+    if message:
+        return message
+    return f"{type(exc).__name__} (no message)"
+
 
 audit_orchestrator = AuditOrchestrator()

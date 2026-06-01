@@ -100,6 +100,13 @@ async def run_bulk_job(job_id: UUID, storage_key: str) -> None:
         event_bus.emit(job_id, "error", f"Bulk job failed: {exc}")
 
 
+def _format_audit_error(exc: BaseException) -> str:
+    message = str(exc).strip()
+    if message:
+        return message
+    return f"{type(exc).__name__} (no message)"
+
+
 def _fail_audit(audit_id: UUID, exc: Exception) -> None:
     audit = audit_store.get(audit_id)
     if audit is None:
@@ -107,7 +114,8 @@ def _fail_audit(audit_id: UUID, exc: Exception) -> None:
 
         audit = AuditRun(id=audit_id)
         audit_store.create(audit)
+    detail = _format_audit_error(exc)
     audit.status = "failed"
-    audit.error = str(exc)
+    audit.error = detail
     audit_store.save(audit)
-    event_bus.emit(audit_id, "error", f"Audit failed: {exc}")
+    event_bus.emit(audit_id, "error", f"Audit failed: {detail}")

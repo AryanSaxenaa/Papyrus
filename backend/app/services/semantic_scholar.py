@@ -28,19 +28,22 @@ class SemanticScholarClient:
             "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf,"
             "publicationVenue,publicationTypes,publicationDate"
         )
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await get_with_throttle(
-                "semantic_scholar",
-                lambda: client.get(
-                    f"{self.BASE}/paper/ARXIV:{clean}",
-                    params={"fields": fields},
-                    headers=self._headers,
-                ),
-            )
-            await rate_limit_service.record("semantic_scholar")
-            if response.status_code != 200:
-                return None
-            return self._normalize_paper(response.json())
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await get_with_throttle(
+                    "semantic_scholar",
+                    lambda: client.get(
+                        f"{self.BASE}/paper/ARXIV:{clean}",
+                        params={"fields": fields},
+                        headers=self._headers,
+                    ),
+                )
+                await rate_limit_service.record("semantic_scholar")
+                if response.status_code != 200:
+                    return None
+                return self._normalize_paper(response.json())
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            return None
 
     async def lookup_doi(self, doi: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("semantic_scholar"):
@@ -50,19 +53,22 @@ class SemanticScholarClient:
             "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf,"
             "publicationVenue,publicationTypes,publicationDate"
         )
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await get_with_throttle(
-                "semantic_scholar",
-                lambda: client.get(
-                    f"{self.BASE}/paper/DOI:{normalized}",
-                    params={"fields": fields},
-                    headers=self._headers,
-                ),
-            )
-            await rate_limit_service.record("semantic_scholar")
-            if response.status_code != 200:
-                return None
-            return self._normalize_paper(response.json())
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await get_with_throttle(
+                    "semantic_scholar",
+                    lambda: client.get(
+                        f"{self.BASE}/paper/DOI:{normalized}",
+                        params={"fields": fields},
+                        headers=self._headers,
+                    ),
+                )
+                await rate_limit_service.record("semantic_scholar")
+                if response.status_code != 200:
+                    return None
+                return self._normalize_paper(response.json())
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            return None
 
     async def search_title(self, title: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("semantic_scholar"):
@@ -72,22 +78,25 @@ class SemanticScholarClient:
             "limit": 1,
             "fields": "title,authors,year,externalIds,abstract,isOpenAccess,openAccessPdf",
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await get_with_throttle(
-                "semantic_scholar",
-                lambda: client.get(
-                    f"{self.BASE}/paper/search",
-                    params=params,
-                    headers=self._headers,
-                ),
-            )
-            await rate_limit_service.record("semantic_scholar")
-            if response.status_code != 200:
-                return None
-            data = response.json().get("data") or []
-            if not data:
-                return None
-            return self._normalize_paper(data[0])
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await get_with_throttle(
+                    "semantic_scholar",
+                    lambda: client.get(
+                        f"{self.BASE}/paper/search",
+                        params=params,
+                        headers=self._headers,
+                    ),
+                )
+                await rate_limit_service.record("semantic_scholar")
+                if response.status_code != 200:
+                    return None
+                data = response.json().get("data") or []
+                if not data:
+                    return None
+                return self._normalize_paper(data[0])
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            return None
 
     def _normalize_paper(self, paper: dict[str, Any]) -> dict[str, Any]:
         external = paper.get("externalIds") or {}
