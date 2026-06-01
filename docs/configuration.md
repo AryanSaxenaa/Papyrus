@@ -60,6 +60,7 @@ Do **not** assume DeepSeek-hosted models run on OpenRouter unless you set `LLM_B
 | `REDIS_URL` | `redis://localhost:6379/0` or Redis Cloud | Redis Cloud / Upstash |
 | `USE_CELERY_BACKGROUND` | `true` | `true` |
 | `USE_CELERY_BULK` | `true` | `true` |
+| `CELERY_AUDIT_QUEUE` | (optional) | Defaults to `audits-{APP_ENV}` (`audits-production` in prod) |
 | `FILE_STORAGE_BACKEND` | `local` | `gcs` |
 | `GCS_BUCKET` | — | Required when `FILE_STORAGE_BACKEND=gcs` |
 

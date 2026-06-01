@@ -4,11 +4,23 @@ Citation integrity audit pipeline — verifies that references exist, classifies
 
 Papyrus does **not** detect AI authorship. It audits the reference layer.
 
+## Audit duration (expect 10–15 minutes)
+
+A typical PDF audit with roughly **10–15 citations** takes about **10–15 minutes** end to end. That is intentional, not a hang.
+
+Papyrus walks each citation through multiple resolvers (CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC, arXiv, and optional Exa/Firecrawl) and applies **per-provider throttling** so we stay inside each service’s polite-use and free-tier limits. For example, the backend spaces CrossRef calls (~10/s cap), Semantic Scholar (~1/s), and arXiv (one request every 3 seconds). Citations are resolved with limited concurrency so we do not burst providers.
+
+On **free or hobby API tiers**, those limits are tighter and audits skew toward the longer end of the range. **Paid or higher-quota keys** (Semantic Scholar, OpenAlex, Hugging Face inference, etc.) allow higher throughput; you can raise budgets in code via `backend/app/services/rate_limits.py` if your contracts permit it.
+
+While an audit runs, the activity log streams resolver steps in real time. Status stays `running` until resolution and scoring finish. Production should use the **Celery worker** (`papyrus-worker` on Cloud Run) so work is not tied to a single browser request; see [health/detailed](https://papyrus-api-694307068650.us-central1.run.app/api/health/detailed) for `celery_worker_available` and `effective_mode: celery`.
+
 ## Stack
 
-- **Backend:** FastAPI, Redis (cache + Celery broker), Celery (async bulk worker), PyMuPDF PDF ingestion (optional GROBID for public beta)
-- **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC (REST), arXiv API, Exa, Firecrawl; optional Apify only for arXiv/journal fallbacks
-- **Frontend:** React + Vite + Tailwind + motion, D3 (heatmap/timeline), pdf.js (paper anatomy)
+- **Backend:** FastAPI, Postgres, Redis (cache + Celery broker), Celery worker (`audits-production` / `audits-development` queues), GCS or local file storage for PDFs
+- **Ingestion:** PyMuPDF (default); optional GROBID when enabled
+- **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC (REST), arXiv API, Exa (signal-only), Firecrawl (landing abstracts); optional Apify for arXiv/journal fallbacks only
+- **NLI / embeddings:** Hugging Face Inference (default) or OpenRouter/OpenAI/lexical fallbacks
+- **Frontend:** React + Vite + Tailwind, D3 heatmap/timeline, pdf.js paper anatomy, sample PDF on upload card
 
 ## Documentation
 
@@ -31,8 +43,9 @@ Papyrus does **not** detect AI authorship. It audits the reference layer.
 |---------|-----|--------|
 | **Web UI** | https://papyrus-web-694307068650.us-central1.run.app | Static React; `VITE_API_BASE_URL` baked at build time |
 | **API** | https://papyrus-api-694307068650.us-central1.run.app | FastAPI on port 8080 |
-| **Health** | https://papyrus-api-694307068650.us-central1.run.app/api/health/detailed | Postgres, Redis, Celery worker, GCS mode |
-| **Worker** | `papyrus-worker` (private) | Celery; `min-instances=1`; not browser-facing |
+| **Health** | https://papyrus-api-694307068650.us-central1.run.app/api/health/detailed | Postgres, Redis, Celery heartbeat/inspect, GCS |
+| **Worker** | `papyrus-worker` (private) | Celery on `audits-production`; `min-instances=1`; Redis heartbeat |
+| **Sample PDF** | https://papyrus-web-694307068650.us-central1.run.app/samples/2108.12837v1.pdf | Bundled arXiv example (Try sample PDF in UI) |
 
 Cloud Run serves each service on two hostnames (hash and project-number forms). **`CORS_ORIGINS` must list every web URL you use**, comma-separated, or the browser shows “Failed to fetch”.
 
@@ -73,9 +86,10 @@ Default stack (see [docs/configuration.md](docs/configuration.md) for full list)
 | Alt LLM host | OpenRouter only | `LLM_BACKEND=openrouter` — e.g. `openrouter/owl-alpha`, `OPENROUTER_FALLBACK_MODEL` (Nemotron); not used for DeepSeek-hosted models |
 | NLI | Hugging Face | `NLI_BACKEND=hf`, `HUGGINGFACE_API_KEY` |
 | Embeddings | Snowflake Arctic (HF) | `EMBEDDINGS_BACKEND=snowflake` |
-| Background jobs | Celery | `USE_CELERY_BACKGROUND=true`, needs Redis + worker |
+| Background jobs | Celery | `USE_CELERY_BACKGROUND=true`, Redis, worker on `audits-{APP_ENV}` |
+| Celery queue | `audits-production` (prod) | Isolates prod from local `audits-development` on shared Redis |
 
-Copy [`.env.example`](.env.example) to `.env` and set resolver mailtos (`CROSSREF_MAILTO`, `OPENALEX_MAILTO`, `UNPAYWALL_EMAIL`).
+Copy [`.env.example`](.env.example) to `.env` and set resolver mailtos (`CROSSREF_MAILTO`, `OPENALEX_MAILTO`, `UNPAYWALL_EMAIL`). Do not point a local Celery worker at production `REDIS_URL` unless it uses `audits-development` only.
 
 ## Quick start
 
@@ -108,7 +122,7 @@ docker compose --profile grobid up -d grobid
 
 ### Bulk ZIP jobs
 
-`USE_CELERY_BULK` defaults to **true**. The API uses Celery when Redis is up and a worker is listening; otherwise it runs the job in-process via FastAPI `BackgroundTasks` (safe for bare `uvicorn` without a worker). Docker Compose starts the `worker` service automatically.
+`USE_CELERY_BULK` defaults to **true**. The API enqueues to Celery when Redis is up and a worker is detected (Redis heartbeat or inspect on `audits-development` locally / `audits-production` in prod). Otherwise it falls back to in-process `BackgroundTasks` (fine for local `uvicorn` without a worker; avoid for long production PDFs). Docker Compose runs `worker` on queue `audits-development`.
 
 ### 3. API
 
@@ -136,7 +150,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and upload a PDF. The dev server proxies `/api` to the backend (`vite.config.ts`); production web calls the Cloud Run API URL via `frontend/src/lib/api.ts` (`VITE_API_BASE_URL`).
+Open http://localhost:5173 and upload a PDF, or use **Try sample PDF** (bundled arXiv paper under `frontend/public/samples/`). The dev server proxies `/api` to the backend (`vite.config.ts`); production web calls the Cloud Run API URL via `VITE_API_BASE_URL` at build time.
 
 ## API
 
@@ -162,7 +176,7 @@ Open http://localhost:5173 and upload a PDF. The dev server proxies `/api` to th
 | `GET` | `/api/admin/config` | Integration feature flags |
 | `GET` | `/api/admin/corrections` | Recent user intent/claim corrections (ground truth) |
 | `GET` | `/api/health` | Basic health check |
-| `GET` | `/api/health/detailed` | Postgres, Redis, GROBID (or skipped), Celery worker probe, `file_storage_backend` |
+| `GET` | `/api/health/detailed` | Postgres, Redis, GROBID (or skipped), Celery queue/heartbeat/inspect, `file_storage_backend` |
 | `GET` | `/api/audits` | List all audits |
 | `GET` | `/api/audits/summaries` | Indexed audit list (Postgres summaries table) |
 | `PATCH` | `/api/audits/{id}/citations/{cid}/intent` | Reclassify citation intent • reruns NLI |
@@ -179,24 +193,22 @@ Open http://localhost:5173 and upload a PDF. The dev server proxies `/api` to th
 
 ## Implementation status (v1)
 
-The v1 slice is implemented end-to-end: upload → multi-source resolution → classified heatmap → side-by-side claim viewer → exports. Defaults match [docs/configuration.md](docs/configuration.md) (PyMuPDF ingestion, direct REST resolvers, Celery background jobs).
+End-to-end flow is implemented: upload (or DOI/URL) → multi-source resolution with throttling → intent + claim extraction → heatmap and side-by-side viewer → TXT/JSON/PDF exports. Defaults match [docs/configuration.md](docs/configuration.md).
 
-| Area | Shipped |
-|------|---------|
-| Ingestion | PyMuPDF; optional GROBID; LLM PDF bibliography gated off |
-| Resolution | CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC REST, arXiv API, Exa (signal-only), Firecrawl (landing abstracts) |
-| Optional | Apify only for arXiv metadata + journal ISSN fallbacks when `APIFY_API_TOKEN` is set |
-| Verdicts | Types 1–7, retraction, version mismatch, coverage/risk, NLI with claim approval |
-| UI | Live SSE log, D3 heatmap, paper anatomy (pdf.js), bulk ZIP dashboard, admin integrations panel |
-| Ops | Postgres + GCS artifacts, Cloud Run deploy (`papyrus-audit`), rate-limit admin API |
+| Area | Shipped in this repo |
+|------|----------------------|
+| Ingestion | PyMuPDF bibliography + inline markers; optional GROBID; `ENABLE_LLM_PDF_INGESTION=false` by default |
+| Resolution | CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC REST, arXiv; Exa weak signal; Firecrawl abstracts; optional Apify arXiv/ISSN fallbacks |
+| Throttling | Per-provider intervals and concurrency in `rate_limits.py`; daily budgets exposed in admin API |
+| Verdicts | Hallucination types 1–7, retraction, version mismatch timeline, coverage/risk, NLI with optional claim approval |
+| UI | SSE activity log, D3 heatmap, paper anatomy (pdf.js), bulk ZIP dashboard, past audits, sample PDF try/download |
+| Background work | Celery on `audits-production` / `audits-development`; Redis worker heartbeat; API falls back to BackgroundTasks only when no worker |
+| Persistence | Postgres audit JSON + summaries; GCS (`FILE_STORAGE_BACKEND=gcs`) for uploads on Cloud Run |
+| Deploy | `deploy/cloudrun/` → `papyrus-api`, `papyrus-worker`, `papyrus-web` on GCP project `papyrus-audit` |
+
+**Not implemented (by design for v1):** Author Ghost, DOAJ Journal Phantom, circular citation analysis — see [papyrus-spec.md](./papyrus-spec.md).
 
 Full architecture and taxonomy: [papyrus-spec.md](./papyrus-spec.md).
-
-### Excluded per spec (not implemented)
-
-- **Author Ghost** — high false-positive rate on legitimate first publications and non-Western names.
-- **Journal Phantom (DOAJ)** — replaced by CrossRef ISSN + OpenAlex verification.
-- **Circular citation analysis** — documented as v2 in spec; excluded from v1.
 
 ### Tests
 
