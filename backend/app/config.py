@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     use_celery_background: bool = True
     # Alias kept for existing .env files.
     use_celery_bulk: bool = True
+    # Optional override; default audits-{app_env} isolates prod from local dev workers on shared Redis.
+    celery_audit_queue: str | None = None
     nli_requires_claim_approval: bool = True
     sync_relational_audits: bool = True
     use_relational_read: bool = True
@@ -131,6 +133,11 @@ class Settings(BaseSettings):
 
     def celery_background_enabled(self) -> bool:
         return self.use_celery_background or self.use_celery_bulk
+
+    def audit_queue_name(self) -> str:
+        if self.celery_audit_queue and self.celery_audit_queue.strip():
+            return self.celery_audit_queue.strip()
+        return f"audits-{self.app_env}"
 
     @staticmethod
     def _is_placeholder_email(email: str) -> bool:

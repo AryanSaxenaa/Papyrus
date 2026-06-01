@@ -25,6 +25,20 @@ def _claim_audit(audit_id: UUID) -> bool:
     return True
 
 
+def _storage_not_found_message(storage_key: str, exc: FileNotFoundError) -> str:
+    from app.config import get_settings
+
+    settings = get_settings()
+    base = f"Uploaded PDF not found for storage key {storage_key!r} ({exc})."
+    if settings.file_storage_backend != "gcs":
+        return base
+    return (
+        f"{base} The file may be missing from object storage, or a Celery worker in another "
+        f"environment (for example local dev on queue 'audits-development') consumed this task "
+        f"while production uses queue {settings.audit_queue_name()!r}."
+    )
+
+
 async def run_pdf_audit(audit_id: UUID, storage_key: str) -> None:
     from app.pipeline.orchestrator import audit_orchestrator
 
@@ -33,6 +47,8 @@ async def run_pdf_audit(audit_id: UUID, storage_key: str) -> None:
             return
         with file_store.local_path(storage_key) as pdf_path:
             await audit_orchestrator.run(audit_id, pdf_path)
+    except FileNotFoundError as exc:
+        _fail_audit(audit_id, RuntimeError(_storage_not_found_message(storage_key, exc)))
     except Exception as exc:  # noqa: BLE001
         _fail_audit(audit_id, exc)
 

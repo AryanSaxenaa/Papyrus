@@ -112,6 +112,7 @@ async def health_detailed() -> dict:
         "celery_worker_available": celery_ready,
         "effective_mode": "celery" if celery_ready else "background_tasks",
         "file_storage_backend": settings.file_storage_backend,
+        "celery_audit_queue": settings.audit_queue_name(),
     }
 
     return {"status": "ok" if all(c.get("ok") for c in checks.values()) else "degraded", "checks": checks}

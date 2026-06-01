@@ -72,6 +72,9 @@ node_modules/
 frontend/dist/
 *.tsbuildinfo
 
+# Local copy at repo root only (bundled copy lives in frontend/public/samples/)
+/2108.12837v1.pdf
+
 # Video / Remotion pitch deck (local only — not published)
 video/
 

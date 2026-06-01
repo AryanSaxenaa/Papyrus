@@ -21,12 +21,18 @@ def test_worker_consumes_audits_queue() -> None:
         )
         is False
     )
-    assert (
-        background_dispatch.worker_consumes_audits_queue(
-            {"celery@host": [{"name": "audits", "exchange": {"name": "audits"}}]}
+    with patch("app.services.background_dispatch.get_settings") as settings:
+        settings.return_value.audit_queue_name.return_value = "audits-development"
+        assert (
+            background_dispatch.worker_consumes_audits_queue(
+                {
+                    "celery@host": [
+                        {"name": "audits-development", "exchange": {"name": "audits-development"}}
+                    ]
+                }
+            )
+            is True
         )
-        is True
-    )
 
 
 def test_celery_worker_available_false_when_worker_on_wrong_queue() -> None:
@@ -64,7 +70,7 @@ def test_celery_worker_available_false_without_redis() -> None:
         assert asyncio.run(background_dispatch.celery_worker_available()) is False
 
 
-def test_enqueue_celery_uses_audits_queue() -> None:
+def test_enqueue_celery_uses_configured_audit_queue() -> None:
     background_dispatch.reset_celery_availability_cache()
     with (
         patch(
@@ -72,15 +78,17 @@ def test_enqueue_celery_uses_audits_queue() -> None:
             new_callable=AsyncMock,
             return_value=True,
         ),
+        patch("app.services.background_dispatch.get_settings") as settings,
         patch("app.worker.celery_app") as celery_app,
     ):
+        settings.return_value.audit_queue_name.return_value = "audits-production"
         assert asyncio.run(
             background_dispatch._enqueue_celery("app.worker.run_pdf_audit", "id", "key")
         )
         celery_app.send_task.assert_called_once_with(
             "app.worker.run_pdf_audit",
             args=("id", "key"),
-            queue="audits",
+            queue="audits-production",
         )
 
 

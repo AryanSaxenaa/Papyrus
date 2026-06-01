@@ -79,7 +79,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: celery -A app.worker.celery_app worker -l info -Q audits --concurrency=1
+    command: celery -A app.worker.celery_app worker -l info -Q audits-development --concurrency=1
 
   web:
     image: node:22-alpine

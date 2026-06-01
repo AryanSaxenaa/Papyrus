@@ -34,15 +34,20 @@ async def redis_reachable() -> bool:
         return False
 
 
-def worker_consumes_audits_queue(active_queues: dict | None) -> bool:
-    """True when at least one live worker is bound to the audits queue."""
+def worker_consumes_audit_queue(active_queues: dict | None, queue_name: str) -> bool:
+    """True when at least one live worker is bound to the configured audit queue."""
     if not active_queues:
         return False
     for queues in active_queues.values():
         for queue in queues or []:
-            if isinstance(queue, dict) and queue.get("name") == "audits":
+            if isinstance(queue, dict) and queue.get("name") == queue_name:
                 return True
     return False
+
+
+def worker_consumes_audits_queue(active_queues: dict | None) -> bool:
+    """Backward-compatible alias for tests."""
+    return worker_consumes_audit_queue(active_queues, get_settings().audit_queue_name())
 
 
 async def celery_worker_available() -> bool:
@@ -70,10 +75,12 @@ async def celery_worker_available() -> bool:
         inspect = celery_app.control.inspect(timeout=2.0)
         stats = inspect.stats() if inspect else None
         active_queues = inspect.active_queues() if inspect else None
-        available = bool(stats) and worker_consumes_audits_queue(active_queues)
+        queue_name = settings.audit_queue_name()
+        available = bool(stats) and worker_consumes_audit_queue(active_queues, queue_name)
         if not available:
             logger.info(
-                "Background queue: no worker on audits queue (stats=%s, active_queues=%s) — using BackgroundTasks",
+                "Background queue: no worker on %s (stats=%s, active_queues=%s) — using BackgroundTasks",
+                queue_name,
                 bool(stats),
                 active_queues,
             )
@@ -93,7 +100,8 @@ async def _enqueue_celery(task_name: str, *args: Any) -> bool:
     try:
         from app.worker import celery_app
 
-        celery_app.send_task(task_name, args=args, queue="audits")
+        queue_name = get_settings().audit_queue_name()
+        celery_app.send_task(task_name, args=args, queue=queue_name)
         return True
     except Exception as exc:
         logger.warning("Celery enqueue failed (%s)", exc)
@@ -108,7 +116,11 @@ async def enqueue_pdf_audit(
     from app.services.events import event_bus
 
     if await _enqueue_celery("app.worker.run_pdf_audit", str(audit_id), storage_key):
-        event_bus.emit(audit_id, "system", "Audit dispatched to Celery (audits queue)")
+        event_bus.emit(
+            audit_id,
+            "system",
+            f"Audit dispatched to Celery ({get_settings().audit_queue_name()} queue)",
+        )
         return "celery"
     from app.services.audit_jobs import run_pdf_audit
 

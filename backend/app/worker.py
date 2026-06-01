@@ -11,16 +11,17 @@ from celery import Celery
 from app.config import get_settings
 
 settings = get_settings()
+_audit_queue = settings.audit_queue_name()
 
 celery_app = Celery("papyrus", broker=settings.redis_url, backend=settings.redis_url)
 
 _celery_conf: dict = {
-    "task_default_queue": "audits",
+    "task_default_queue": _audit_queue,
     "task_routes": {
-        "app.worker.run_pdf_audit": {"queue": "audits"},
-        "app.worker.run_doi_audit": {"queue": "audits"},
-        "app.worker.run_url_audit": {"queue": "audits"},
-        "app.worker.run_bulk_audit": {"queue": "audits"},
+        "app.worker.run_pdf_audit": {"queue": _audit_queue},
+        "app.worker.run_doi_audit": {"queue": _audit_queue},
+        "app.worker.run_url_audit": {"queue": _audit_queue},
+        "app.worker.run_bulk_audit": {"queue": _audit_queue},
     },
     "task_track_started": True,
     "worker_prefetch_multiplier": 1,

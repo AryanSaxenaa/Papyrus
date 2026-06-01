@@ -72,3 +72,13 @@ def test_production_rejects_json_only_persistence() -> None:
 def test_production_deepseek_requires_api_key() -> None:
     with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
         Settings(**_production_kwargs(deepseek_api_key=None))
+
+
+def test_audit_queue_name_defaults_by_app_env() -> None:
+    assert Settings(app_env="development").audit_queue_name() == "audits-development"
+    assert Settings(**_production_kwargs()).audit_queue_name() == "audits-production"
+
+
+def test_audit_queue_name_override() -> None:
+    settings = Settings(**_production_kwargs(celery_audit_queue="audits-staging"))
+    assert settings.audit_queue_name() == "audits-staging"
