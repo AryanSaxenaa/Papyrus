@@ -4,6 +4,8 @@ Citation integrity audit pipeline — verifies that references exist, classifies
 
 Papyrus does **not** detect AI authorship. It audits the reference layer.
 
+[![Watch the video](https://img.youtube.com/vi/_FrRz0Y-tTk/maxresdefault.jpg)](https://youtu.be/_FrRz0Y-tTk)
+
 ## Audit duration (expect 10–15 minutes)
 
 A typical PDF audit with roughly **10–15 citations** takes about **10–15 minutes** end to end. That is intentional, not a hang.
