@@ -13,7 +13,8 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_SECONDS = 30.0
+_CACHE_TTL_TRUE_SECONDS = 30.0
+_CACHE_TTL_FALSE_SECONDS = 5.0
 _cached_available: bool | None = None
 _cached_at: float = 0.0
 
@@ -73,7 +74,7 @@ async def celery_worker_diagnostics() -> dict[str, object]:
         inspect_error = str(exc)
 
     available = heartbeat or (ping_count > 0 and on_queue)
-    return {
+    result = {
         "queue": queue_name,
         "heartbeat": heartbeat,
         "inspect_ping_workers": ping_count,
@@ -82,25 +83,38 @@ async def celery_worker_diagnostics() -> dict[str, object]:
         "inspect_error": inspect_error,
         "celery_worker_available": available,
     }
+    _update_availability_cache(available)
+    return result
 
 
-async def celery_worker_available() -> bool:
+def _update_availability_cache(available: bool) -> None:
+    global _cached_available, _cached_at
+    _cached_available = available
+    _cached_at = time.monotonic()
+
+
+def _cache_still_valid(now: float) -> bool:
+    if _cached_available is None:
+        return False
+    ttl = _CACHE_TTL_TRUE_SECONDS if _cached_available else _CACHE_TTL_FALSE_SECONDS
+    return (now - _cached_at) < ttl
+
+
+async def celery_worker_available(*, force_refresh: bool = False) -> bool:
     global _cached_available, _cached_at
 
     now = time.monotonic()
-    if _cached_available is not None and (now - _cached_at) < _CACHE_TTL_SECONDS:
-        return _cached_available
+    if not force_refresh and _cache_still_valid(now):
+        return bool(_cached_available)
 
     settings = get_settings()
     if not settings.celery_background_enabled():
-        _cached_available = False
-        _cached_at = now
+        _update_availability_cache(False)
         return False
 
     if not await redis_reachable():
         logger.info("Background queue: Redis unreachable — using in-process BackgroundTasks")
-        _cached_available = False
-        _cached_at = now
+        _update_availability_cache(False)
         return False
 
     diagnostics = await celery_worker_diagnostics()
@@ -114,13 +128,11 @@ async def celery_worker_available() -> bool:
             diagnostics["inspect_ping_workers"],
             diagnostics["inspect_on_queue"],
         )
-    _cached_available = available
-    _cached_at = now
     return available
 
 
 async def _enqueue_celery(task_name: str, *args: Any) -> bool:
-    if not await celery_worker_available():
+    if not await celery_worker_available(force_refresh=True):
         return False
     try:
         from app.worker import celery_app

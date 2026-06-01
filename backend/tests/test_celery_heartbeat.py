@@ -9,6 +9,24 @@ def test_heartbeat_key_includes_queue() -> None:
     assert heartbeat_key("audits-production") == "papyrus:celery:heartbeat:audits-production"
 
 
+def test_enqueue_refreshes_stale_false_cache() -> None:
+    background_dispatch.reset_celery_availability_cache()
+    background_dispatch._update_availability_cache(False)
+    with (
+        patch(
+            "app.services.background_dispatch.celery_worker_available",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as available,
+        patch("app.worker.celery_app") as celery_app,
+    ):
+        assert asyncio.run(
+            background_dispatch._enqueue_celery("app.worker.run_pdf_audit", "id", "key")
+        )
+        available.assert_awaited_once_with(force_refresh=True)
+        celery_app.send_task.assert_called_once()
+
+
 def test_celery_worker_available_true_when_heartbeat_present() -> None:
     background_dispatch.reset_celery_availability_cache()
     with (

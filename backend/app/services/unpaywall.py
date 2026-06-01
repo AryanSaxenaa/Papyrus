@@ -14,24 +14,27 @@ class UnpaywallClient:
     async def lookup(self, doi: str) -> dict[str, Any] | None:
         settings = get_settings()
         normalized = normalize_doi(doi)
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{self.BASE}/{normalized}",
-                params={"email": settings.unpaywall_email},
-            )
-            if response.status_code == 404:
-                return None
-            response.raise_for_status()
-            payload = response.json()
-            best = payload.get("best_oa_location") or {}
-            pdf_url = best.get("url_for_pdf") or best.get("url")
-            return {
-                "is_oa": payload.get("is_oa"),
-                "open_access_pdf": pdf_url,
-                "oa_url": pdf_url or best.get("url"),
-                "license": best.get("license"),
-                "host_type": best.get("host_type"),
-            }
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.BASE}/{normalized}",
+                    params={"email": settings.unpaywall_email},
+                )
+                if response.status_code == 404:
+                    return None
+                response.raise_for_status()
+                payload = response.json()
+                best = payload.get("best_oa_location") or {}
+                pdf_url = best.get("url_for_pdf") or best.get("url")
+                return {
+                    "is_oa": payload.get("is_oa"),
+                    "open_access_pdf": pdf_url,
+                    "oa_url": pdf_url or best.get("url"),
+                    "license": best.get("license"),
+                    "host_type": best.get("host_type"),
+                }
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            return None
 
 
 unpaywall_client = UnpaywallClient()

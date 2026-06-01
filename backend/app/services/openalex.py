@@ -31,42 +31,51 @@ class OpenAlexClient:
             return None
         if not await rate_limit_service.allow("openalex"):
             return None
-        result, _rate_limited = await self._lookup_doi_native(normalized)
-        return result
+        try:
+            result, _rate_limited = await self._lookup_doi_native(normalized)
+            return result
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            return None
 
     async def verify_journal_issn(self, issn: str) -> dict[str, Any] | None:
         """OpenAlex source lookup for ISSN-based journal existence verification."""
         if not await rate_limit_service.allow("openalex"):
             return None
         normalized = issn.replace("-", "")
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await get_with_throttle(
-                "openalex",
-                lambda: client.get(
-                    f"{self.BASE}/sources",
-                    params={**self._params(), "filter": f"issn:{normalized}", "per_page": 1},
-                ),
-            )
-            await rate_limit_service.record("openalex")
-            if response.status_code != 200:
-                return None
-            results = response.json().get("results") or []
-            if not results:
-                return None
-            source = results[0]
-            return {
-                "id": source.get("id"),
-                "display_name": source.get("display_name"),
-                "issn_l": source.get("issn_l"),
-                "type": source.get("type"),
-                "first_publication_year": source.get("first_publication_year"),
-            }
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await get_with_throttle(
+                    "openalex",
+                    lambda: client.get(
+                        f"{self.BASE}/sources",
+                        params={**self._params(), "filter": f"issn:{normalized}", "per_page": 1},
+                    ),
+                )
+                await rate_limit_service.record("openalex")
+                if response.status_code != 200:
+                    return None
+                results = response.json().get("results") or []
+                if not results:
+                    return None
+                source = results[0]
+                return {
+                    "id": source.get("id"),
+                    "display_name": source.get("display_name"),
+                    "issn_l": source.get("issn_l"),
+                    "type": source.get("type"),
+                    "first_publication_year": source.get("first_publication_year"),
+                }
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            return None
 
     async def search_title(self, title: str) -> dict[str, Any] | None:
         if not await rate_limit_service.allow("openalex"):
             return None
-        result, _rate_limited = await self._search_title_native(title)
-        return result
+        try:
+            result, _rate_limited = await self._search_title_native(title)
+            return result
+        except (httpx.HTTPError, httpx.TimeoutException, ValueError):
+            return None
 
     async def _lookup_doi_native(self, normalized_doi: str) -> tuple[dict[str, Any] | None, bool]:
         async with httpx.AsyncClient(timeout=30.0) as client:
