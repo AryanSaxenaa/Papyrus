@@ -12,6 +12,7 @@ type Props = {
   onStartReference: (kind: "doi" | "url", value: string) => void;
   onBulkZip: (file: File) => void;
   onReplayRecorded?: () => void;
+  onStartShepherd?: () => void;
   moreOptions?: ReactNode;
 };
 
@@ -27,6 +28,7 @@ export function AppUploadCard({
   onStartReference,
   onBulkZip,
   onReplayRecorded,
+  onStartShepherd,
   moreOptions,
 }: Props) {
   const [tab, setTab] = useState<Tab>("pdf");
@@ -218,13 +220,25 @@ export function AppUploadCard({
 
       {hint && <p className="mt-2 text-[11px] text-amber-700">{hint}</p>}
 
+      {onStartShepherd && (
+        <button
+          type="button"
+          data-testid="shepherd-mode-entry"
+          disabled={uploading}
+          onClick={onStartShepherd}
+          className="mt-4 w-full rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5 text-[13px] font-medium text-violet-950 transition-colors hover:bg-violet-100 disabled:opacity-50"
+        >
+          Shepherd mode (guided tour with real data)
+        </button>
+      )}
+
       {onReplayRecorded && (
         <button
           type="button"
           data-testid="replay-recorded-audit"
           disabled={uploading}
           onClick={onReplayRecorded}
-          className="mt-4 w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-[13px] font-medium text-sky-900 transition-colors hover:bg-sky-100 disabled:opacity-50"
+          className="mt-2 w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-[13px] font-medium text-sky-900 transition-colors hover:bg-sky-100 disabled:opacity-50"
         >
           Replay a recorded audit
         </button>

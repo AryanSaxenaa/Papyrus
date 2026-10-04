@@ -17,8 +17,14 @@ import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
 import { CreditsMeter } from "./components/CreditsMeter";
 import { ReplayBanner } from "./components/ReplayBanner";
+import { ShepherdModePrompt, ShepherdTourBanner } from "./components/ShepherdModePrompt";
 import { MathGridBg } from "./components/app/MathGridBg";
+import { useShepherdTour } from "./hooks/useShepherdTour";
 import { apiUrl } from "./lib/api";
+import {
+  markShepherdDeclined,
+  shouldOfferShepherdMode,
+} from "./lib/shepherdStorage";
 import { connectAuditEventSource } from "./lib/sse";
 import type {
   AppPublicConfig,
@@ -53,6 +59,13 @@ export default function App() {
     per_audit_cap: number;
     enabled: boolean;
   } | null>(null);
+  const [shepherdPromptOpen, setShepherdPromptOpen] = useState(false);
+  const [shepherdLoading, setShepherdLoading] = useState(false);
+  const [shepherdTouring, setShepherdTouring] = useState(false);
+
+  const { startTour, cancelTour } = useShepherdTour({
+    onFinish: () => setShepherdTouring(false),
+  });
 
   useEffect(() => {
     void (async () => {
@@ -74,6 +87,12 @@ export default function App() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (appConfig && !audit && shouldOfferShepherdMode()) {
+      setShepherdPromptOpen(true);
+    }
+  }, [appConfig, audit]);
 
   const refreshAudit = useCallback(async (id: string) => {
     const response = await fetch(apiUrl(`/api/audits/${id}`));
@@ -176,6 +195,22 @@ export default function App() {
     }
   };
 
+  const waitForAuditTerminal = async (id: string, maxMs = 90_000): Promise<AuditRun | null> => {
+    const deadline = Date.now() + maxMs;
+    while (Date.now() < deadline) {
+      const response = await fetch(apiUrl(`/api/audits/${id}`));
+      if (response.ok) {
+        const body = (await response.json()) as AuditRun;
+        setAudit(body);
+        if (body.status === "complete" || body.status === "failed") {
+          return body;
+        }
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 600));
+    }
+    return null;
+  };
+
   const onReplayRecorded = async () => {
     const replaySet = appConfig?.replay_set ?? "demo-a";
     setUploading(true);
@@ -190,6 +225,56 @@ export default function App() {
       setError(err instanceof Error ? err.message : "Replay failed");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const loadReplayAudit = async (): Promise<AuditRun | null> => {
+    const replaySet = appConfig?.replay_set ?? "demo-a";
+    setError(null);
+    setEvents([]);
+    setSelected(null);
+    const response = await fetch(apiUrl(`/api/audits/replay/${replaySet}`), { method: "POST" });
+    if (!response.ok) throw new Error(await response.text());
+    const created = (await response.json()) as AuditRun;
+    setAudit(created);
+    setAuditsListKey((key) => key + 1);
+    return waitForAuditTerminal(created.id);
+  };
+
+  const onAcceptShepherdMode = async () => {
+    setShepherdLoading(true);
+    setError(null);
+    try {
+      const finished = await loadReplayAudit();
+      if (!finished || finished.status !== "complete" || finished.citations.length === 0) {
+        throw new Error("Could not load the guided tour audit.");
+      }
+      const first = finished.citations[0];
+      setSelected(first);
+      setShepherdPromptOpen(false);
+      setShepherdTouring(true);
+      window.requestAnimationFrame(() => {
+        startTour(() => setSelected(first));
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Shepherd mode failed");
+      setShepherdPromptOpen(false);
+      setShepherdTouring(false);
+    } finally {
+      setShepherdLoading(false);
+    }
+  };
+
+  const onDeclineShepherdMode = () => {
+    markShepherdDeclined();
+    setShepherdPromptOpen(false);
+    cancelTour();
+    setShepherdTouring(false);
+  };
+
+  const openShepherdPrompt = () => {
+    if (!uploading && !shepherdLoading) {
+      setShepherdPromptOpen(true);
     }
   };
 
@@ -455,6 +540,7 @@ export default function App() {
               onUploadPdf={(file) => void onUpload(file)}
               onStartReference={(kind, value) => void onStartReference(kind, value)}
               onBulkZip={(file) => void onBulkUpload(file)}
+              onStartShepherd={openShepherdPrompt}
               onReplayRecorded={() => void onReplayRecorded()}
               moreOptions={
                 <PastAudits
@@ -470,7 +556,15 @@ export default function App() {
           </div>
         </section>
 
+        <ShepherdModePrompt
+          open={shepherdPromptOpen}
+          loading={shepherdLoading}
+          onAccept={() => void onAcceptShepherdMode()}
+          onDecline={onDeclineShepherdMode}
+        />
+
         <main className="space-y-6 pb-8">
+          {shepherdTouring && <ShepherdTourBanner />}
           {appConfig?.mode === "replay" && (
             <ReplayBanner replaySet={appConfig.replay_set} />
           )}
@@ -624,7 +718,7 @@ export default function App() {
           )}
 
           {audit && (
-            <div className="papyrus-card">
+            <div className="papyrus-card" data-testid="current-audit-card">
               <p className="papyrus-eyebrow">Current audit</p>
               <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -667,7 +761,7 @@ export default function App() {
               </div>
               <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
               <LimitationsPanel audit={audit} />
-              <div className="mt-6 border-t border-zinc-100 pt-5">
+              <div className="mt-6 border-t border-zinc-100 pt-5" data-testid="citation-heatmap-section">
                 <p className="papyrus-section-title">Citation heatmap</p>
                 <div className="mt-2">
                   <HeatmapLegend />

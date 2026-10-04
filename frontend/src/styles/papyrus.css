@@ -20,6 +20,38 @@
   color: var(--papyrus-text);
 }
 
+.papyrus-shepherd-step.shepherd-element {
+  border-radius: 0.75rem;
+  border: 1px solid var(--papyrus-border);
+  box-shadow: 0 20px 40px rgb(0 0 0 / 12%);
+  max-width: 22rem;
+}
+
+.papyrus-shepherd-step .shepherd-header {
+  background: var(--papyrus-mint-bg);
+  padding: 0.75rem 1rem;
+}
+
+.papyrus-shepherd-step .shepherd-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--papyrus-primary);
+}
+
+.papyrus-shepherd-step .shepherd-text {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--papyrus-muted);
+  padding: 0.75rem 1rem;
+}
+
+.papyrus-shepherd-step .shepherd-footer .shepherd-button {
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+}
+
 .papyrus-eyebrow {
   font-size: 0.75rem;
   font-weight: 600;
