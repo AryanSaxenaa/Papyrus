@@ -1,0 +1,2 @@
+{"t_rel_ms": 0, "type": "system", "message": "Replay of a recorded audit (demo-a)"}
+{"t_rel_ms": 500, "type": "serpapi.call", "message": "Scholar witness: match", "engine": "google_scholar", "citation_index": 1}

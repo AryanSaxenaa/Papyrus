@@ -89,6 +89,56 @@ class Settings(BaseSettings):
     embeddings_backend: str = "snowflake"  # snowflake (HF inference) | openrouter | openai | lexical
     snowflake_embedding_model: str = "Snowflake/snowflake-arctic-embed-m-v1.5"
 
+    papyrus_mode: str = "live"  # live | record | replay
+    serpapi_enabled: bool = True
+    serpapi_api_key: str | None = None
+    serpapi_scope: str = "residual"  # residual | all | off
+    serpapi_max_credits_per_audit: int = 40
+    serpapi_monthly_hard_cap: int = 240
+    serpapi_max_per_hour: int = 40
+    serpapi_cache_ttl_hours: int = 168
+    serpapi_no_cache: bool = False
+    replay_set: str = "demo-a"
+    replay_speedup: int = 20
+    public_demo_mode: bool = False
+    live_access_code: str | None = None
+    serve_frontend: bool = False
+    static_dir: str = "./static"
+    file_retention_days: int = 7
+
+    @field_validator("database_url")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        url = value.strip()
+        if url.startswith("postgres://"):
+            url = "postgresql+psycopg2://" + url[len("postgres://") :]
+        elif url.startswith("postgresql://") and "+psycopg2" not in url:
+            url = "postgresql+psycopg2://" + url[len("postgresql://") :]
+        return url
+
+    @field_validator("papyrus_mode")
+    @classmethod
+    def normalize_papyrus_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"live", "record", "replay"}:
+            raise ValueError("PAPYRUS_MODE must be live, record, or replay")
+        return normalized
+
+    @field_validator("serpapi_scope")
+    @classmethod
+    def normalize_serpapi_scope(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"residual", "all", "off"}:
+            raise ValueError("SERPAPI_SCOPE must be residual, all, or off")
+        return normalized
+
+    def serpapi_active(self) -> bool:
+        if not self.serpapi_enabled or self.serpapi_scope == "off":
+            return False
+        if self.papyrus_mode == "replay":
+            return True
+        return bool(self.serpapi_api_key)
+
     @field_validator("app_env")
     @classmethod
     def normalize_app_env(cls, value: str) -> str:
@@ -176,6 +226,10 @@ class Settings(BaseSettings):
                 )
             if self.nli_backend == "hf" and not self.huggingface_api_key:
                 raise ValueError("HUGGINGFACE_API_KEY is required when NLI_BACKEND=hf in production")
+            if self.serpapi_enabled and self.papyrus_mode == "live" and not self.serpapi_api_key:
+                raise ValueError(
+                    "SERPAPI_API_KEY is required when SERPAPI_ENABLED=true and PAPYRUS_MODE=live in production"
+                )
         return self
 
     def cors_origins_list(self) -> list[str]:

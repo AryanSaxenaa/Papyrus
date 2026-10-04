@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,12 +41,19 @@ class AuditLimitations(BaseModel):
     out_of_scope: list[str] = Field(
         default_factory=lambda: [
             "AI authorship detection",
-            "Author Ghost (author publication history heuristics)",
             "Journal Phantom via DOAJ",
             "Circular citation analysis (v2)",
             "Self-citation manipulation",
             "Research quality beyond reference integrity",
         ]
+    )
+    scholar_coverage_note: str = (
+        "Google Scholar via SerpApi is an independent witness with uneven coverage "
+        "(books, theses, regional journals). A Scholar miss is unknown, not proof of fabrication."
+    )
+    author_profile_note: str = (
+        "Author profile presence is positive-only: confirmed when the author's Scholar profile lists the work; "
+        "otherwise unknown — never counted as a failure."
     )
 
 
@@ -111,6 +119,58 @@ class VersionMismatchInfo(BaseModel):
     material_difference: bool = False
 
 
+class SerpApiReceipt(BaseModel):
+    call_id: str
+    engine: Literal[
+        "google_scholar",
+        "google_scholar_cite",
+        "google_scholar_author",
+        "google",
+    ]
+    params: dict[str, Any]
+    search_metadata_id: str | None = None
+    json_endpoint: str | None = None
+    http_status: int
+    credits: int
+    cache_hit: bool
+    latency_ms: int
+    created_at: datetime
+    raw_ref: str
+    sha256_raw: str
+
+
+class ScholarCandidate(BaseModel):
+    result_id: str
+    title: str
+    link: str | None = None
+    summary: str | None = None
+    authors: list[dict[str, Any]] = Field(default_factory=list)
+    year: int | None = None
+    cited_by: int | None = None
+    cites_id: str | None = None
+    versions_total: int | None = None
+    cluster_id: str | None = None
+    title_sim: float = 0.0
+
+
+class ConcordanceReport(BaseModel):
+    source_format: Literal["APA", "MLA"]
+    authors: Literal["agree", "disagree", "unknown"]
+    year: Literal["agree", "disagree", "unknown"]
+    venue: Literal["agree", "disagree", "unknown"]
+    scholar_string: str
+
+
+class ScholarEvidence(BaseModel):
+    state: Literal["match", "near", "miss", "fetch_error", "skipped", "disabled"]
+    skipped_reason: str | None = None
+    best: ScholarCandidate | None = None
+    concordance: ConcordanceReport | None = None
+    author_presence: Literal["confirmed", "unknown", "not_checked"] = "not_checked"
+    author_matched_title: str | None = None
+    receipts: list[SerpApiReceipt] = Field(default_factory=list)
+
+
 class CitationRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     index: int
@@ -151,6 +211,12 @@ class CitationRecord(BaseModel):
 
     status: str = "pending"  # pending | resolving | complete
     verdict_color: str = "pending"  # UI token
+
+    scholar: ScholarEvidence | None = None
+    scholar_note: str | None = None
+    scholar_limitation: str | None = None
+    author_presence_note: str | None = None
+    serpapi_receipts: list[SerpApiReceipt] = Field(default_factory=list)
 
 
 class CoverageSummary(BaseModel):

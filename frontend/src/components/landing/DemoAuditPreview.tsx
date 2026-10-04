@@ -3,6 +3,7 @@ import { CoverageBar } from "../CoverageBar";
 import { CoverageSummary } from "../CoverageSummary";
 import { HeatmapLegend } from "../HeatmapLegend";
 import { DEMO_AUDIT } from "../../data/demoAudit";
+import { SampleChip } from "../SampleChip";
 import type { HeatmapFilter } from "../../types";
 
 const CitationHeatmap = lazy(() =>
@@ -47,7 +48,10 @@ export function DemoAuditPreview({ showHeatmap = true, className = "" }: Props) 
 
   return (
     <div className={`text-left ${className}`}>
-      <p className="papyrus-eyebrow">Current audit</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="papyrus-eyebrow">Current audit</p>
+        <SampleChip />
+      </div>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="font-serif-display text-[15px] font-bold leading-snug text-[#0a3d2e] sm:text-base">

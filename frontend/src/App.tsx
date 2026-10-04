@@ -15,10 +15,19 @@ import { AppUploadCard } from "./components/app/AppUploadCard";
 import { AdminPanel } from "./components/AdminPanel";
 import { PastAudits } from "./components/PastAudits";
 import { SideBySideDrawer } from "./components/SideBySideDrawer";
+import { CreditsMeter } from "./components/CreditsMeter";
+import { ReplayBanner } from "./components/ReplayBanner";
 import { MathGridBg } from "./components/app/MathGridBg";
 import { apiUrl } from "./lib/api";
 import { connectAuditEventSource } from "./lib/sse";
-import type { AuditRun, BulkDashboard, CitationRecord, HeatmapFilter, StreamEvent } from "./types";
+import type {
+  AppPublicConfig,
+  AuditRun,
+  BulkDashboard,
+  CitationRecord,
+  HeatmapFilter,
+  StreamEvent,
+} from "./types";
 
 export default function App() {
   const [audit, setAudit] = useState<AuditRun | null>(null);
@@ -37,6 +46,34 @@ export default function App() {
   const [expandedBulkId, setExpandedBulkId] = useState<string | null>(null);
   const [bulkAuditCache, setBulkAuditCache] = useState<Record<string, AuditRun>>({});
   const [auditsListKey, setAuditsListKey] = useState(0);
+  const [appConfig, setAppConfig] = useState<AppPublicConfig | null>(null);
+  const [serpapiBudget, setSerpapiBudget] = useState<{
+    monthly_spent: number;
+    monthly_cap: number;
+    per_audit_cap: number;
+    enabled: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch(apiUrl("/api/config"));
+        if (res.ok) setAppConfig((await res.json()) as AppPublicConfig);
+        const budgetRes = await fetch(apiUrl("/api/serpapi/budget"));
+        if (budgetRes.ok) {
+          const body = (await budgetRes.json()) as {
+            monthly_spent: number;
+            monthly_cap: number;
+            per_audit_cap: number;
+            enabled: boolean;
+          };
+          setSerpapiBudget(body);
+        }
+      } catch {
+        /* offline dev */
+      }
+    })();
+  }, []);
 
   const refreshAudit = useCallback(async (id: string) => {
     const response = await fetch(apiUrl(`/api/audits/${id}`));
@@ -134,6 +171,23 @@ export default function App() {
       await startAudit(await fetch(apiUrl("/api/audits"), { method: "POST", body }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onReplayRecorded = async () => {
+    const replaySet = appConfig?.replay_set ?? "demo-a";
+    setUploading(true);
+    setError(null);
+    setEvents([]);
+    setSelected(null);
+    try {
+      await startAudit(
+        await fetch(apiUrl(`/api/audits/replay/${replaySet}`), { method: "POST" }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Replay failed");
     } finally {
       setUploading(false);
     }
@@ -401,6 +455,7 @@ export default function App() {
               onUploadPdf={(file) => void onUpload(file)}
               onStartReference={(kind, value) => void onStartReference(kind, value)}
               onBulkZip={(file) => void onBulkUpload(file)}
+              onReplayRecorded={() => void onReplayRecorded()}
               moreOptions={
                 <PastAudits
                   embedded
@@ -416,6 +471,18 @@ export default function App() {
         </section>
 
         <main className="space-y-6 pb-8">
+          {appConfig?.mode === "replay" && (
+            <ReplayBanner replaySet={appConfig.replay_set} />
+          )}
+          {serpapiBudget && (
+            <CreditsMeter
+              mode={appConfig?.mode ?? "live"}
+              enabled={serpapiBudget.enabled}
+              monthlySpent={serpapiBudget.monthly_spent}
+              monthlyCap={serpapiBudget.monthly_cap}
+              perAuditCap={serpapiBudget.per_audit_cap}
+            />
+          )}
 
           {error && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

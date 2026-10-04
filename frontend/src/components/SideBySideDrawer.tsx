@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { ResolutionTrail } from "./ResolutionTrail";
 import { VersionMismatchTimeline } from "./VersionMismatchTimeline";
 import { highlightEvidencePassage } from "../lib/highlightEvidence";
+import { ReceiptCard } from "./ReceiptCard";
+import { WitnessMatrix } from "./WitnessMatrix";
 import type { AuditRun, CitationRecord } from "../types";
 
 const INTENT_OPTIONS = ["evidentiary", "methodological", "contrastive", "background"];
@@ -113,11 +115,33 @@ export function SideBySideDrawer({
               <VersionMismatchTimeline info={citation.version_mismatch} />
             )}
             <div className="mt-4">
+              <p className="text-xs text-zinc-400">Witness matrix</p>
+              <div className="mt-2">
+                <WitnessMatrix citation={citation} />
+              </div>
+              {citation.scholar_limitation && (
+                <p className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2 text-xs text-zinc-600">
+                  {citation.scholar_limitation}
+                </p>
+              )}
+              {citation.author_presence_note && (
+                <p className="mt-2 text-xs text-zinc-500">{citation.author_presence_note}</p>
+              )}
+            </div>
+            <div className="mt-4">
               <p className="text-xs text-zinc-400">Resolution sources</p>
               <div className="mt-2 max-h-40 overflow-y-auto">
                 <ResolutionTrail citation={citation} compact />
               </div>
             </div>
+            {(citation.serpapi_receipts?.length || citation.scholar?.receipts?.length) ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs text-zinc-400">SerpApi receipts</p>
+                {(citation.serpapi_receipts ?? citation.scholar?.receipts ?? []).map((receipt) => (
+                  <ReceiptCard key={receipt.call_id} receipt={receipt} />
+                ))}
+              </div>
+            ) : null}
             <label className="mt-4 block text-xs text-zinc-500">
               Intent
               <select

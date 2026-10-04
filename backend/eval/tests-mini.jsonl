@@ -1,0 +1,2 @@
+{"id":"s001","title":"Sample Real Entry","authors":["A Author"],"year":2020,"truth":"real","synthetic":true,"stratum":"journal_doi","corruption":"none"}
+{"id":"s002","title":"Fabricated Synthetic","authors":["B Author"],"year":2019,"truth":"fabricated_synthetic","synthetic":true,"stratum":"preprint","corruption":"invented"}

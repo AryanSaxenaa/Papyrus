@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, UploadFile
@@ -39,6 +40,8 @@ from app.services.background_dispatch import (
     enqueue_pdf_audit,
     enqueue_url_audit,
 )
+from app.services.replay.runner import replay_audit_events
+from app.services.serpapi.ledger import serpapi_ledger
 from app.storage.files import bulk_zip_key, file_store, upload_key
 from app.store import audit_store
 
@@ -64,6 +67,18 @@ class UrlAuditRequest(BaseModel):
 @router.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok", "service": "papyrus"}
+
+
+@router.get("/config")
+async def public_config() -> dict:
+    settings = get_settings()
+    return {
+        "mode": settings.papyrus_mode,
+        "replay_set": settings.replay_set,
+        "serpapi_enabled": settings.serpapi_active(),
+        "public_demo_mode": settings.public_demo_mode,
+        "pipeline_version": settings.pipeline_version,
+    }
 
 
 @router.get("/health/detailed")
@@ -119,6 +134,13 @@ async def health_detailed() -> dict:
         "celery_heartbeat": celery_diag["heartbeat"],
         "celery_inspect_ping_workers": celery_diag["inspect_ping_workers"],
         "celery_inspect_on_queue": celery_diag["inspect_on_queue"],
+    }
+    checks["serpapi"] = {
+        "ok": True,
+        "enabled": settings.serpapi_active(),
+        "mode": settings.papyrus_mode,
+        "monthly_spent": serpapi_ledger.total_credits(),
+        "monthly_cap": settings.serpapi_monthly_hard_cap,
     }
 
     return {"status": "ok" if all(c.get("ok") for c in checks.values()) else "degraded", "checks": checks}
@@ -201,6 +223,38 @@ async def create_audit(background: BackgroundTasks, file: UploadFile) -> AuditRu
     file_store.write_bytes(storage_key, content)
     audit_store.create(audit)
     await enqueue_pdf_audit(audit.id, storage_key, background)
+    return audit
+
+
+@router.post("/audits/replay/{replay_set}", status_code=202)
+async def create_replay_audit(replay_set: str, background: BackgroundTasks) -> AuditRun:
+    settings = get_settings()
+    fixture_dir = Path(settings.audit_data_dir) / "fixtures" / replay_set
+    snapshot_path = fixture_dir / "audit.json"
+    if not snapshot_path.exists():
+        raise HTTPException(status_code=404, detail=f"Replay set '{replay_set}' not found")
+
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    audit = AuditRun(
+        paper_title=payload.get("paper_title"),
+        pipeline_version=payload.get("pipeline_version", settings.pipeline_version),
+        status="running",
+    )
+    if payload.get("citations"):
+        audit.citations = [CitationRecord.model_validate(c) for c in payload["citations"]]
+    audit_store.create(audit)
+
+    async def _run_replay() -> None:
+        try:
+            await replay_audit_events(audit.id, replay_set)
+            audit.status = "complete"
+            finalize_scores(audit)
+        except Exception as exc:
+            audit.status = "failed"
+            audit.error = str(exc)[:500]
+        audit_store.save(audit)
+
+    background.add_task(_run_replay)
     return audit
 
 

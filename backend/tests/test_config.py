@@ -51,6 +51,7 @@ def _production_kwargs(**overrides: object) -> dict:
         "deepseek_api_key": "sk-test",
         "nli_backend": "hf",
         "huggingface_api_key": "hf_test",
+        "serpapi_api_key": "serpapi_test_key",
         "crossref_mailto": "ops@yourdomain.com",
         "openalex_mailto": "ops@yourdomain.com",
         "unpaywall_email": "ops@yourdomain.com",

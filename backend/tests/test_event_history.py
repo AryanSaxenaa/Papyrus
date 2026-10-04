@@ -34,6 +34,12 @@ def test_event_bus_history_merges_memory_with_database(monkeypatch) -> None:
         "app.services.relational_audit.load_audit_events",
         fake_load,
     )
+    monkeypatch.setattr(
+        "app.services.cache.cache_service.load_audit_events_sync",
+        lambda _aid: [
+            '{"ts":"2026-05-31T19:45:00+00:00","type":"crossref","message":"CrossRef DOI lookup"}',
+        ],
+    )
     history = bus.history(audit_id)
     assert len(history) == 3
     types = {event["type"] for event in history}

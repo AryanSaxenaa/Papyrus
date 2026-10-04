@@ -74,6 +74,39 @@ export type AuditLimitations = {
   out_of_scope?: string[];
 };
 
+export type SerpApiReceipt = {
+  call_id: string;
+  engine: string;
+  params: Record<string, unknown>;
+  search_metadata_id?: string | null;
+  json_endpoint?: string | null;
+  http_status: number;
+  credits: number;
+  cache_hit: boolean;
+  latency_ms: number;
+  created_at?: string;
+  raw_ref: string;
+  sha256_raw: string;
+};
+
+export type ScholarEvidence = {
+  state: string;
+  skipped_reason?: string | null;
+  best?: { result_id: string; title: string; title_sim?: number } | null;
+  concordance?: Record<string, unknown> | null;
+  author_presence?: "confirmed" | "unknown" | "not_checked";
+  author_matched_title?: string | null;
+  receipts?: SerpApiReceipt[];
+};
+
+export type AppPublicConfig = {
+  mode: string;
+  replay_set: string;
+  serpapi_enabled: boolean;
+  public_demo_mode: boolean;
+  pipeline_version: string;
+};
+
 export type CitationRecord = {
   id: string;
   index: number;
@@ -109,6 +142,11 @@ export type CitationRecord = {
   resolved_authors?: string[];
   retracted?: boolean;
   resolution_attempts: ResolutionAttempt[];
+  scholar?: ScholarEvidence | null;
+  scholar_note?: string | null;
+  scholar_limitation?: string | null;
+  author_presence_note?: string | null;
+  serpapi_receipts?: SerpApiReceipt[];
 };
 
 export type AuditRun = {

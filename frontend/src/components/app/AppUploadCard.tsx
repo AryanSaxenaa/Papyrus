@@ -11,6 +11,7 @@ type Props = {
   onUploadPdf: (file: File) => void;
   onStartReference: (kind: "doi" | "url", value: string) => void;
   onBulkZip: (file: File) => void;
+  onReplayRecorded?: () => void;
   moreOptions?: ReactNode;
 };
 
@@ -25,6 +26,7 @@ export function AppUploadCard({
   onUploadPdf,
   onStartReference,
   onBulkZip,
+  onReplayRecorded,
   moreOptions,
 }: Props) {
   const [tab, setTab] = useState<Tab>("pdf");
@@ -215,6 +217,17 @@ export function AppUploadCard({
       )}
 
       {hint && <p className="mt-2 text-[11px] text-amber-700">{hint}</p>}
+
+      {onReplayRecorded && (
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={onReplayRecorded}
+          className="mt-4 w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-[13px] font-medium text-sky-900 transition-colors hover:bg-sky-100 disabled:opacity-50"
+        >
+          Replay a recorded audit
+        </button>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3 text-[11px] text-zinc-400">
         <span>Supported format: PDF up to 200MB</span>

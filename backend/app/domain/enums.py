@@ -46,6 +46,21 @@ class RiskLevel(StrEnum):
     CRITICAL = "critical"
 
 
+class WitnessState(StrEnum):
+    MATCH = "match"
+    NEAR = "near"
+    MISS = "miss"
+    FETCH_ERROR = "fetch_error"
+    SKIPPED = "skipped"
+    DISABLED = "disabled"
+
+
+class AuthorPresence(StrEnum):
+    CONFIRMED = "confirmed"
+    UNKNOWN = "unknown"
+    NOT_CHECKED = "not_checked"
+
+
 class ResolutionSource(StrEnum):
     CROSSREF = "crossref"
     SEMANTIC_SCHOLAR = "semantic_scholar"
@@ -60,3 +75,6 @@ class ResolutionSource(StrEnum):
     DEEPSEEK = "deepseek"
     GROBID = "grobid"
     PYMUPDF = "pymupdf"
+    SERPAPI_SCHOLAR = "serpapi_scholar"
+    SERPAPI_SCHOLAR_CITE = "serpapi_scholar_cite"
+    SERPAPI_SCHOLAR_AUTHOR = "serpapi_scholar_author"

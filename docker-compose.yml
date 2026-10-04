@@ -94,6 +94,26 @@ services:
     depends_on:
       - api
 
+  app-lite:
+    build:
+      context: ./backend
+    profiles:
+      - lite
+    environment:
+      APP_ENV: development
+      PAPYRUS_MODE: replay
+      PERSISTENCE_BACKEND: json
+      USE_CELERY_BACKGROUND: "false"
+      AUDIT_DATA_DIR: ./data/audits
+      REPLAY_SET: demo-a
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - ./backend/tests/fixtures/replay:/app/data/audits/fixtures
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080
+
 volumes:
   papyrus_pg:
   papyrus_uploads:

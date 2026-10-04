@@ -5,6 +5,8 @@ from uuid import UUID
 from app.domain.enums import EvidenceTier, HallucinationType, ResolutionSource
 from app.domain.metadata import ResolvedMetadata
 from app.domain.models import CitationRecord, ResolutionAttempt
+from app.pipeline.scholar_verdicts import apply_scholar_before_doi404
+from app.pipeline.scholar_witness import run_scholar_witness
 from app.pipeline.verdicts import detect_hallucination
 from app.text.similarity import compare_titles
 from app.pipeline.title_drift import apply_title_drift_gate
@@ -384,6 +386,8 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
             found=exa.get("found", False),
         )
 
+    await run_scholar_witness(audit_id, record)
+
     if (
         record.evidence_tier == EvidenceTier.TIER_4
         and cited.doi
@@ -399,6 +403,7 @@ async def resolve_record(audit_id: UUID, record: CitationRecord) -> ResolvedMeta
             citation_index=record.index,
             hallucination=record.hallucination_type.value,
         )
+        apply_scholar_before_doi404(record)
 
     doi = record.resolved_doi or cited.doi
     if doi:

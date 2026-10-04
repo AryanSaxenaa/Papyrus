@@ -1,0 +1,33 @@
+{
+  "paper_title": "Replay demo manuscript",
+  "pipeline_version": "2.0",
+  "status": "complete",
+  "citations": [
+    {
+      "index": 1,
+      "bibliography": {
+        "index": 1,
+        "raw": "Ada Lovelace. On computing. 1843.",
+        "title": "On computing",
+        "authors": ["Ada Lovelace"],
+        "year": 1843
+      },
+      "intent": "background",
+      "evidence_tier": "tier_3",
+      "hallucination_type": "none",
+      "verdict_color": "supported",
+      "status": "complete",
+      "resolution_attempts": [],
+      "scholar": {
+        "state": "match",
+        "author_presence": "unknown",
+        "best": {
+          "result_id": "demo",
+          "title": "On computing",
+          "title_sim": 0.99
+        },
+        "receipts": []
+      }
+    }
+  ]
+}

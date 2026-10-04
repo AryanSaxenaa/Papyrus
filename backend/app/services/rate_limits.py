@@ -69,6 +69,8 @@ class RateLimitService:
 
     async def wait(self, source: str) -> None:
         """Space out HTTP calls to respect upstream per-second / concurrency limits."""
+        if get_settings().papyrus_mode == "replay":
+            return
         policy = THROTTLE.get(source)
         if not policy:
             return
@@ -82,6 +84,8 @@ class RateLimitService:
                 self._last_request_at[source] = time.monotonic()
 
     async def record(self, source: str) -> None:
+        if get_settings().papyrus_mode == "replay":
+            return
         key = self._day_key(source)
         try:
             current = await cache_service.get_json("counter", key) or {"count": 0}

@@ -150,3 +150,22 @@ class CitationCorrectionRecord(Base):
     original_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     corrected_value: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SerpApiCallRow(Base):
+    __tablename__ = "serpapi_calls"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    audit_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    citation_id: Mapped[str | None] = mapped_column(String(36), index=True, nullable=True)
+    engine: Mapped[str] = mapped_column(String(32))
+    params_json: Mapped[str] = mapped_column(Text)
+    search_metadata_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    json_endpoint: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    http_status: Mapped[int] = mapped_column(Integer)
+    credits: Mapped[int] = mapped_column(Integer)
+    cache_hit: Mapped[bool] = mapped_column(Boolean, default=False)
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    raw_key: Mapped[str] = mapped_column(String(256))
+    sha256_raw: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

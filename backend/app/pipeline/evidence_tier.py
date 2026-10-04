@@ -13,3 +13,11 @@ def tier_from_resolved(resolved: dict) -> EvidenceTier:
     if resolved.get("title"):
         return EvidenceTier.TIER_3
     return EvidenceTier.TIER_4
+
+
+def tier_with_scholar(current: EvidenceTier, *, scholar_corroborated: bool) -> EvidenceTier:
+    if not scholar_corroborated:
+        return current
+    if current == EvidenceTier.TIER_4:
+        return EvidenceTier.TIER_3
+    return current
