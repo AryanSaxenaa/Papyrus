@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from app.spa_static import mount_spa
 from redis.exceptions import RedisError
 
 from app.api.evidence import router as evidence_router
@@ -45,9 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(evidence_router, prefix="/api")
     app.include_router(admin_router, prefix="/api")
     if settings.serve_frontend:
-        static_dir = Path(settings.static_dir)
-        if static_dir.exists():
-            app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="spa")
+        mount_spa(app, Path(settings.static_dir))
     return app
 
 
