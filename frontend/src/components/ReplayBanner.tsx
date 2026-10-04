@@ -11,8 +11,8 @@ export function ReplayBanner({ replaySet }: Props) {
     >
       <p className="font-medium">Replay of a recorded audit</p>
       <p className="mt-1 text-xs text-amber-900/90">
-        Provider responses are served from fixtures ({replaySet ?? "demo-a"}). No API keys, Postgres,
-        Redis, or Celery are required. Timing is compressed for demo.
+        Shepherd demo loads a recorded audit of the sample PDF ({replaySet ?? "demo-a"}). Your own live uploads call
+        providers directly. This preload does not spend SerpApi credits; event timing is compressed for the tour.
       </p>
     </div>
   );

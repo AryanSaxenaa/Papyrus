@@ -25,7 +25,8 @@ export function ShepherdModePrompt({ open, loading, onAccept, onDecline }: Props
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-zinc-600">
           We&apos;ll preload a <strong className="font-semibold text-zinc-800">real recorded audit</strong>{" "}
-          (replay API), then walk you through <strong className="font-semibold text-zinc-800">upload</strong>,{" "}
+          a <strong className="font-semibold text-zinc-800">recorded audit</strong> of the sample PDF (real pipeline
+          output), then walk you through <strong className="font-semibold text-zinc-800">upload</strong>,{" "}
           <strong className="font-semibold text-zinc-800">SerpApi credits</strong>, the heatmap, and the{" "}
           <strong className="font-semibold text-zinc-800">Scholar witness matrix</strong> — not just the side
           drawer. When you exit, the same audit stays loaded for live PDF/DOI/URL uploads.
@@ -65,7 +66,8 @@ export function ShepherdTourBanner() {
     >
       <p className="font-medium">Shepherd mode — guided tour</p>
       <p className="mt-1 text-xs text-sky-900/90">
-        Preloaded audit uses real API replay data. Exit the tour anytime; results stay loaded.
+        Preloaded audit is a frozen run of the sample manuscript (CrossRef, Scholar witness, etc.). Live uploads use
+        real APIs. Exit the tour anytime; results stay loaded.
       </p>
     </div>
   );

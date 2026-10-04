@@ -117,7 +117,7 @@ export function useShepherdTour({ onFinish }: Options) {
         id: "audit",
         title: "Audit summary",
         text:
-          "Coverage, risk, and pipeline version for the preloaded replay audit (real fixture data). After the tour, this panel stays so you can export reports or run your own uploads.",
+          "Coverage, risk, and pipeline version from a real run on the sample PDF (frozen fixture). After the tour, this panel stays so you can export reports or run your own live uploads.",
         attachTo: { element: "[data-tour='shepherd-audit']", on: "bottom" },
         beforeShowPromise: () =>
           waitForSelector("[data-tour='shepherd-audit']").then((el) => {

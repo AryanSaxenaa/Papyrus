@@ -1,0 +1,12 @@
+{
+  "replay_set": "demo-a",
+  "source_pdf": "2108.12837v1.pdf",
+  "credits_spent": 0,
+  "citation_count": 11,
+  "serpapi_calls": 0,
+  "recorded_at": "2026-10-04T13:53:06.762290Z",
+  "recorded_with": {
+    "papyrus": "2.0",
+    "mode": "record"
+  }
+}

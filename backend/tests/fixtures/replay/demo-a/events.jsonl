@@ -1,2 +1,43 @@
-{"t_rel_ms": 0, "type": "system", "message": "Replay of a recorded audit (demo-a)"}
-{"t_rel_ms": 500, "type": "serpapi.call", "message": "Scholar witness: match", "engine": "google_scholar", "citation_index": 1}
+{"type": "ingestion", "message": "PDF upload received", "path": "tests\\fixtures\\sample-pdfs\\2108.12837v1.pdf", "t_rel_ms": 0}
+{"type": "ingestion", "message": "Citation extraction complete", "bibliography_count": 11, "inline_count": 0, "t_rel_ms": 8259}
+{"type": "intent", "message": "Intent classification complete", "counts": {"background": 11}, "t_rel_ms": 16362}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 2, "success": true, "title": "Day of the week effect in paper submission/acceptance/rejection to/in/by peer review journals", "t_rel_ms": 28273}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 1, "success": true, "title": "Collaborative coefficient: A single measure of the degree of collaboration in research", "t_rel_ms": 36623}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 2, "success": true, "t_rel_ms": 47197}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 1, "success": true, "t_rel_ms": 55815}
+{"type": "fulltext", "message": "Open-access full text retrieved", "citation_index": 2, "chars": 24315, "t_rel_ms": 68962}
+{"type": "verdict", "message": "Citation #2 verdict assigned", "citation_index": 2, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 77990}
+{"type": "verdict", "message": "Citation #1 verdict assigned", "citation_index": 1, "hallucination": "none", "tier": "tier_3", "color": "neutral", "t_rel_ms": 87016}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 3, "success": true, "title": "Phenomena of Retraction", "t_rel_ms": 96662}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 4, "success": true, "title": "Misconduct as the main cause for retraction. A descriptive study of retracted publications and their authors", "t_rel_ms": 105067}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 4, "success": true, "t_rel_ms": 115808}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 3, "success": true, "t_rel_ms": 124485}
+{"type": "europe_pmc", "message": "Europe PMC lookup", "citation_index": 3, "success": true, "t_rel_ms": 138908}
+{"type": "europe_pmc", "message": "Europe PMC lookup", "citation_index": 4, "success": true, "t_rel_ms": 147284}
+{"type": "verdict", "message": "Citation #3 verdict assigned", "citation_index": 3, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 156344}
+{"type": "verdict", "message": "Citation #4 verdict assigned", "citation_index": 4, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 165448}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 5, "success": true, "title": "A systematic review of retracted publications in emergency medicine", "t_rel_ms": 174076}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 6, "success": false, "t_rel_ms": 182734}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 5, "success": true, "t_rel_ms": 192624}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 6, "success": true, "t_rel_ms": 201725}
+{"type": "europe_pmc", "message": "Europe PMC lookup", "citation_index": 5, "success": true, "t_rel_ms": 211100}
+{"type": "verdict", "message": "Citation #5 verdict assigned", "citation_index": 5, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 219938}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 7, "success": true, "title": "International scientific collaboration among Iranian researchers during 1998\u20102007", "t_rel_ms": 229351}
+{"type": "verdict", "message": "Citation #6 verdict assigned", "citation_index": 6, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 237878}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 7, "success": true, "t_rel_ms": 247717}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 8, "success": true, "title": "Retractions covered by Retraction Watch in the 2013\u20132015 period: prevalence for the most productive countries", "t_rel_ms": 256043}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 8, "success": true, "t_rel_ms": 265907}
+{"type": "verdict", "message": "Citation #7 verdict assigned", "citation_index": 7, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 277312}
+{"type": "verdict", "message": "Citation #8 verdict assigned", "citation_index": 8, "hallucination": "type_2_doi_redirect", "tier": "tier_3", "color": "failure", "t_rel_ms": 286082}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 9, "success": true, "title": "Retractions in the Engineering Field: A Study on the Web of Science Database", "t_rel_ms": 295267}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 10, "success": true, "title": "Science publishing: The trouble with retractions", "t_rel_ms": 304638}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 9, "success": true, "t_rel_ms": 313762}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 10, "success": true, "t_rel_ms": 323085}
+{"type": "europe_pmc", "message": "Europe PMC lookup", "citation_index": 10, "success": true, "t_rel_ms": 332827}
+{"type": "verdict", "message": "Citation #10 verdict assigned", "citation_index": 10, "hallucination": "type_2_doi_redirect", "tier": "tier_3", "color": "failure", "t_rel_ms": 341825}
+{"type": "verdict", "message": "Citation #9 verdict assigned", "citation_index": 9, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 350590}
+{"type": "crossref", "message": "CrossRef DOI lookup", "citation_index": 11, "success": true, "title": "Patient-Specific Embryonic Stem Cells Derived from Human SCNT Blastocysts", "t_rel_ms": 359042}
+{"type": "semantic_scholar", "message": "Semantic Scholar DOI lookup", "citation_index": 11, "success": true, "t_rel_ms": 369451}
+{"type": "europe_pmc", "message": "Europe PMC lookup", "citation_index": 11, "success": true, "t_rel_ms": 380056}
+{"type": "verdict", "message": "Citation #11 verdict assigned", "citation_index": 11, "hallucination": "type_2_doi_redirect", "tier": "tier_2", "color": "failure", "t_rel_ms": 388984}
+{"type": "summary", "message": "Audit complete", "coverage": 72.7, "risk": "critical", "t_rel_ms": 397162}
