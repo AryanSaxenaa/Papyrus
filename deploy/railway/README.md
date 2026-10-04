@@ -29,16 +29,6 @@ Lean profile: one `papyrus` service + Postgres plugin. Full profile adds Redis a
 
 Replay-only demos: set `PAPYRUS_MODE=replay`, `PERSISTENCE_BACKEND=json`, ship fixtures under `AUDIT_DATA_DIR/fixtures/` (Dockerfile.railway copies `backend/tests/fixtures/replay/`). SerpApi and LLM API keys are optional in production when mode is replay.
 
-Smoke / E2E:
-
-```bash
-# API (set LIVE_ACCESS_CODE for live ingest checks)
-python backend/scripts/api_smoke_remote.py --base https://your-app.up.railway.app --access-code "$LIVE_ACCESS_CODE" --live-doi
-
-# Playwright UI
-cd e2e && npm ci && npx playwright install chromium && PAPYRUS_E2E_BASE_URL=https://your-app.up.railway.app npm test
-```
-
 ## Full profile
 
 Add `REDIS_URL`, `USE_CELERY_BACKGROUND=true`, and a second service running:

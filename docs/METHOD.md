@@ -2,8 +2,6 @@
 
 Papyrus resolves each bibliography entry against several scholarly indexes, then applies claim–evidence alignment (NLI) for evidentiary citations.
 
-**SerpApi India Hackathon 2026 track:** [Knowledge & Public Interest](https://serpapi.github.io/serpapi-india-hackathon-2026/#tracks) — see [SERPAPI_INDIA_HACKATHON.md](./SERPAPI_INDIA_HACKATHON.md).
-
 **Google Scholar via SerpApi** is an additional *witness*, not a sole authority:
 
 - `google_scholar` — does a similar title exist?

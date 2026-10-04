@@ -4,17 +4,6 @@ Citation integrity audit pipeline — verifies that references exist, classifies
 
 Papyrus does **not** detect AI authorship. It audits the reference layer.
 
-## SerpApi India Hackathon 2026
-
-| | |
-|---|---|
-| **Track** | [**Knowledge & Public Interest**](https://serpapi.github.io/serpapi-india-hackathon-2026/#tracks) — Scholar / research tools |
-| **SerpApi role** | Core witness layer via **`google_scholar`**, **`google_scholar_cite`**, **`google_scholar_author`** (budget, cache, ledger, UI receipts, evidence bundle) |
-| **Live demo** | https://papyrus-production-70fb.up.railway.app/app — opt-in **Shepherd mode** walks the UI with a real replay audit |
-| **Details** | [docs/SERPAPI_INDIA_HACKATHON.md](docs/SERPAPI_INDIA_HACKATHON.md) · [docs/METHOD.md](docs/METHOD.md) · [docs/spec/PAPYRUS-FULL-SPEC.md](docs/spec/PAPYRUS-FULL-SPEC.md) |
-
-Pre-existing project: **Yes** (tag `pre-hackathon-baseline`). Hackathon work adds meaningful, evidenced SerpApi usage — see [docs/PRE_EXISTING_WORK.md](docs/PRE_EXISTING_WORK.md).
-
 [![Watch the video](https://img.youtube.com/vi/_FrRz0Y-tTk/maxresdefault.jpg)](https://youtu.be/_FrRz0Y-tTk)
 
 ## Audit duration (expect 10–15 minutes)
@@ -32,7 +21,7 @@ While an audit runs, the activity log streams resolver steps in real time. Statu
 - **Backend:** FastAPI, Postgres, Redis (cache + Celery broker), Celery worker (`audits-production` / `audits-development` queues), GCS or local file storage for PDFs
 - **Ingestion:** PyMuPDF (default); optional GROBID when enabled
 - **Resolution:** CrossRef, Semantic Scholar, OpenAlex, Unpaywall, Europe PMC (REST), arXiv API, Exa (signal-only), Firecrawl (landing abstracts); optional Apify for arXiv/journal fallbacks
-- **SerpApi (Scholar witness):** `google_scholar`, `google_scholar_cite`, `google_scholar_author` — receipts, monthly cap, witness matrix in UI (`backend/app/services/serpapi/`) only
+- **SerpApi (Scholar witness):** `google_scholar`, `google_scholar_cite`, `google_scholar_author` — receipts, monthly cap, witness matrix (`backend/app/services/serpapi/`)
 - **NLI / embeddings:** Hugging Face Inference (default) or OpenRouter/OpenAI/lexical fallbacks
 - **Frontend:** React + Vite + Tailwind, D3 heatmap/timeline, pdf.js paper anatomy, sample PDF on upload card
 
@@ -40,7 +29,6 @@ While an audit runs, the activity log streams resolver steps in real time. Statu
 
 | Doc | Contents |
 |-----|----------|
-| [docs/SERPAPI_INDIA_HACKATHON.md](docs/SERPAPI_INDIA_HACKATHON.md) | Hackathon track, SerpApi engines, submission checklist |
 | [docs/configuration.md](docs/configuration.md) | Env vars: PDF ingestion, LLM backends, NLI, embeddings, Celery |
 | [docs/cloudrun-deployment.md](docs/cloudrun-deployment.md) | Cloud Run + Supabase/Redis/GCS (recommended for GCP) |
 | [docs/gcp-deployment.md](docs/gcp-deployment.md) | Cloud SQL, VMs, cost options |
@@ -137,7 +125,7 @@ docker compose --profile lite up --build
 # or: make demo
 ```
 
-Pre-hackathon baseline: git tag `pre-hackathon-baseline`. SerpApi hackathon work is in commits after that tag. See [docs/PRE_EXISTING_WORK.md](docs/PRE_EXISTING_WORK.md) and [docs/spec/PAPYRUS-FULL-SPEC.md](docs/spec/PAPYRUS-FULL-SPEC.md).
+SerpApi Scholar witness and replay mode: see [docs/METHOD.md](docs/METHOD.md) and `backend/app/services/serpapi/`.
 
 `api` and `worker` load `.env` from the repo root. **GROBID is not started by default.** To enable later:
 
