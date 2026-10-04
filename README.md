@@ -90,6 +90,8 @@ Default stack (see [docs/configuration.md](docs/configuration.md) for full list)
 | Embeddings | Snowflake Arctic (HF) | `EMBEDDINGS_BACKEND=snowflake` |
 | Background jobs | Celery | `USE_CELERY_BACKGROUND=true`, Redis, worker on `audits-{APP_ENV}` |
 | Celery queue | `audits-production` (prod) | Isolates prod from local `audits-development` on shared Redis |
+| SerpApi Scholar witness | `SERPAPI_ENABLED`, `SERPAPI_API_KEY` | Engines: `google_scholar`, `google_scholar_cite`, `google_scholar_author` |
+| Replay demo | `PAPYRUS_MODE=replay` | No keys; fixtures under `AUDIT_DATA_DIR/fixtures/`; `make demo` |
 
 Copy [`.env.example`](.env.example) to `.env` and set resolver mailtos (`CROSSREF_MAILTO`, `OPENALEX_MAILTO`, `UNPAYWALL_EMAIL`). Do not point a local Celery worker at production `REDIS_URL` unless it uses `audits-development` only.
 
@@ -114,6 +116,15 @@ Full stack (API + UI + Celery worker):
 ```bash
 docker compose up --build api worker web
 ```
+
+Judge / offline demo (replay, no Postgres/Redis/Celery):
+
+```bash
+docker compose --profile lite up --build
+# or: make demo
+```
+
+Pre-hackathon baseline: git tag `pre-hackathon-baseline`. SerpApi hackathon work is in commits after that tag. See [docs/PRE_EXISTING_WORK.md](docs/PRE_EXISTING_WORK.md) and [docs/spec/PAPYRUS-FULL-SPEC.md](docs/spec/PAPYRUS-FULL-SPEC.md).
 
 `api` and `worker` load `.env` from the repo root. **GROBID is not started by default.** To enable later:
 

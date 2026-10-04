@@ -159,8 +159,8 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_file_storage_backend(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if normalized not in {"local", "gcs"}:
-            raise ValueError("FILE_STORAGE_BACKEND must be local or gcs")
+        if normalized not in {"local", "gcs", "postgres"}:
+            raise ValueError("FILE_STORAGE_BACKEND must be local, gcs, or postgres")
         return normalized
 
     @field_validator("embeddings_backend")

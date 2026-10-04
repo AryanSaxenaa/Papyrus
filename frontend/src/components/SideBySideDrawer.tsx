@@ -4,6 +4,7 @@ import { VersionMismatchTimeline } from "./VersionMismatchTimeline";
 import { highlightEvidencePassage } from "../lib/highlightEvidence";
 import { ReceiptCard } from "./ReceiptCard";
 import { WitnessMatrix } from "./WitnessMatrix";
+import { apiUrl } from "../lib/api";
 import type { AuditRun, CitationRecord } from "../types";
 
 const INTENT_OPTIONS = ["evidentiary", "methodological", "contrastive", "background"];
@@ -49,16 +50,24 @@ export function SideBySideDrawer({
               {citation.bibliography.title ?? "Untitled reference"}
             </h3>
           </div>
-          <button
-            type="button"
-            onMouseDown={(event) => {
-              event.preventDefault();
-              onClose();
-            }}
-            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href={apiUrl(`/api/audits/${audit.id}/bundle.zip`)}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+            >
+              Evidence bundle
+            </a>
+            <button
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                onClose();
+              }}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+            >
+              Close
+            </button>
+          </div>
         </header>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[1fr_0.9fr_1fr]">

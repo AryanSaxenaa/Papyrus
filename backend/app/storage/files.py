@@ -122,12 +122,96 @@ def audit_json_key(audit_id: str) -> str:
     return f"audits/{audit_id}.json"
 
 
+class PostgresFileStore(FileStore):
+    def write_bytes(self, key: str, data: bytes) -> None:
+        from datetime import datetime, timezone
+
+        from sqlalchemy.orm import Session
+
+        from app.db.models import FileBlobRow
+        from app.db.session import get_engine
+
+        engine = get_engine()
+        if engine is None:
+            raise RuntimeError("Postgres file store requires postgres persistence")
+        with Session(engine) as session:
+            row = session.get(FileBlobRow, key)
+            if row is None:
+                row = FileBlobRow(
+                    key=key,
+                    content=data,
+                    content_type="application/octet-stream",
+                    size=len(data),
+                    created_at=datetime.now(timezone.utc),
+                )
+                session.add(row)
+            else:
+                row.content = data
+                row.size = len(data)
+            session.commit()
+
+    def read_bytes(self, key: str) -> bytes:
+        from sqlalchemy.orm import Session
+
+        from app.db.models import FileBlobRow
+        from app.db.session import get_engine
+
+        engine = get_engine()
+        if engine is None:
+            raise RuntimeError("Postgres file store requires postgres persistence")
+        with Session(engine) as session:
+            row = session.get(FileBlobRow, key)
+            if row is None:
+                raise FileNotFoundError(key)
+            return bytes(row.content)
+
+    def exists(self, key: str) -> bool:
+        from sqlalchemy.orm import Session
+
+        from app.db.models import FileBlobRow
+        from app.db.session import get_engine
+
+        engine = get_engine()
+        if engine is None:
+            return False
+        with Session(engine) as session:
+            return session.get(FileBlobRow, key) is not None
+
+    def delete(self, key: str) -> None:
+        from sqlalchemy.orm import Session
+
+        from app.db.models import FileBlobRow
+        from app.db.session import get_engine
+
+        engine = get_engine()
+        if engine is None:
+            return
+        with Session(engine) as session:
+            row = session.get(FileBlobRow, key)
+            if row is not None:
+                session.delete(row)
+                session.commit()
+
+    @contextmanager
+    def local_path(self, key: str) -> Iterator[Path]:
+        data = self.read_bytes(key)
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(data)
+            path = Path(tmp.name)
+        try:
+            yield path
+        finally:
+            path.unlink(missing_ok=True)
+
+
 def _build_file_store() -> FileStore:
     settings = get_settings()
     if settings.file_storage_backend == "gcs":
         if not settings.gcs_bucket:
             raise ValueError("GCS_BUCKET is required when FILE_STORAGE_BACKEND=gcs")
         return GcsFileStore(settings.gcs_bucket, settings.gcs_prefix)
+    if settings.file_storage_backend == "postgres":
+        return PostgresFileStore()
     root = Path(settings.file_storage_root)
     return LocalFileStore(root)
 

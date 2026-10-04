@@ -1,4 +1,4 @@
-name: Backend tests
+name: CI
 
 on:
   push:
@@ -19,5 +19,20 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
+      - name: Secret scan
+        run: python backend/scripts/secret_scan.py
       - name: Run pytest
         run: python -m pytest tests/ -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run build

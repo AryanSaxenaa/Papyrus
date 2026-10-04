@@ -3,11 +3,13 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.config import get_settings
 from app.services.serpapi.budget import serpapi_budget
 from app.services.serpapi.ledger import serpapi_ledger
+from app.services.evidence.bundle import build_evidence_zip
 from app.store import audit_store
 
 router = APIRouter(tags=["evidence"])
@@ -47,6 +49,23 @@ async def audit_serpapi_calls(audit_id: str) -> dict:
     if not audit:
         raise HTTPException(status_code=404, detail="Audit not found")
     return {"audit_id": audit_id, "calls": serpapi_ledger.list_for_audit(audit_id)}
+
+
+@router.get("/audits/{audit_id}/bundle.zip")
+async def audit_evidence_bundle_zip(audit_id: str) -> Response:
+    try:
+        uid = UUID(audit_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid audit id") from exc
+    audit = audit_store.get(uid)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    payload = build_evidence_zip(audit)
+    return Response(
+        content=payload,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="papyrus-evidence-{audit_id}.zip"'},
+    )
 
 
 @router.get("/audits/{audit_id}/bundle")

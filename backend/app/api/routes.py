@@ -5,13 +5,14 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 from sse_starlette.sse import EventSourceResponse
 
+from app.api.demo_guard import require_live_audit_access
 from app.api.reports import render_json_report, render_text_report
 from app.config import get_settings
 from app.domain.enums import CitationIntent, NliVerdict
@@ -207,8 +208,16 @@ async def get_audit_paper_pdf(audit_id: UUID) -> StreamingResponse:
     )
 
 
+def _pdf_magic_ok(content: bytes) -> bool:
+    return content.startswith(b"%PDF")
+
+
 @router.post("/audits", status_code=202)
-async def create_audit(background: BackgroundTasks, file: UploadFile) -> AuditRun:
+async def create_audit(
+    background: BackgroundTasks,
+    file: UploadFile,
+    _: None = Depends(require_live_audit_access),
+) -> AuditRun:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF uploads are supported")
 
@@ -217,6 +226,8 @@ async def create_audit(background: BackgroundTasks, file: UploadFile) -> AuditRu
     content = await file.read()
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=f"PDF exceeds {settings.max_upload_mb} MB limit")
+    if not _pdf_magic_ok(content):
+        raise HTTPException(status_code=400, detail="File does not look like a PDF")
 
     audit = AuditRun()
     storage_key = upload_key(str(audit.id))
@@ -259,7 +270,11 @@ async def create_replay_audit(replay_set: str, background: BackgroundTasks) -> A
 
 
 @router.post("/audits/doi", status_code=202)
-async def create_doi_audit(background: BackgroundTasks, body: DoiAuditRequest) -> AuditRun:
+async def create_doi_audit(
+    background: BackgroundTasks,
+    body: DoiAuditRequest,
+    _: None = Depends(require_live_audit_access),
+) -> AuditRun:
     audit = AuditRun()
     audit_store.create(audit)
     await enqueue_doi_audit(audit.id, body.doi, background)
@@ -267,7 +282,11 @@ async def create_doi_audit(background: BackgroundTasks, body: DoiAuditRequest) -
 
 
 @router.post("/audits/url", status_code=202)
-async def create_url_audit(background: BackgroundTasks, body: UrlAuditRequest) -> AuditRun:
+async def create_url_audit(
+    background: BackgroundTasks,
+    body: UrlAuditRequest,
+    _: None = Depends(require_live_audit_access),
+) -> AuditRun:
     audit = AuditRun(source_url=body.url)
     audit_store.create(audit)
     storage_key = upload_key(str(audit.id))
@@ -276,7 +295,11 @@ async def create_url_audit(background: BackgroundTasks, body: UrlAuditRequest) -
 
 
 @router.post("/audits/bulk", status_code=202)
-async def create_bulk_audit(background: BackgroundTasks, file: UploadFile) -> BulkAuditJob:
+async def create_bulk_audit(
+    background: BackgroundTasks,
+    file: UploadFile,
+    _: None = Depends(require_live_audit_access),
+) -> BulkAuditJob:
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Bulk upload requires a ZIP of PDF files")
 

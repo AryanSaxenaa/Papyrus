@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.domain.models import BibliographyEntry, ConcordanceReport, ScholarCandidate
+from app.domain.models import BibliographyEntry, ConcordanceReport, ScholarCandidate, SerpApiReceipt
 from app.services.serpapi.client import SerpApiClient
 from app.text.similarity import compare_titles
 
@@ -87,12 +87,12 @@ class ScholarClient:
         audit_id: str | None,
         citation_id: str | None,
         tier2: bool = False,
-    ) -> tuple[dict[str, Any], list[ScholarCandidate]]:
+    ) -> tuple[dict[str, Any], list[ScholarCandidate], SerpApiReceipt]:
         params: dict[str, Any] = {"q": build_scholar_query(entry, tier2=tier2)}
         if entry.year:
             params["as_ylo"] = entry.year
             params["as_yhi"] = entry.year
-        body, _receipt = await self._client.search(
+        body, receipt = await self._client.search(
             "google_scholar",
             params,
             audit_id=audit_id,
@@ -103,7 +103,7 @@ class ScholarClient:
             for candidate in candidates:
                 ratio, _ = compare_titles(entry.title, candidate.title)
                 candidate.title_sim = ratio
-        return body, candidates
+        return body, candidates, receipt
 
     async def canonical_citation(
         self,
@@ -111,15 +111,15 @@ class ScholarClient:
         *,
         audit_id: str | None,
         citation_id: str | None,
-    ) -> tuple[dict[str, Any], str | None, str | None]:
-        body, _receipt = await self._client.search(
+    ) -> tuple[dict[str, Any], str | None, str | None, SerpApiReceipt]:
+        body, receipt = await self._client.search(
             "google_scholar_cite",
             {"q": result_id},
             audit_id=audit_id,
             citation_id=citation_id,
         )
         apa, mla = parse_cite_strings(body)
-        return body, apa, mla
+        return body, apa, mla, receipt
 
     async def author_articles(
         self,
@@ -127,14 +127,14 @@ class ScholarClient:
         *,
         audit_id: str | None,
         citation_id: str | None,
-    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        body, _receipt = await self._client.search(
+    ) -> tuple[dict[str, Any], list[dict[str, Any]], SerpApiReceipt]:
+        body, receipt = await self._client.search(
             "google_scholar_author",
             {"author_id": author_id},
             audit_id=audit_id,
             citation_id=citation_id,
         )
-        return body, parse_author_articles(body)
+        return body, parse_author_articles(body), receipt
 
 
 def compare_citation_fields(entry: BibliographyEntry, scholar_string: str) -> ConcordanceReport:

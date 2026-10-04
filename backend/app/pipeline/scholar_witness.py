@@ -42,29 +42,32 @@ async def run_scholar_witness(
     cited = record.bibliography
     audit_key = str(audit_id)
 
+    receipts: list = []
     try:
-        _body, candidates = await client.find_work(
+        _body, candidates, receipt = await client.find_work(
             cited,
             audit_id=audit_key,
             citation_id=record.id,
         )
+        receipts.append(receipt)
     except Exception as exc:  # noqa: BLE001 — witness must not break pipeline
         return ScholarEvidence(state="fetch_error", skipped_reason=str(exc)[:200])
 
     best, state = match_scholar_candidates(cited, candidates)
     if state == "miss" and cited.title:
         try:
-            _body2, candidates2 = await client.find_work(
+            _body2, candidates2, receipt2 = await client.find_work(
                 cited,
                 audit_id=audit_key,
                 citation_id=record.id,
                 tier2=True,
             )
+            receipts.append(receipt2)
             best, state = match_scholar_candidates(cited, candidates2)
         except Exception:
             pass
 
-    evidence = ScholarEvidence(state=state, best=best)
+    evidence = ScholarEvidence(state=state, best=best, receipts=receipts)
     record.resolution_attempts.append(
         ResolutionAttempt(
             source=ResolutionSource.SERPAPI_SCHOLAR,
@@ -84,11 +87,12 @@ async def run_scholar_witness(
 
     if state in {"near", "match_field_conflict"} and best:
         try:
-            _cite_body, apa, _mla = await client.canonical_citation(
+            _cite_body, apa, _mla, cite_receipt = await client.canonical_citation(
                 best.result_id,
                 audit_id=audit_key,
                 citation_id=record.id,
             )
+            evidence.receipts.append(cite_receipt)
             if apa:
                 evidence.concordance = compare_citation_fields(cited, apa)
                 record.resolution_attempts.append(
@@ -111,11 +115,12 @@ async def run_scholar_witness(
                 break
         if author_id:
             try:
-                _auth_body, articles = await client.author_articles(
+                _auth_body, articles, author_receipt = await client.author_articles(
                     author_id,
                     audit_id=audit_key,
                     citation_id=record.id,
                 )
+                evidence.receipts.append(author_receipt)
                 if cited.title and lists_work(articles, cited.title):
                     evidence.author_presence = "confirmed"
                     evidence.author_matched_title = cited.title
