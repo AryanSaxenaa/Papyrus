@@ -36,3 +36,32 @@ jobs:
           node-version: "22"
       - run: npm ci
       - run: npm run build
+
+  api-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest tests/test_api_integration.py -q
+
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm test
+        env:
+          PAPYRUS_E2E_BASE_URL: https://papyrus-production-70fb.up.railway.app

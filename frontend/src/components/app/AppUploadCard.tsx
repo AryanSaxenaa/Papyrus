@@ -82,7 +82,7 @@ export function AppUploadCard({
   };
 
   return (
-    <div className="min-w-0 rounded-xl border border-zinc-100 bg-white p-4 sm:p-5">
+    <div data-testid="app-upload-card" className="min-w-0 rounded-xl border border-zinc-100 bg-white p-4 sm:p-5">
       <p className="text-[13px] leading-relaxed text-zinc-600">
         Upload a PDF, or paste a DOI or open-access URL. We verify citations and evidential support —{" "}
         <strong className="font-semibold text-[#1a3d32]">not authorship detection.</strong>
@@ -221,6 +221,7 @@ export function AppUploadCard({
       {onReplayRecorded && (
         <button
           type="button"
+          data-testid="replay-recorded-audit"
           disabled={uploading}
           onClick={onReplayRecorded}
           className="mt-4 w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-2.5 text-[13px] font-medium text-sky-900 transition-colors hover:bg-sky-100 disabled:opacity-50"

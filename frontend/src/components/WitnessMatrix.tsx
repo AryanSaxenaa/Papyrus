@@ -59,7 +59,11 @@ type Props = {
 
 export function WitnessMatrix({ citation, compact }: Props) {
   return (
-    <ul className={`flex ${compact ? "gap-1.5" : "flex-wrap gap-3"}`} role="list">
+    <ul
+      data-testid="witness-matrix"
+      className={`flex ${compact ? "gap-1.5" : "flex-wrap gap-3"}`}
+      role="list"
+    >
       {WITNESSES.map((witness) => {
         const state = resolveState(citation, witness.key);
         const aria =

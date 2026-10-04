@@ -1,0 +1,11 @@
+{
+  "name": "papyrus-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}
