@@ -10,6 +10,7 @@
 **/.ruff_cache
 backend/data
 backend/tests
+!backend/tests/fixtures/**
 *.md
 .env
 .env.*
