@@ -123,10 +123,14 @@ def main() -> int:
         record("GET", "/api/admin/corrections/export.csv", client.get("/api/admin/corrections/export.csv"))
 
         if mode == "live":
-            record(
-                "POST",
-                "/api/audits/doi (no code)",
-                client.post("/api/audits/doi", json={"doi": args.doi}),
+            blocked = client.post("/api/audits/doi", json={"doi": args.doi})
+            results.append(
+                (
+                    "OK" if blocked.status_code == 403 else "FAIL",
+                    "POST /api/audits/doi (no code)",
+                    blocked.status_code,
+                    "expected 403 when PUBLIC_DEMO_MODE",
+                )
             )
             if args.access_code:
                 doi_live = client.post("/api/audits/doi", json={"doi": args.doi}, headers=headers_live)
