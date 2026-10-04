@@ -1,13 +1,25 @@
 import { expect, test } from "@playwright/test";
 
+async function dismissShepherdIfPresent(page: import("@playwright/test").Page) {
+  const prompt = page.getByTestId("shepherd-mode-prompt");
+  if (await prompt.isVisible().catch(() => false)) {
+    await page.getByRole("button", { name: "No thanks" }).click();
+  }
+}
+
 test.describe("Papyrus app shell", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("papyrus.shepherd.declined", "1");
+    });
+  });
+
   test("upload card and replay flow open witness drawer", async ({ page }) => {
     await page.goto("/app");
     await page.waitForLoadState("networkidle");
+    await dismissShepherdIfPresent(page);
 
-    const uploadCard = page.getByTestId("app-upload-card");
-    const uploadTab = page.getByRole("tab", { name: "Upload PDF" });
-    await expect(uploadCard.or(uploadTab)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId("app-upload-card")).toBeVisible({ timeout: 60_000 });
 
     const configRes = await page.request.get("/api/config");
     expect(configRes.ok()).toBeTruthy();
@@ -33,12 +45,14 @@ test.describe("Papyrus app shell", () => {
     const heatmapCell = page.locator("[data-citation-id]").first();
     await expect(heatmapCell).toBeVisible({ timeout: 60_000 });
     await heatmapCell.click();
-    await expect(page.getByTestId("witness-matrix").or(page.getByText("Scholar"))).toBeVisible();
+    await expect(page.getByTestId("witness-matrix")).toBeVisible();
   });
 
   test("DOI tab accepts input in live demo mode", async ({ page }) => {
     await page.goto("/app");
     await page.waitForLoadState("networkidle");
+    await dismissShepherdIfPresent(page);
+
     const doiTab = page.getByRole("tab", { name: "DOI" });
     await expect(doiTab).toBeVisible({ timeout: 60_000 });
     await doiTab.click();
