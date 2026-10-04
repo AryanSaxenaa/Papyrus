@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libmupdf-dev bu
 COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./
+COPY backend/tests/fixtures/replay/ /app/data/audits/fixtures/
 COPY --from=web /web/dist /app/static
+ENV AUDIT_DATA_DIR=/app/data/audits
 ENV SERVE_FRONTEND=true STATIC_DIR=/app/static PYTHONUNBUFFERED=1
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
