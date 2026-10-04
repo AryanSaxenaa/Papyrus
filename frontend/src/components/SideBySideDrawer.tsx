@@ -39,7 +39,10 @@ export function SideBySideDrawer({
   const highlightClaim = claim && context.includes(claim);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-stretch justify-end bg-zinc-900/30 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-40 flex items-stretch justify-end bg-zinc-900/30 backdrop-blur-sm"
+      data-testid="citation-evidence-drawer"
+    >
       <div className="flex h-full w-full max-w-6xl flex-col border-l border-zinc-200 bg-white shadow-2xl">
         <header className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
           <div>
@@ -123,7 +126,7 @@ export function SideBySideDrawer({
             {citation.version_mismatch && (
               <VersionMismatchTimeline info={citation.version_mismatch} />
             )}
-            <div className="mt-4">
+            <div className="mt-4" data-tour="shepherd-witness-block">
               <p className="text-xs text-zinc-400">Witness matrix</p>
               <div className="mt-2">
                 <WitnessMatrix citation={citation} />
@@ -143,14 +146,23 @@ export function SideBySideDrawer({
                 <ResolutionTrail citation={citation} compact />
               </div>
             </div>
-            {(citation.serpapi_receipts?.length || citation.scholar?.receipts?.length) ? (
-              <div className="mt-4 space-y-2">
-                <p className="text-xs text-zinc-400">SerpApi receipts</p>
-                {(citation.serpapi_receipts ?? citation.scholar?.receipts ?? []).map((receipt) => (
+            <div className="mt-4 space-y-2" data-tour="shepherd-serpapi-receipts">
+              <p className="text-xs text-zinc-400">SerpApi receipts</p>
+              {(citation.serpapi_receipts ?? citation.scholar?.receipts ?? []).length > 0 ? (
+                (citation.serpapi_receipts ?? citation.scholar?.receipts ?? []).map((receipt) => (
                   <ReceiptCard key={receipt.call_id} receipt={receipt} />
-                ))}
-              </div>
-            ) : null}
+                ))
+              ) : (
+                <p className="rounded-lg border border-sky-100 bg-sky-50/80 p-2 text-xs text-sky-950">
+                  Live Scholar witness calls attach a receipt per engine (`search_metadata.id`, credits).
+                  Export{" "}
+                  <a className="font-medium underline" href={apiUrl(`/api/audits/${audit.id}/bundle.zip`)}>
+                    evidence bundle
+                  </a>{" "}
+                  for the full SerpApi ledger.
+                </p>
+              )}
+            </div>
             <label className="mt-4 block text-xs text-zinc-500">
               Intent
               <select

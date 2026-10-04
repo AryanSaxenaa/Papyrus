@@ -250,11 +250,18 @@ export default function App() {
         throw new Error("Could not load the guided tour audit.");
       }
       const first = finished.citations[0];
-      setSelected(first);
+      setSelected(null);
       setShepherdPromptOpen(false);
       setShepherdTouring(true);
       window.requestAnimationFrame(() => {
-        startTour(() => setSelected(first));
+        startTour({
+          openCitation: () => setSelected(first),
+          closeCitation: () => setSelected(null),
+          openActivity: () => setActivityOpen(true),
+          scrollToTourTarget: (selector) => {
+            document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" });
+          },
+        });
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Shepherd mode failed");
@@ -515,7 +522,11 @@ export default function App() {
       <LandingNav />
 
       <div className="mx-auto max-w-[1120px] px-5 lg:px-8">
-        <section id="audit-start" className="scroll-mt-[var(--lp-nav-h)] pb-6 lg:pb-8">
+        <section
+          id="audit-start"
+          data-tour="shepherd-upload"
+          className="scroll-mt-[var(--lp-nav-h)] pb-6 lg:pb-8"
+        >
           <div className="grid lg:grid-cols-2 lg:gap-10 mb-0">
             <div className="min-w-0 mt-[70px]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#40916c]">
@@ -569,13 +580,15 @@ export default function App() {
             <ReplayBanner replaySet={appConfig.replay_set} />
           )}
           {serpapiBudget && (
-            <CreditsMeter
-              mode={appConfig?.mode ?? "live"}
-              enabled={serpapiBudget.enabled}
-              monthlySpent={serpapiBudget.monthly_spent}
-              monthlyCap={serpapiBudget.monthly_cap}
-              perAuditCap={serpapiBudget.per_audit_cap}
-            />
+            <div data-tour="shepherd-serpapi-meter">
+              <CreditsMeter
+                mode={appConfig?.mode ?? "live"}
+                enabled={serpapiBudget.enabled}
+                monthlySpent={serpapiBudget.monthly_spent}
+                monthlyCap={serpapiBudget.monthly_cap}
+                perAuditCap={serpapiBudget.per_audit_cap}
+              />
+            </div>
           )}
 
           {error && (
@@ -718,7 +731,11 @@ export default function App() {
           )}
 
           {audit && (
-            <div className="papyrus-card" data-testid="current-audit-card">
+            <div
+              className="papyrus-card"
+              data-testid="current-audit-card"
+              data-tour="shepherd-audit"
+            >
               <p className="papyrus-eyebrow">Current audit</p>
               <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -761,7 +778,11 @@ export default function App() {
               </div>
               <CoverageSummary audit={audit} filter={filter} onFilter={setFilter} />
               <LimitationsPanel audit={audit} />
-              <div className="mt-6 border-t border-zinc-100 pt-5" data-testid="citation-heatmap-section">
+              <div
+                className="mt-6 border-t border-zinc-100 pt-5"
+                data-testid="citation-heatmap-section"
+                data-tour="shepherd-heatmap"
+              >
                 <p className="papyrus-section-title">Citation heatmap</p>
                 <div className="mt-2">
                   <HeatmapLegend />
@@ -825,7 +846,7 @@ export default function App() {
           )}
 
           {audit && (
-            <div className="papyrus-card !p-4">
+            <div className="papyrus-card !p-4" data-tour="shepherd-activity">
               <button
                 type="button"
                 className="flex w-full items-center justify-between gap-2 text-sm font-semibold text-zinc-700 hover:text-zinc-900 transition-colors"

@@ -25,8 +25,10 @@ export function ShepherdModePrompt({ open, loading, onAccept, onDecline }: Props
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-zinc-600">
           We&apos;ll preload a <strong className="font-semibold text-zinc-800">real recorded audit</strong>{" "}
-          (same data as the replay API), walk you through the heatmap and Scholar witness matrix, then
-          leave everything open for your own uploads.
+          (replay API), then walk you through <strong className="font-semibold text-zinc-800">upload</strong>,{" "}
+          <strong className="font-semibold text-zinc-800">SerpApi credits</strong>, the heatmap, and the{" "}
+          <strong className="font-semibold text-zinc-800">Scholar witness matrix</strong> — not just the side
+          drawer. When you exit, the same audit stays loaded for live PDF/DOI/URL uploads.
         </p>
         <p className="mt-2 text-xs text-zinc-500">
           Nothing starts until you accept. Decline to use the app without the tour.
