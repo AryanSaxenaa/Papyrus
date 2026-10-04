@@ -213,17 +213,19 @@ class Settings(BaseSettings):
         if self.app_env == "production":
             if self.file_storage_backend == "gcs" and not self.gcs_bucket:
                 raise ValueError("GCS_BUCKET is required when FILE_STORAGE_BACKEND=gcs in production")
-            if self.persistence_backend not in {"postgres", "both"}:
+            replay_only = self.papyrus_mode == "replay"
+            if not replay_only and self.persistence_backend not in {"postgres", "both"}:
                 raise ValueError(
                     "PERSISTENCE_BACKEND must be postgres or both in production "
-                    "(json-only storage is not supported on Cloud Run)"
+                    "(json-only storage is not supported on Cloud Run; use PAPYRUS_MODE=replay for fixture-only demos)"
                 )
-            if self.llm_backend == "deepseek" and not self.deepseek_api_key:
-                raise ValueError("DEEPSEEK_API_KEY is required when LLM_BACKEND=deepseek in production")
-            if self.llm_backend == "openrouter" and not self.openrouter_api_key:
-                raise ValueError(
-                    "OPENROUTER_API_KEY is required when LLM_BACKEND=openrouter in production"
-                )
+            if not replay_only:
+                if self.llm_backend == "deepseek" and not self.deepseek_api_key:
+                    raise ValueError("DEEPSEEK_API_KEY is required when LLM_BACKEND=deepseek in production")
+                if self.llm_backend == "openrouter" and not self.openrouter_api_key:
+                    raise ValueError(
+                        "OPENROUTER_API_KEY is required when LLM_BACKEND=openrouter in production"
+                    )
             if self.nli_backend == "hf" and not self.huggingface_api_key:
                 raise ValueError("HUGGINGFACE_API_KEY is required when NLI_BACKEND=hf in production")
             if self.serpapi_enabled and self.papyrus_mode == "live" and not self.serpapi_api_key:

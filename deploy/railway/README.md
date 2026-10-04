@@ -27,7 +27,7 @@ Lean profile: one `papyrus` service + Postgres plugin. Full profile adds Redis a
 | `EMBEDDINGS_BACKEND` | `lexical` |
 | `CROSSREF_MAILTO` / `OPENALEX_MAILTO` / `UNPAYWALL_EMAIL` | real addresses |
 
-Replay-only demos: set `PAPYRUS_MODE=replay`, leave SerpApi key unset, and ship fixtures under `AUDIT_DATA_DIR/fixtures/`.
+Replay-only demos: set `PAPYRUS_MODE=replay`, `PERSISTENCE_BACKEND=json`, ship fixtures under `AUDIT_DATA_DIR/fixtures/` (Dockerfile.railway copies `backend/tests/fixtures/replay/`). SerpApi and LLM API keys are optional in production when mode is replay.
 
 ## Full profile
 
